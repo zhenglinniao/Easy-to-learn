@@ -39,6 +39,7 @@ import { ThemeToggle, useTheme } from '../theme';
 
 import '@excalidraw/excalidraw/index.css';
 import styles from './CanvasPage.module.css';
+import { ConflictResolutionDialog } from './ConflictResolutionDialog';
 
 interface OpenMenu {
   x: number;
@@ -187,6 +188,8 @@ export default function CanvasPage() {
   const [localBoards, setLocalBoards] = useState<StoredBoard[]>([]);
   const [pendingLocalDelete, setPendingLocalDelete] = useState<string | null>(null);
   const [confirmClearLocal, setConfirmClearLocal] = useState(false);
+  const [conflictBusy, setConflictBusy] = useState(false);
+  const [conflictError, setConflictError] = useState<string | null>(null);
   const requestInputs = useRef(
     new Map<
       string,
@@ -272,6 +275,9 @@ export default function CanvasPage() {
             })),
           );
           api.addFiles(files as never);
+          if ((await repository.getConflictCopies(boardId)).length > 0) {
+            setSyncState('conflict');
+          }
         }
         hydratedBoard.current = boardId;
         if (stored && user && client && boardId.startsWith('local_')) {
@@ -546,6 +552,93 @@ export default function CanvasPage() {
     navigate('/canvas', { replace: true });
   };
 
+  const downloadConflictCopy = async () => {
+    if (!repositoryRef.current) return;
+    setConflictError(null);
+    try {
+      const copies = await repositoryRef.current.getConflictCopies(boardId);
+      const latest = copies.sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+      if (!latest) throw new Error('找不到本地冲突副本。');
+      const assets = await repositoryRef.current.getAssets(boardId);
+      downloadJson(
+        `easy-to-learn-conflict-${boardId}.easy-to-learn.json`,
+        await createCompleteExport(latest.snapshot, assets),
+      );
+    } catch (error) {
+      setConflictError(error instanceof Error ? error.message : '无法下载本地冲突副本。');
+    }
+  };
+
+  const openRemoteVersion = async () => {
+    const client = getOptionalSupabaseClient();
+    if (!client || !repositoryRef.current || !api) return;
+    setConflictBusy(true);
+    setConflictError(null);
+    try {
+      const remote = new RemoteBoardRepository(client);
+      const snapshot = await remote.read(boardId);
+      const downloads = await Promise.all(
+        snapshot.assets.map(async (manifest) => ({
+          manifest,
+          blob: await remote.downloadAsset(manifest.objectPath),
+        })),
+      );
+      await repositoryRef.current.resolveConflictWithRemote(snapshot, downloads);
+      const assets = await repositoryRef.current.getAssets(boardId);
+      hydratedBoard.current = null;
+      api.updateScene({
+        elements: snapshot.excalidraw.elements as never,
+        appState: snapshot.excalidraw.appState as never,
+      });
+      api.addFiles(
+        (await Promise.all(
+          assets.map(async (asset) => ({
+            id: asset.fileId,
+            dataURL: await blobToDataUrl(asset.blob),
+            mimeType: asset.mimeType,
+            created: Date.now(),
+            lastRetrieved: Date.now(),
+          })),
+        )) as never,
+      );
+      setTutorBoards(snapshot.tutorBoards);
+      hydratedBoard.current = boardId;
+      setSyncState('synced');
+    } catch (error) {
+      setConflictError(error instanceof Error ? error.message : '暂时无法打开云端版本。');
+    } finally {
+      setConflictBusy(false);
+    }
+  };
+
+  const saveConflictAsNewBoard = async () => {
+    const client = getOptionalSupabaseClient();
+    if (!client || !repositoryRef.current || !user) return;
+    setConflictBusy(true);
+    setConflictError(null);
+    try {
+      const remote = new RemoteBoardRepository(client);
+      let targetBoardId = await repositoryRef.current.getPreparedConflictTarget(boardId);
+      if (!targetBoardId) {
+        const created = await remote.create('冲突副本');
+        targetBoardId = created.boardId;
+        await repositoryRef.current.prepareConflictCopyAsNewBoard(boardId, targetBoardId, user.id);
+      }
+      const result = await new BoardSyncEngine(
+        repositoryRef.current,
+        new SupabaseBoardGateway(client, crypto.randomUUID()),
+      ).syncBoard(targetBoardId);
+      if (result.state !== 'synced' && result.state !== 'clean') {
+        throw new Error('新画板暂时无法同步，本地副本仍然保留。');
+      }
+      await repositoryRef.current.clearCloudBoardCacheAfterConflict(boardId);
+      navigate(`/canvas/${targetBoardId}`, { replace: true });
+    } catch (error) {
+      setConflictError(error instanceof Error ? error.message : '无法另存为新画板。');
+      setConflictBusy(false);
+    }
+  };
+
   const handleAction = async (action: RadialMenuAction) => {
     if (!api || loadingAction) return;
     setLoadingAction(action);
@@ -809,6 +902,16 @@ export default function CanvasPage() {
               ? `已准备 ${prepared.elementCount} 个元素的${prepared.action === 'solve' ? '解题' : '提示'}输入${prepared.textLength > 0 ? ` · ${prepared.textLength} 个文字` : ''}${prepared.hasImage ? ' · 1 张选区图片' : ''}`
               : preparationError)}
         </div>
+      ) : null}
+
+      {syncState === 'conflict' && user ? (
+        <ConflictResolutionDialog
+          busy={conflictBusy}
+          error={conflictError}
+          onOpenRemote={() => void openRemoteVersion()}
+          onSaveAsNew={() => void saveConflictAsNewBoard()}
+          onDownload={() => void downloadConflictCopy()}
+        />
       ) : null}
 
       {showLocalData ? (
