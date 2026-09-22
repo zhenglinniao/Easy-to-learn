@@ -17,6 +17,7 @@ Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无�
 - 支持 light/dark、窄屏布局、键盘焦点和 reduced motion。
 - 可选启用 Sentry 浏览器异常采集；服务端 API 输出不含题目和身份信息的结构化错误日志。
 - 游客与登录用户每天各 3 次有效 AI 请求，同一身份每 5 分钟最多 1 次。
+- 官网使用原创吉祥物“小易”演示题目到分步辅导的过程，并完整支持 reduced motion。
 
 ## 技术栈
 
