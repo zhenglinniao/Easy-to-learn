@@ -67,6 +67,8 @@ export const assetManifestItemSchema = z
 export const persistedTutorBoardSchema = z
   .strictObject({
     id: nonEmptyStringSchema,
+    // 仅用于将辅导板关联到已完成的 AI 请求，以便在 24 小时内提交结构化反馈。
+    requestId: z.uuid().optional(),
     title: z.string().min(1).max(120),
     result: tutorResultSchema,
     stepIndex: nonNegativeIntegerSchema,
