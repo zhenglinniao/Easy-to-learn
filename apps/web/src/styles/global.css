@@ -50,6 +50,34 @@ a {
   text-align: center;
 }
 
+.fatal-error {
+  width: min(440px, calc(100% - 40px));
+  margin: 32vh auto 0;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.fatal-error button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 11px;
+  padding: 0 16px;
+  color: #fffaf1;
+  background: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.fatal-error button:focus-visible {
+  outline: 3px solid rgba(238, 108, 77, 0.34);
+  outline-offset: 3px;
+}
+
 .app-shell {
   width: min(1120px, calc(100% - 40px));
   margin: 0 auto;
