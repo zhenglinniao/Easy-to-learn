@@ -12,7 +12,9 @@ export function SiteHeader() {
       </Link>
       <nav aria-label="主导航">
         <ThemeToggle />
-        <Link to="/canvas">打开画布</Link>
+        <Link className={styles.navCanvas} to="/canvas">
+          打开画布
+        </Link>
         {user ? (
           <>
             <Link to="/boards">我的画板</Link>

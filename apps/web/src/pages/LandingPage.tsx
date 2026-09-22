@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { LearningCompanion } from './LearningCompanion';
 import { SiteHeader } from './SiteHeader';
 import styles from './pages.module.css';
 
@@ -43,10 +44,19 @@ export default function LandingPage() {
         </div>
         <div className={styles.heroCanvas} aria-label="产品界面示意">
           <div className={styles.problem}>2x + 3 = 11</div>
+          <svg className={styles.learningPath} viewBox="0 0 400 260" aria-hidden="true">
+            <path d="M112 72c72 6 70 82 137 85 42 2 63 29 84 65" />
+          </svg>
+          <LearningCompanion />
           <div className={styles.tutorPreview}>
             <span>AI TUTOR · 步骤 1</span>
             <strong>先把常数项移到右边</strong>
             <p>等式两边同时减去 3，得到 2x = 8。</p>
+            <div className={styles.tutorProgress} aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </div>
           </div>
         </div>
       </section>

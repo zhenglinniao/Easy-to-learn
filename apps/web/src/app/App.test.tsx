@@ -12,6 +12,8 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: /思考不必离开/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '游客直接使用' })).toHaveAttribute('href', '/canvas');
     expect(screen.getByRole('link', { name: '登录并云端保存' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '吉祥物小易，正在指向解题步骤' })).toBeInTheDocument();
+    expect(screen.getByText('小易正在陪你拆解')).toBeInTheDocument();
   });
 
   it('保存并即时应用主题偏好', async () => {
