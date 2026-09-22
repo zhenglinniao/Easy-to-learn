@@ -6,11 +6,32 @@ import type {
 } from '@excalidraw/excalidraw/types';
 import {
   getTutorSelection,
+  inspectTutorSource,
   prepareTutorSelection,
+  resolveTutorSource,
+  scenePointToClient,
   shouldOpenTutorMenu,
 } from '@easy-to-learn/canvas-adapter';
-import { RadialMenu, type RadialMenuAction } from '@easy-to-learn/ui';
+import {
+  tutorRequestSchema,
+  type PersistedTutorBoardV2,
+  type TutorRequest,
+} from '@easy-to-learn/domain';
+import {
+  BoardSyncEngine,
+  BroadcastSyncCoordinator,
+  LocalBoardRepository,
+  openLocalDatabase,
+  type SyncState,
+} from '@easy-to-learn/persistence';
+import { RadialMenu, TutorBoard, type RadialMenuAction } from '@easy-to-learn/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+
+import { getOptionalSupabaseClient, useAuth } from '../auth';
+import { TutorApiClient } from '../ai-tutor';
+import { RemoteBoardRepository, SupabaseBoardGateway } from '../boards';
+import { ThemeToggle, useTheme } from '../theme';
 
 import '@excalidraw/excalidraw/index.css';
 import styles from './CanvasPage.module.css';
@@ -38,7 +59,114 @@ const didHitSelection = (pointerDownState: PointerDownState): boolean =>
   pointerDownState.hit.element !== null ||
   pointerDownState.hit.hasHitCommonBoundingBoxOfSelectedElements;
 
+const syncLabel = (state: SyncState, isUser: boolean): string => {
+  if (!isUser) return '游客 · 仅本机';
+  if (state === 'synced' || state === 'clean') return '已保存到云端';
+  if (state === 'local-saving') return '正在本地保存';
+  if (state === 'syncing-assets' || state === 'syncing-snapshot') return '正在同步';
+  if (state === 'conflict') return '版本冲突 · 已保留副本';
+  if (state === 'offline' || state === 'retrying') return '离线 · 等待同步';
+  if (state === 'failed-local') return '本地保存失败';
+  return '已保存本机 · 待同步';
+};
+
+type CanvasElements = Parameters<
+  NonNullable<React.ComponentProps<typeof Excalidraw>['onChange']>
+>[0];
+type CanvasFiles = Parameters<NonNullable<React.ComponentProps<typeof Excalidraw>['onChange']>>[2];
+
+const blobToDataUrl = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+
+const sha256 = async (blob: Blob): Promise<string> => {
+  const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+};
+
+const PERSISTED_ELEMENT_TYPES = new Set([
+  'rectangle',
+  'diamond',
+  'ellipse',
+  'text',
+  'image',
+  'line',
+  'arrow',
+  'freedraw',
+  'frame',
+  'magicframe',
+  'iframe',
+  'embeddable',
+]);
+
+const persistBoard = async (
+  repository: LocalBoardRepository,
+  boardId: string,
+  elements: CanvasElements,
+  appState: AppState,
+  files: CanvasFiles,
+  tutorBoards: PersistedTutorBoardV2[],
+  ownerId: string,
+) => {
+  const manifests = [];
+  const existingAssets = new Map(
+    (await repository.getAssets(boardId)).map((asset) => [asset.fileId, asset]),
+  );
+  for (const file of Object.values(files)) {
+    const blob = await fetch(file.dataURL).then((response) => response.blob());
+    const contentHash = await sha256(blob);
+    const bitmap = await createImageBitmap(blob);
+    const manifest = {
+      fileId: file.id,
+      objectPath: `${ownerId}/${boardId}/${contentHash}`,
+      contentHash,
+      mimeType: file.mimeType as 'image/png' | 'image/jpeg' | 'image/webp',
+      byteSize: blob.size,
+      width: bitmap.width,
+      height: bitmap.height,
+    };
+    bitmap.close();
+    const existing = existingAssets.get(file.id);
+    if (
+      !existing ||
+      existing.contentHash !== contentHash ||
+      existing.objectPath !== manifest.objectPath
+    ) {
+      await repository.putAsset(manifest, blob);
+    }
+    manifests.push(manifest);
+  }
+  await repository.saveDurableChange({
+    schemaVersion: 2,
+    boardId,
+    revision: 0,
+    excalidraw: {
+      elements: elements.filter((element) => PERSISTED_ELEMENT_TYPES.has(element.type)) as never,
+      appState: {
+        viewBackgroundColor: appState.viewBackgroundColor,
+        gridSize: appState.gridSize,
+        gridStep: appState.gridStep,
+        gridModeEnabled: appState.gridModeEnabled,
+        objectsSnapModeEnabled: appState.objectsSnapModeEnabled,
+      },
+    },
+    assets: manifests,
+    tutorBoards,
+    updatedAt: new Date().toISOString(),
+  });
+};
+
 export default function CanvasPage() {
+  const { user, session, signOut } = useAuth();
+  const theme = useTheme();
+  const { boardId: routeBoardId } = useParams();
+  const navigate = useNavigate();
+  const [generatedBoardId] = useState(() => `local_${crypto.randomUUID()}`);
+  const boardId = routeBoardId ?? generatedBoardId;
   const stageRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<OpenMenu | null>(null);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
@@ -46,6 +174,110 @@ export default function CanvasPage() {
   const [loadingAction, setLoadingAction] = useState<RadialMenuAction | null>(null);
   const [prepared, setPrepared] = useState<PreparedSummary | null>(null);
   const [preparationError, setPreparationError] = useState<string | null>(null);
+  const [tutorBoards, setTutorBoards] = useState<PersistedTutorBoardV2[]>([]);
+  const [viewportState, setViewportState] = useState<AppState | null>(null);
+  const [stageOrigin, setStageOrigin] = useState({ x: 0, y: 0 });
+  const [syncState, setSyncState] = useState<SyncState>('clean');
+  const requestInputs = useRef(
+    new Map<
+      string,
+      Omit<TutorRequest, 'requestId' | 'mode' | 'parentTutorBoardId' | 'targetStepId'>
+    >(),
+  );
+  const requestAbort = useRef<AbortController | null>(null);
+  const repositoryRef = useRef<LocalBoardRepository | null>(null);
+  const syncEngineRef = useRef<BoardSyncEngine | null>(null);
+  const syncCoordinatorRef = useRef<BroadcastSyncCoordinator | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sourceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hydratedBoard = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (routeBoardId) {
+      if (!routeBoardId.startsWith('local_') && !user) {
+        navigate(`/login?redirect=${encodeURIComponent(`/canvas/${routeBoardId}`)}`, {
+          replace: true,
+        });
+      }
+      return;
+    }
+    if (user) navigate('/boards', { replace: true });
+    else navigate(`/canvas/${generatedBoardId}`, { replace: true });
+  }, [generatedBoardId, navigate, routeBoardId, user]);
+
+  useEffect(() => {
+    if (!api || hydratedBoard.current === boardId) return;
+    let active = true;
+    let closeDatabase: (() => void) | undefined;
+    void openLocalDatabase()
+      .then(async (database) => {
+        closeDatabase = () => database.close();
+        if (!active) {
+          database.close();
+          return;
+        }
+        const repository = new LocalBoardRepository(database);
+        repositoryRef.current = repository;
+        let stored = await repository.getBoard(boardId);
+        const client = getOptionalSupabaseClient();
+        const isCloudBoard = Boolean(user && client && !boardId.startsWith('local_'));
+        if (isCloudBoard && user && client) {
+          syncEngineRef.current = new BoardSyncEngine(
+            repository,
+            new SupabaseBoardGateway(client, crypto.randomUUID()),
+          );
+          syncCoordinatorRef.current = new BroadcastSyncCoordinator();
+          if (!stored?.dirty) {
+            try {
+              const remoteRepository = new RemoteBoardRepository(client);
+              const snapshot = await remoteRepository.read(boardId);
+              for (const manifest of snapshot.assets) {
+                const blob = await remoteRepository.downloadAsset(manifest.objectPath);
+                await repository.putAsset(manifest, blob);
+                await repository.markAssetState(boardId, manifest.fileId, 'uploaded');
+              }
+              stored = await repository.storeRemoteSnapshot(snapshot);
+            } catch (error) {
+              if (!stored) throw error;
+              setSyncState('offline');
+            }
+          }
+        }
+        if (stored && active) {
+          api.updateScene({
+            elements: stored.snapshot.excalidraw.elements as never,
+            appState: stored.snapshot.excalidraw.appState as never,
+          });
+          setTutorBoards(stored.snapshot.tutorBoards);
+          setSyncState(stored.dirty ? 'dirty' : 'synced');
+          const assets = await repository.getAssets(boardId);
+          const files = await Promise.all(
+            assets.map(async (asset) => ({
+              id: asset.fileId,
+              dataURL: await blobToDataUrl(asset.blob),
+              mimeType: asset.mimeType,
+              created: Date.now(),
+              lastRetrieved: Date.now(),
+            })),
+          );
+          api.addFiles(files as never);
+        }
+        hydratedBoard.current = boardId;
+      })
+      .catch(() => setPreparationError('本地画板无法恢复，请先导出重要数据后再重试。'));
+    return () => {
+      active = false;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (syncTimer.current) clearTimeout(syncTimer.current);
+      if (sourceTimer.current) clearTimeout(sourceTimer.current);
+      syncCoordinatorRef.current?.close();
+      syncCoordinatorRef.current = null;
+      syncEngineRef.current = null;
+      repositoryRef.current = null;
+      closeDatabase?.();
+    };
+  }, [api, boardId, user]);
 
   const setMenu = useCallback((next: OpenMenu | null) => {
     menuRef.current = next;
@@ -91,21 +323,131 @@ export default function CanvasPage() {
     };
   }, [api, setMenu]);
 
-  const handleChange = useCallback(
-    (
-      _elements: Parameters<NonNullable<React.ComponentProps<typeof Excalidraw>['onChange']>>[0],
-      appState: AppState,
-    ) => {
-      const currentMenu = menuRef.current;
-      if (
-        currentMenu &&
-        selectionSignature(appState.selectedElementIds) !== currentMenu.selectionSignature
-      ) {
-        setMenu(null);
-      }
-    },
-    [setMenu],
-  );
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const update = () => {
+      const bounds = stage.getBoundingClientRect();
+      setStageOrigin({ x: bounds.left, y: bounds.top });
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(stage);
+    window.addEventListener('resize', update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (syncState !== 'dirty' || !syncEngineRef.current || !syncCoordinatorRef.current) return;
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => {
+      void (async () => {
+        const lease = await syncCoordinatorRef.current?.acquire(boardId);
+        if (!lease) return;
+        try {
+          setSyncState('syncing-snapshot');
+          const result = await syncEngineRef.current?.syncBoard(boardId);
+          if (result) setSyncState(result.state);
+          if (result?.retryAt) {
+            syncTimer.current = setTimeout(
+              () => setSyncState('dirty'),
+              Math.max(0, result.retryAt - Date.now()),
+            );
+          }
+          if ((await repositoryRef.current?.getOutbox(boardId))?.length) {
+            if (!result?.retryAt) setSyncState('dirty');
+          }
+        } finally {
+          lease.release();
+        }
+      })().catch(() => setSyncState('retrying'));
+    }, 3_000);
+    return () => {
+      if (syncTimer.current) clearTimeout(syncTimer.current);
+    };
+  }, [boardId, syncState]);
+
+  const handleChange = (
+    elements: Parameters<NonNullable<React.ComponentProps<typeof Excalidraw>['onChange']>>[0],
+    appState: AppState,
+    files: Parameters<NonNullable<React.ComponentProps<typeof Excalidraw>['onChange']>>[2],
+  ) => {
+    setViewportState(appState);
+    const currentMenu = menuRef.current;
+    if (
+      currentMenu &&
+      selectionSignature(appState.selectedElementIds) !== currentMenu.selectionSignature
+    ) {
+      setMenu(null);
+    }
+    if (hydratedBoard.current !== boardId || !repositoryRef.current) return;
+    if (sourceTimer.current) clearTimeout(sourceTimer.current);
+    if (tutorBoards.length > 0) {
+      sourceTimer.current = setTimeout(() => {
+        void Promise.all(
+          tutorBoards.map(async (board) =>
+            resolveTutorSource(board, await inspectTutorSource(elements, board.source.elementIds)),
+          ),
+        ).then((next) => {
+          if (JSON.stringify(next) !== JSON.stringify(tutorBoards)) {
+            setTutorBoards(next);
+            void persistBoard(
+              repositoryRef.current!,
+              boardId,
+              elements,
+              appState,
+              files,
+              next,
+              user?.id ?? 'local',
+            )
+              .then(() => setSyncState('dirty'))
+              .catch(() => setPreparationError('辅导板锚点保存失败，请稍后重试。'));
+          }
+        });
+      }, 250);
+    }
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      setSyncState('local-saving');
+      void persistBoard(
+        repositoryRef.current!,
+        boardId,
+        elements,
+        appState,
+        files,
+        tutorBoards,
+        user?.id ?? 'local',
+      )
+        .then(() => {
+          setSyncState('dirty');
+        })
+        .catch(() => {
+          setSyncState('failed-local');
+          setPreparationError('本地自动保存失败，请导出副本后再继续。');
+        });
+    }, 250);
+  };
+
+  const commitTutorBoards = (next: PersistedTutorBoardV2[]) => {
+    setTutorBoards(next);
+    if (!api || !repositoryRef.current || hydratedBoard.current !== boardId) return;
+    void persistBoard(
+      repositoryRef.current,
+      boardId,
+      api.getSceneElementsIncludingDeleted(),
+      api.getAppState(),
+      api.getFiles(),
+      next,
+      user?.id ?? 'local',
+    )
+      .then(() => {
+        setSyncState('dirty');
+      })
+      .catch(() => setPreparationError('辅导板本地保存失败，请导出副本后再继续。'));
+  };
 
   const handleAction = async (action: RadialMenuAction) => {
     if (!api || loadingAction) return;
@@ -115,6 +457,66 @@ export default function CanvasPage() {
       const appState = api.getAppState();
       const selection = getTutorSelection(api.getSceneElements(), appState.selectedElementIds);
       const input = await prepareTutorSelection(selection, api.getFiles());
+      const requestId = crypto.randomUUID();
+      requestAbort.current?.abort();
+      requestAbort.current = new AbortController();
+      const client = new TutorApiClient(async () => session?.access_token ?? null);
+      const uploadedImage =
+        input.image && !input.image.base64
+          ? await client.uploadImage(requestId, input.image.blob, requestAbort.current?.signal)
+          : null;
+      setPrepared({
+        action,
+        elementCount: input.elementIds.length,
+        textLength: input.text?.length ?? 0,
+        hasImage: input.image !== undefined,
+      });
+      const base = {
+        schemaVersion: 1 as const,
+        boardId,
+        locale: 'zh-CN' as const,
+        ...(input.text ? { text: input.text } : {}),
+        ...(input.image?.base64
+          ? { image: { mimeType: input.image.mimeType, base64: input.image.base64 } }
+          : uploadedImage
+            ? { image: uploadedImage }
+            : {}),
+        source: {
+          elementIds: input.elementIds,
+          selectionBounds: input.selectionBounds,
+          contentHash: input.contentHash,
+        },
+      };
+      const request = tutorRequestSchema.parse({
+        ...base,
+        requestId,
+        mode: action,
+      });
+      const response = await client.execute(request, requestAbort.current.signal);
+      const now = new Date().toISOString();
+      const id = crypto.randomUUID();
+      const next: PersistedTutorBoardV2 = {
+        id,
+        title: response.result.title,
+        result: response.result,
+        stepIndex: 0,
+        sceneAnchor: {
+          sceneX: input.selectionBounds.x + input.selectionBounds.width + 28,
+          sceneY: input.selectionBounds.y,
+        },
+        anchorMode: 'follow-source',
+        source: {
+          elementIds: input.elementIds,
+          bounds: input.selectionBounds,
+          contentHash: input.contentHash,
+          relativeOffset: { x: 28, y: 0 },
+          status: 'active',
+        },
+        createdAt: now,
+        updatedAt: now,
+      };
+      requestInputs.current.set(id, base);
+      commitTutorBoards([...tutorBoards, next]);
       setPrepared({
         action,
         elementCount: input.elementIds.length,
@@ -122,8 +524,87 @@ export default function CanvasPage() {
         hasImage: input.image !== undefined,
       });
       setMenu(null);
-    } catch {
-      setPreparationError('无法准备当前选区，请重新选择后再试。');
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setPreparationError(
+        error instanceof Error ? error.message : '无法处理当前选区，请重新选择后再试。',
+      );
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const explainStep = async (parentId: string, targetStepId: string) => {
+    let base = requestInputs.current.get(parentId);
+    const parent = tutorBoards.find(({ id }) => id === parentId);
+    if (!parent) {
+      setPreparationError('原题上下文已失效，请重新选择题目。');
+      return;
+    }
+    setLoadingAction('solve');
+    try {
+      const requestId = crypto.randomUUID();
+      if (!base && api) {
+        const sourceIds = Object.fromEntries(
+          parent.source.elementIds.map((id) => [id, true as const]),
+        ) as AppState['selectedElementIds'];
+        const selection = getTutorSelection(api.getSceneElements(), sourceIds);
+        const input = await prepareTutorSelection(selection, api.getFiles());
+        const client = new TutorApiClient(async () => session?.access_token ?? null);
+        const uploadedImage =
+          input.image && !input.image.base64
+            ? await client.uploadImage(requestId, input.image.blob)
+            : null;
+        base = {
+          schemaVersion: 1,
+          boardId,
+          locale: 'zh-CN',
+          ...(input.text ? { text: input.text } : {}),
+          ...(input.image?.base64
+            ? { image: { mimeType: input.image.mimeType, base64: input.image.base64 } }
+            : uploadedImage
+              ? { image: uploadedImage }
+              : {}),
+          source: {
+            elementIds: input.elementIds,
+            selectionBounds: input.selectionBounds,
+            contentHash: input.contentHash,
+          },
+        };
+        requestInputs.current.set(parentId, base);
+      }
+      if (!base) throw new Error('原题上下文已失效，请重新选择题目。');
+      const request = tutorRequestSchema.parse({
+        ...base,
+        requestId,
+        mode: 'explain_step',
+        parentTutorBoardId: parentId,
+        targetStepId,
+      });
+      const result = await new TutorApiClient(async () => session?.access_token ?? null).execute(
+        request,
+      );
+      const now = new Date().toISOString();
+      const id = crypto.randomUUID();
+      const child: PersistedTutorBoardV2 = {
+        ...parent,
+        id,
+        title: result.result.title,
+        result: result.result,
+        stepIndex: 0,
+        sceneAnchor: {
+          sceneX: parent.sceneAnchor.sceneX + 34,
+          sceneY: parent.sceneAnchor.sceneY + 34,
+        },
+        parentTutorBoardId: parentId,
+        targetStepId,
+        createdAt: now,
+        updatedAt: now,
+      };
+      requestInputs.current.set(id, base);
+      commitTutorBoards([...tutorBoards, child]);
+    } catch (error) {
+      setPreparationError(error instanceof Error ? error.message : '无法解释当前步骤。');
     } finally {
       setLoadingAction(null);
     }
@@ -140,7 +621,20 @@ export default function CanvasPage() {
           <strong>学习画布</strong>
           <span>选择题目后使用 AI 操作</span>
         </div>
-        <span className={styles.mode}>画布编辑</span>
+        <div className={styles.userBar}>
+          <ThemeToggle />
+          <span className={styles.saveState}>{syncLabel(syncState, Boolean(user))}</span>
+          {user ? (
+            <>
+              <Link to="/boards">{user.user_metadata?.name ?? user.email ?? '账户'}</Link>
+              <button type="button" onClick={() => void signOut()}>
+                退出
+              </button>
+            </>
+          ) : (
+            <Link to="/login?redirect=/canvas">登录保存</Link>
+          )}
+        </div>
       </header>
 
       <section className={styles.workspace} aria-label="AI 学习画布工作区">
@@ -149,6 +643,7 @@ export default function CanvasPage() {
             excalidrawAPI={setApi}
             langCode="zh-CN"
             name="Easy to learn"
+            theme={theme}
             onChange={handleChange}
             initialData={{
               appState: {
@@ -165,6 +660,27 @@ export default function CanvasPage() {
               onClose={() => setMenu(null)}
             />
           ) : null}
+          {tutorBoards.map((board) => {
+            const clientPoint = viewportState
+              ? scenePointToClient(board.sceneAnchor, viewportState)
+              : { x: board.sceneAnchor.sceneX, y: board.sceneAnchor.sceneY };
+            return (
+              <TutorBoard
+                key={board.id}
+                board={board}
+                screenPosition={{
+                  x: clientPoint.x - stageOrigin.x,
+                  y: clientPoint.y - stageOrigin.y,
+                }}
+                sceneUnitsPerClientPixel={1 / (viewportState?.zoom.value ?? 1)}
+                onChange={(next) =>
+                  commitTutorBoards(tutorBoards.map((item) => (item.id === next.id ? next : item)))
+                }
+                onClose={(id) => commitTutorBoards(tutorBoards.filter((item) => item.id !== id))}
+                onExplainStep={(id, stepId) => void explainStep(id, stepId)}
+              />
+            );
+          })}
         </div>
 
         <aside className={styles.guide} aria-label="画布使用提示">

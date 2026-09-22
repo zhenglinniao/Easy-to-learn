@@ -193,30 +193,28 @@
     transform: none;
   }
 }
-@media (prefers-color-scheme: dark) {
-  .board {
-    border-color: rgba(255, 255, 255, 0.11);
-    color: #f4eee6;
-    background: rgba(40, 37, 33, 0.98);
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
-  }
-  .header,
-  .footer {
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-  .blocks {
-    color: #c9c0b5;
-  }
-  .iconButton,
-  .actions button,
-  .flowNode {
-    border-color: rgba(255, 255, 255, 0.12);
-    color: inherit;
-    background: #302d29;
-  }
-  .math,
-  .diagram,
-  .flow {
-    background: #24221f;
-  }
+:global(html[data-theme='dark']) .board {
+  border-color: rgba(255, 255, 255, 0.11);
+  color: #f4eee6;
+  background: rgba(40, 37, 33, 0.98);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+}
+:global(html[data-theme='dark']) .header,
+:global(html[data-theme='dark']) .footer {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+:global(html[data-theme='dark']) .blocks {
+  color: #c9c0b5;
+}
+:global(html[data-theme='dark']) .iconButton,
+:global(html[data-theme='dark']) .actions button,
+:global(html[data-theme='dark']) .flowNode {
+  border-color: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  background: #302d29;
+}
+:global(html[data-theme='dark']) .math,
+:global(html[data-theme='dark']) .diagram,
+:global(html[data-theme='dark']) .flow {
+  background: #24221f;
 }

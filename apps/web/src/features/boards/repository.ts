@@ -1,4 +1,10 @@
 import { parsePersistedCanvas, type PersistedCanvasV2 } from '@easy-to-learn/domain';
+import {
+  RevisionConflictError,
+  type RemoteBoardGateway,
+  type StoredAsset,
+  type StoredBoard,
+} from '@easy-to-learn/persistence';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface BoardSummary {
@@ -41,6 +47,11 @@ export class RemoteBoardRepository {
     if (error) throw error;
     return parsePersistedCanvas(data.snapshot_json);
   }
+  async downloadAsset(objectPath: string): Promise<Blob> {
+    const { data, error } = await this.client.storage.from('board-assets').download(objectPath);
+    if (error || !data) throw error ?? new Error('画板图片下载失败');
+    return data;
+  }
   async rename(boardId: string, title: string): Promise<void> {
     const { error } = await this.client.rpc('rename_board', {
       p_board_id: boardId,
@@ -51,5 +62,53 @@ export class RemoteBoardRepository {
   async delete(boardId: string): Promise<void> {
     const { error } = await this.client.rpc('delete_board', { p_board_id: boardId });
     if (error) throw error;
+  }
+}
+
+const isRevisionConflict = (error: { message?: string } | null): boolean =>
+  error?.message?.includes('REVISION_CONFLICT') ?? false;
+
+export class SupabaseBoardGateway implements RemoteBoardGateway {
+  constructor(
+    private readonly client: SupabaseClient,
+    private readonly editorId: string,
+  ) {}
+
+  async uploadAsset(asset: StoredAsset): Promise<void> {
+    const { error } = await this.client.storage
+      .from('board-assets')
+      .upload(asset.objectPath, asset.blob, {
+        contentType: asset.mimeType,
+        upsert: true,
+      });
+    if (error) throw error;
+  }
+
+  async saveSnapshot(board: StoredBoard, expectedRevision: number): Promise<number> {
+    const { data, error } = await this.client
+      .rpc('save_board', {
+        p_board_id: board.boardId,
+        p_expected_revision: expectedRevision,
+        p_snapshot: board.snapshot,
+        p_asset_manifest: board.snapshot.assets,
+        p_editor_id: this.editorId,
+      })
+      .single();
+    if (error) {
+      if (isRevisionConflict(error)) {
+        const { data: remote } = await this.client
+          .from('boards')
+          .select('revision')
+          .eq('id', board.boardId)
+          .maybeSingle();
+        throw new RevisionConflictError(Number(remote?.revision ?? expectedRevision + 1));
+      }
+      throw error;
+    }
+    return Number((data as { revision: number }).revision);
+  }
+
+  async deleteBoard(boardId: string): Promise<void> {
+    await new RemoteBoardRepository(this.client).delete(boardId);
   }
 }
