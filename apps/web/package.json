@@ -13,6 +13,7 @@
     "@easy-to-learn/domain": "workspace:*",
     "@easy-to-learn/ui": "workspace:*",
     "@excalidraw/excalidraw": "0.18.1",
+    "@excalidraw/mermaid-to-excalidraw": "2.2.2",
     "@sentry/react": "10.75.2",
     "@supabase/supabase-js": "2.116.0",
     "@tanstack/react-query": "5.103.2",
