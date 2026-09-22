@@ -140,4 +140,47 @@ describe('TutorApiClient', () => {
       .mockResolvedValue(Response.json({ data: { html: '<b>x</b>' } }));
     await expect(new TutorApiClient(async () => 'jwt', invalid).execute(request)).rejects.toThrow();
   });
+
+  it('提交结构化 AI 反馈并携带登录凭据', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }));
+    const input = {
+      requestId: '00000000-0000-4000-8000-000000000010',
+      rating: -1 as const,
+      category: 'incorrect_answer' as const,
+    };
+
+    await expect(
+      new TutorApiClient(async () => 'jwt', fetcher).submitFeedback(input),
+    ).resolves.toBeUndefined();
+
+    const options = fetcher.mock.calls[0]?.[1];
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/ai/feedback',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(input) }),
+    );
+    expect(new Headers(options?.headers).get('Authorization')).toBe('Bearer jwt');
+  });
+
+  it('为游客反馈建立会话并显示服务端错误', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: 'FORBIDDEN', message: '反馈窗口已结束' }), {
+          status: 403,
+        }),
+      );
+
+    await expect(
+      new TutorApiClient(async () => null, fetcher).submitFeedback({
+        requestId: '00000000-0000-4000-8000-000000000010',
+        rating: 1,
+      }),
+    ).rejects.toThrow('反馈窗口已结束');
+    expect(fetcher).toHaveBeenNthCalledWith(
+      1,
+      '/api/anonymous/session',
+      expect.objectContaining({ method: 'POST', credentials: 'same-origin' }),
+    );
+  });
 });

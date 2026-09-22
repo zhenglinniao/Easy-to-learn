@@ -104,4 +104,29 @@ describe('TutorBoard', () => {
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('a')).toBeNull();
   });
+
+  it('提交正向反馈或带分类的负向反馈', async () => {
+    const user = userEvent.setup();
+    const onFeedback = vi.fn();
+    const { rerender } = render(
+      <TutorBoard board={board} onChange={vi.fn()} onClose={vi.fn()} onFeedback={onFeedback} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: '有帮助' }));
+    expect(onFeedback).toHaveBeenCalledWith(1);
+    await user.click(screen.getByRole('button', { name: '有问题' }));
+    await user.click(screen.getByRole('button', { name: '答案错误' }));
+    expect(onFeedback).toHaveBeenCalledWith(-1, 'incorrect_answer');
+
+    rerender(
+      <TutorBoard
+        board={board}
+        onChange={vi.fn()}
+        onClose={vi.fn()}
+        feedbackState="sent"
+        onFeedback={onFeedback}
+      />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('已收到反馈，谢谢你。');
+  });
 });

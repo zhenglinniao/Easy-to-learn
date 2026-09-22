@@ -298,6 +298,18 @@ describe('持久化契约', () => {
     expect(
       persistedCanvasSchema.safeParse({
         ...canvasBase,
+        tutorBoards: [{ ...tutorBoard, requestId: '00000000-0000-4000-8000-000000000010' }],
+      }).success,
+    ).toBe(true);
+    expect(
+      persistedCanvasSchema.safeParse({
+        ...canvasBase,
+        tutorBoards: [{ ...tutorBoard, requestId: 'not-a-uuid' }],
+      }).success,
+    ).toBe(false);
+    expect(
+      persistedCanvasSchema.safeParse({
+        ...canvasBase,
         tutorBoards: [{ ...tutorBoard, stepIndex: 1 }],
       }).success,
     ).toBe(false);

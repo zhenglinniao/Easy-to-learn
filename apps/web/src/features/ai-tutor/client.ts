@@ -1,4 +1,10 @@
-import { tutorResponseSchema, type TutorRequest, type TutorResponse } from '@easy-to-learn/domain';
+import {
+  aiFeedbackInputSchema,
+  tutorResponseSchema,
+  type AiFeedbackInput,
+  type TutorRequest,
+  type TutorResponse,
+} from '@easy-to-learn/domain';
 import { z } from 'zod';
 
 const uploadTicketResponseSchema = z.strictObject({
@@ -75,6 +81,22 @@ export class TutorApiClient {
     });
     if (!upload.ok) throw new Error('选区图片上传失败，请稍后重试。');
     return { mimeType: blob.type, uploadPath: ticket.uploadPath };
+  }
+
+  async submitFeedback(input: AiFeedbackInput, signal?: AbortSignal): Promise<void> {
+    const feedback = aiFeedbackInputSchema.parse(input);
+    const accessToken = await this.getAccessToken();
+    await this.ensureActor(accessToken, signal);
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+    const response = await this.fetcher('/api/ai/feedback', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(feedback),
+      credentials: 'same-origin',
+      ...(signal ? { signal } : {}),
+    });
+    if (!response.ok) throw await this.error(response);
   }
 
   private async ensureActor(accessToken: string | null, signal?: AbortSignal): Promise<void> {

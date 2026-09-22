@@ -1,5 +1,5 @@
-import type { PersistedTutorBoardV2 } from '@easy-to-learn/domain';
-import { useRef, type PointerEvent as ReactPointerEvent } from 'react';
+import type { AiFeedbackCategory, PersistedTutorBoardV2 } from '@easy-to-learn/domain';
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 
 import { TutorBlocks } from './TutorBlocks';
 import styles from './TutorBoard.module.css';
@@ -11,7 +11,16 @@ export interface TutorBoardProps {
   onChange(board: PersistedTutorBoardV2): void;
   onClose(boardId: string): void;
   onExplainStep?(boardId: string, stepId: string): void;
+  feedbackState?: 'idle' | 'sending' | 'sent' | 'error';
+  onFeedback?(rating: -1 | 1, category?: AiFeedbackCategory): void;
 }
+
+const feedbackCategories: ReadonlyArray<{ value: AiFeedbackCategory; label: string }> = [
+  { value: 'incorrect_answer', label: '答案错误' },
+  { value: 'unclear_explanation', label: '解释不清' },
+  { value: 'unsafe_content', label: '内容不合适' },
+  { value: 'other', label: '其他问题' },
+];
 
 export function TutorBoard({
   board,
@@ -20,7 +29,10 @@ export function TutorBoard({
   onChange,
   onClose,
   onExplainStep,
+  feedbackState = 'idle',
+  onFeedback,
 }: TutorBoardProps) {
+  const [showFeedbackCategories, setShowFeedbackCategories] = useState(false);
   const elementRef = useRef<HTMLElement>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -108,6 +120,52 @@ export function TutorBoard({
         <h3>{step.title}</h3>
         <TutorBlocks blocks={step.blocks} />
       </section>
+      {onFeedback ? (
+        <section className={styles.feedback} aria-label="评价这次 AI 回答">
+          {feedbackState === 'sent' ? (
+            <p role="status">已收到反馈，谢谢你。</p>
+          ) : (
+            <>
+              <div className={styles.feedbackPrompt}>
+                <span>这次回答有帮助吗？</span>
+                <div className={styles.feedbackActions}>
+                  <button
+                    type="button"
+                    disabled={feedbackState === 'sending'}
+                    onClick={() => onFeedback(1)}
+                  >
+                    有帮助
+                  </button>
+                  <button
+                    type="button"
+                    aria-expanded={showFeedbackCategories}
+                    disabled={feedbackState === 'sending'}
+                    onClick={() => setShowFeedbackCategories((shown) => !shown)}
+                  >
+                    有问题
+                  </button>
+                </div>
+              </div>
+              {showFeedbackCategories ? (
+                <div className={styles.feedbackCategories} aria-label="选择问题类型">
+                  {feedbackCategories.map((category) => (
+                    <button
+                      key={category.value}
+                      type="button"
+                      disabled={feedbackState === 'sending'}
+                      onClick={() => onFeedback(-1, category.value)}
+                    >
+                      {category.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {feedbackState === 'sending' ? <p role="status">正在发送反馈…</p> : null}
+              {feedbackState === 'error' ? <p role="alert">发送失败，请重试。</p> : null}
+            </>
+          )}
+        </section>
+      ) : null}
       <footer className={styles.footer}>
         <span>
           {board.stepIndex + 1} / {board.result.steps.length}

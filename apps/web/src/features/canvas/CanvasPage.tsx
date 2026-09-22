@@ -14,6 +14,7 @@ import {
 } from '@easy-to-learn/canvas-adapter';
 import {
   tutorRequestSchema,
+  type AiFeedbackCategory,
   type PersistedTutorBoardV2,
   type TutorRequest,
 } from '@easy-to-learn/domain';
@@ -53,6 +54,12 @@ interface PreparedSummary {
   textLength: number;
   hasImage: boolean;
 }
+
+type FeedbackState = 'idle' | 'sending' | 'sent' | 'error';
+const AI_FEEDBACK_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+const canSubmitFeedback = (board: PersistedTutorBoardV2): boolean =>
+  Boolean(board.requestId) && Date.now() <= Date.parse(board.createdAt) + AI_FEEDBACK_WINDOW_MS;
 
 const selectionSignature = (selectedElementIds: AppState['selectedElementIds']): string =>
   Object.keys(selectedElementIds)
@@ -180,6 +187,7 @@ export default function CanvasPage() {
   const [prepared, setPrepared] = useState<PreparedSummary | null>(null);
   const [preparationError, setPreparationError] = useState<string | null>(null);
   const [tutorBoards, setTutorBoards] = useState<PersistedTutorBoardV2[]>([]);
+  const [feedbackStates, setFeedbackStates] = useState<Record<string, FeedbackState>>({});
   const [viewportState, setViewportState] = useState<AppState | null>(null);
   const [stageOrigin, setStageOrigin] = useState({ x: 0, y: 0 });
   const [syncState, setSyncState] = useState<SyncState>('clean');
@@ -687,6 +695,7 @@ export default function CanvasPage() {
       const id = crypto.randomUUID();
       const next: PersistedTutorBoardV2 = {
         id,
+        requestId,
         title: response.result.title,
         result: response.result,
         stepIndex: 0,
@@ -779,6 +788,7 @@ export default function CanvasPage() {
       const child: PersistedTutorBoardV2 = {
         ...parent,
         id,
+        requestId,
         title: result.result.title,
         result: result.result,
         stepIndex: 0,
@@ -797,6 +807,25 @@ export default function CanvasPage() {
       setPreparationError(error instanceof Error ? error.message : '无法解释当前步骤。');
     } finally {
       setLoadingAction(null);
+    }
+  };
+
+  const submitFeedback = async (
+    board: PersistedTutorBoardV2,
+    rating: -1 | 1,
+    category?: AiFeedbackCategory,
+  ) => {
+    if (!board.requestId || feedbackStates[board.id] === 'sending') return;
+    setFeedbackStates((current) => ({ ...current, [board.id]: 'sending' }));
+    try {
+      await new TutorApiClient(async () => session?.access_token ?? null).submitFeedback({
+        requestId: board.requestId,
+        rating,
+        ...(category ? { category } : {}),
+      });
+      setFeedbackStates((current) => ({ ...current, [board.id]: 'sent' }));
+    } catch {
+      setFeedbackStates((current) => ({ ...current, [board.id]: 'error' }));
     }
   };
 
@@ -879,6 +908,13 @@ export default function CanvasPage() {
                 }
                 onClose={(id) => commitTutorBoards(tutorBoards.filter((item) => item.id !== id))}
                 onExplainStep={(id, stepId) => void explainStep(id, stepId)}
+                feedbackState={feedbackStates[board.id] ?? 'idle'}
+                {...(canSubmitFeedback(board)
+                  ? {
+                      onFeedback: (rating: -1 | 1, category?: AiFeedbackCategory) =>
+                        void submitFeedback(board, rating, category),
+                    }
+                  : {})}
               />
             );
           })}
