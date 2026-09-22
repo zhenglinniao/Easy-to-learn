@@ -14,6 +14,14 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: '登录并云端保存' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: '吉祥物小易，正在指向解题步骤' })).toBeInTheDocument();
     expect(screen.getByText('小易正在陪你拆解')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '从一道题，到真正想明白。' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '粘贴题图，先要一条提示。' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: '把图画出来，让推理贴着图走。' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: '今天没做完，明天从原处继续。' }),
+    ).toBeInTheDocument();
   });
 
   it('保存并即时应用主题偏好', async () => {

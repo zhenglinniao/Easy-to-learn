@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { ApplicationScenes } from './ApplicationScenes';
 import { LearningCompanion } from './LearningCompanion';
 import { SiteHeader } from './SiteHeader';
 import styles from './pages.module.css';
@@ -73,6 +74,7 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+      <ApplicationScenes />
       <section className={styles.section} aria-labelledby="how-title">
         <p className={styles.eyebrow}>使用方式</p>
         <h2 id="how-title">从题目到理解，只需四步。</h2>
