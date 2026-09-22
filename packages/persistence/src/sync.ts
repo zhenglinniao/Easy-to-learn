@@ -81,8 +81,6 @@ export class BoardSyncEngine {
         return this.retry(operation);
       }
     }
-    if (operation.operation === 'migration') return this.retry(operation);
-
     const board = await this.repository.getBoard(operation.boardId);
     if (!board) {
       await this.repository.completeOperation(operation);

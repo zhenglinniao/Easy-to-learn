@@ -24,6 +24,7 @@ import {
   createExcalidrawExport,
   LocalBoardRepository,
   openLocalDatabase,
+  type StoredBoard,
   type SyncState,
 } from '@easy-to-learn/persistence';
 import { RadialMenu, TutorBoard, type RadialMenuAction } from '@easy-to-learn/ui';
@@ -32,7 +33,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { getOptionalSupabaseClient, useAuth } from '../auth';
 import { TutorApiClient } from '../ai-tutor';
-import { RemoteBoardRepository, SupabaseBoardGateway } from '../boards';
+import { GuestBoardMigrationService, RemoteBoardRepository, SupabaseBoardGateway } from '../boards';
 import { downloadJson } from '../account';
 import { ThemeToggle, useTheme } from '../theme';
 
@@ -181,6 +182,11 @@ export default function CanvasPage() {
   const [viewportState, setViewportState] = useState<AppState | null>(null);
   const [stageOrigin, setStageOrigin] = useState({ x: 0, y: 0 });
   const [syncState, setSyncState] = useState<SyncState>('clean');
+  const [migrationMessage, setMigrationMessage] = useState<string | null>(null);
+  const [showLocalData, setShowLocalData] = useState(false);
+  const [localBoards, setLocalBoards] = useState<StoredBoard[]>([]);
+  const [pendingLocalDelete, setPendingLocalDelete] = useState<string | null>(null);
+  const [confirmClearLocal, setConfirmClearLocal] = useState(false);
   const requestInputs = useRef(
     new Map<
       string,
@@ -222,6 +228,7 @@ export default function CanvasPage() {
         }
         const repository = new LocalBoardRepository(database);
         repositoryRef.current = repository;
+        await repository.cleanupExpiredGuestMigrations();
         let stored = await repository.getBoard(boardId);
         const client = getOptionalSupabaseClient();
         const isCloudBoard = Boolean(user && client && !boardId.startsWith('local_'));
@@ -267,6 +274,28 @@ export default function CanvasPage() {
           api.addFiles(files as never);
         }
         hydratedBoard.current = boardId;
+        if (stored && user && client && boardId.startsWith('local_')) {
+          setMigrationMessage('正在把游客草稿保存为新的云端画板…');
+          try {
+            const targetBoardId = await new GuestBoardMigrationService(
+              repository,
+              new RemoteBoardRepository(client),
+              new BoardSyncEngine(
+                repository,
+                new SupabaseBoardGateway(client, crypto.randomUUID()),
+              ),
+            ).migrate(boardId, user.id);
+            if (active) navigate(`/canvas/${targetBoardId}`, { replace: true });
+          } catch (error) {
+            if (active) {
+              setMigrationMessage(
+                error instanceof Error
+                  ? error.message
+                  : '游客草稿暂时无法同步，原稿仍安全保留在本机。',
+              );
+            }
+          }
+        }
       })
       .catch(() => setPreparationError('本地画板无法恢复，请先导出重要数据后再重试。'));
     return () => {
@@ -280,7 +309,7 @@ export default function CanvasPage() {
       repositoryRef.current = null;
       closeDatabase?.();
     };
-  }, [api, boardId, user]);
+  }, [api, boardId, navigate, user]);
 
   const setMenu = useCallback((next: OpenMenu | null) => {
     menuRef.current = next;
@@ -486,6 +515,37 @@ export default function CanvasPage() {
     }
   };
 
+  const openLocalData = async () => {
+    if (!repositoryRef.current) return;
+    setLocalBoards(await repositoryRef.current.listLocalBoards());
+    setShowLocalData(true);
+  };
+
+  const exportRawLocalData = async () => {
+    if (!repositoryRef.current) return;
+    downloadJson('easy-to-learn-local-backup.json', await repositoryRef.current.exportRawData());
+  };
+
+  const deleteLocalBoard = async (targetBoardId: string) => {
+    if (!repositoryRef.current) return;
+    await repositoryRef.current.deleteLocalBoard(targetBoardId);
+    setPendingLocalDelete(null);
+    if (targetBoardId === boardId) {
+      setShowLocalData(false);
+      navigate('/canvas', { replace: true });
+      return;
+    }
+    setLocalBoards(await repositoryRef.current.listLocalBoards());
+  };
+
+  const clearLocalData = async () => {
+    if (!repositoryRef.current) return;
+    await repositoryRef.current.clearAllLocalData();
+    setConfirmClearLocal(false);
+    setShowLocalData(false);
+    navigate('/canvas', { replace: true });
+  };
+
   const handleAction = async (action: RadialMenuAction) => {
     if (!api || loadingAction) return;
     setLoadingAction(action);
@@ -667,6 +727,11 @@ export default function CanvasPage() {
           <button type="button" onClick={() => void exportBoard('complete')}>
             备份
           </button>
+          {!user ? (
+            <button type="button" onClick={() => void openLocalData()}>
+              本地数据
+            </button>
+          ) : null}
           {user ? (
             <>
               <Link to="/boards">{user.user_metadata?.name ?? user.email ?? '账户'}</Link>
@@ -675,7 +740,7 @@ export default function CanvasPage() {
               </button>
             </>
           ) : (
-            <Link to="/login?redirect=/canvas">登录保存</Link>
+            <Link to={`/login?redirect=${encodeURIComponent(`/canvas/${boardId}`)}`}>登录保存</Link>
           )}
         </div>
       </header>
@@ -737,11 +802,117 @@ export default function CanvasPage() {
         </aside>
       </section>
 
-      {prepared || preparationError ? (
+      {prepared || preparationError || migrationMessage ? (
         <div className={styles.notice} role="status">
-          {prepared
-            ? `已准备 ${prepared.elementCount} 个元素的${prepared.action === 'solve' ? '解题' : '提示'}输入${prepared.textLength > 0 ? ` · ${prepared.textLength} 个文字` : ''}${prepared.hasImage ? ' · 1 张选区图片' : ''}`
-            : preparationError}
+          {migrationMessage ??
+            (prepared
+              ? `已准备 ${prepared.elementCount} 个元素的${prepared.action === 'solve' ? '解题' : '提示'}输入${prepared.textLength > 0 ? ` · ${prepared.textLength} 个文字` : ''}${prepared.hasImage ? ' · 1 张选区图片' : ''}`
+              : preparationError)}
+        </div>
+      ) : null}
+
+      {showLocalData ? (
+        <div className={styles.dialogBackdrop} role="presentation">
+          <section
+            className={styles.dataDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="local-data-title"
+          >
+            <div className={styles.dialogHeading}>
+              <div>
+                <p>仅保存在这台设备</p>
+                <h2 id="local-data-title">本地画板</h2>
+              </div>
+              <button type="button" onClick={() => setShowLocalData(false)} aria-label="关闭">
+                关闭
+              </button>
+            </div>
+            <div className={styles.localBoardList}>
+              {localBoards.map((localBoard) => (
+                <div key={localBoard.boardId}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowLocalData(false);
+                      navigate(`/canvas/${localBoard.boardId}`);
+                    }}
+                  >
+                    <strong>{localBoard.boardId === boardId ? '当前画板' : '游客画板'}</strong>
+                    <span>{new Date(localBoard.updatedAt).toLocaleString('zh-CN')}</span>
+                  </button>
+                  <button
+                    className={styles.dangerText}
+                    type="button"
+                    onClick={() => {
+                      setShowLocalData(false);
+                      setPendingLocalDelete(localBoard.boardId);
+                    }}
+                  >
+                    删除
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className={styles.dataActions}>
+              <button type="button" onClick={() => void exportRawLocalData()}>
+                下载完整本地备份
+              </button>
+              <button
+                className={styles.dangerText}
+                type="button"
+                onClick={() => {
+                  setShowLocalData(false);
+                  setConfirmClearLocal(true);
+                }}
+              >
+                清空本地数据
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {pendingLocalDelete || confirmClearLocal ? (
+        <div className={styles.dialogBackdrop} role="presentation">
+          <section
+            className={styles.confirmDialog}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="local-delete-title"
+          >
+            <h2 id="local-delete-title">
+              {confirmClearLocal ? '清空所有本地数据？' : '删除这块本地画板？'}
+            </h2>
+            <p>
+              {confirmClearLocal
+                ? '所有游客画板、图片和恢复副本都会从这台设备移除。建议先下载完整备份。'
+                : '画板及其本地图片会立即移除，此操作无法撤销。'}
+            </p>
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingLocalDelete(null);
+                  setConfirmClearLocal(false);
+                  setShowLocalData(true);
+                }}
+              >
+                取消
+              </button>
+              <button
+                className={styles.dangerButton}
+                type="button"
+                onClick={() =>
+                  void (confirmClearLocal
+                    ? clearLocalData()
+                    : deleteLocalBoard(pendingLocalDelete!))
+                }
+              >
+                确认删除
+              </button>
+            </div>
+          </section>
         </div>
       ) : null}
     </main>

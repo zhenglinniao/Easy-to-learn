@@ -152,6 +152,90 @@ describe('LocalBoardRepository', () => {
       outbox: [expect.objectContaining({ operation: 'snapshot' })],
     });
   });
+
+  it('游客草稿迁移为全新云画板并保留 7 天恢复标记', async () => {
+    const { repository, database } = await createRepository();
+    await repository.saveDurableChange(emptySnapshot('local_guest-1'));
+
+    const migration = await repository.prepareGuestMigration(
+      'local_guest-1',
+      '33333333-3333-4333-8333-333333333333',
+      'user-1',
+    );
+
+    expect(migration.board).toMatchObject({
+      boardId: '33333333-3333-4333-8333-333333333333',
+      remoteRevision: 0,
+      dirty: true,
+      snapshot: { boardId: '33333333-3333-4333-8333-333333333333', revision: 0 },
+    });
+    expect(await repository.getBoard('local_guest-1')).toBeDefined();
+    expect(await repository.getOutbox(migration.board.boardId)).toEqual([
+      expect.objectContaining({ operation: 'migration', baseRevision: 0 }),
+    ]);
+    expect(await database.get('migrationBackups', migration.markerId)).toMatchObject({
+      source: 'guest-board:local_guest-1',
+      cleanupAt: '2026-09-29T00:00:00.000Z',
+      status: 'pending',
+    });
+
+    await repository.markMigration(migration.markerId, 'migrated');
+    expect(await database.get('migrationBackups', migration.markerId)).toMatchObject({
+      status: 'migrated',
+    });
+
+    const cleanupRepository = new LocalBoardRepository(
+      database,
+      () => new Date('2026-09-30T00:00:00.000Z'),
+    );
+    await expect(cleanupRepository.cleanupExpiredGuestMigrations()).resolves.toBe(1);
+    expect(await repository.getBoard('local_guest-1')).toBeUndefined();
+    expect(await database.get('migrationBackups', migration.markerId)).toBeUndefined();
+    expect(await repository.getBoard(migration.board.boardId)).toBeDefined();
+  });
+
+  it('本地画板列表按更新时间排序，删除时一并清理关联数据', async () => {
+    const { repository, database } = await createRepository();
+    await repository.saveDurableChange(emptySnapshot('local_old'));
+    await repository.saveDurableChange(emptySnapshot('local_new'));
+    const newer = await repository.getBoard('local_new');
+    expect(newer).toBeDefined();
+    await database.put('boards', { ...newer!, updatedAt: '2026-09-22T00:01:00.000Z' });
+
+    await expect(repository.listLocalBoards()).resolves.toEqual([
+      expect.objectContaining({ boardId: 'local_new' }),
+      expect.objectContaining({ boardId: 'local_old' }),
+    ]);
+    await repository.deleteLocalBoard('local_new');
+    expect(await repository.getBoard('local_new')).toBeUndefined();
+    expect(await repository.getOutbox('local_new')).toEqual([]);
+    await expect(repository.deleteLocalBoard('cloud-board')).rejects.toMatchObject({
+      code: 'DATABASE_CORRUPTED',
+    });
+  });
+
+  it('显式清空本地数据时清理所有恢复存储', async () => {
+    const { repository } = await createRepository();
+    await repository.saveDurableChange(emptySnapshot('local_clear'));
+    await repository.addMigrationBackup({
+      rawData: { legacy: true },
+      source: 'v1',
+      createdAt: now.toISOString(),
+      cleanupAt: '2026-09-29T00:00:00.000Z',
+      status: 'pending',
+    });
+
+    await repository.clearAllLocalData();
+
+    await expect(repository.exportRawData()).resolves.toMatchObject({
+      boards: [],
+      assets: [],
+      outbox: [],
+      preferences: [],
+      migrationBackups: [],
+      conflictCopies: [],
+    });
+  });
 });
 
 describe('BoardSyncEngine', () => {
@@ -215,6 +299,25 @@ describe('BoardSyncEngine', () => {
       expect.objectContaining({ boardId: 'board-1', remoteRevision: 7, localRevision: 1 }),
     ]);
     expect(await repository.getOutbox('board-1')).toEqual([]);
+  });
+
+  it('迁移任务使用与普通快照相同的资产优先同步协议', async () => {
+    const { repository } = await createRepository();
+    await repository.saveDurableChange(emptySnapshot('local_guest'));
+    const { board } = await repository.prepareGuestMigration(
+      'local_guest',
+      '44444444-4444-4444-8444-444444444444',
+      'user-1',
+    );
+    const gateway = remote();
+    const engine = new BoardSyncEngine(repository, gateway, () => true);
+
+    await expect(engine.syncBoard(board.boardId)).resolves.toMatchObject({ state: 'synced' });
+    expect(gateway.saveSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ boardId: board.boardId }),
+      0,
+    );
+    expect(await repository.getOutbox(board.boardId)).toEqual([]);
   });
 
   it('同步期间产生新修改时保留新任务并推进其 baseRevision', async () => {

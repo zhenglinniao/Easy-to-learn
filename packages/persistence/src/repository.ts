@@ -176,6 +176,166 @@ export class LocalBoardRepository {
     return this.database.get('boards', boardId);
   }
 
+  async listLocalBoards(): Promise<StoredBoard[]> {
+    const boards = await this.database.getAll('boards');
+    return boards
+      .filter(({ boardId }) => boardId.startsWith('local_'))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  async deleteLocalBoard(boardId: string): Promise<void> {
+    if (!boardId.startsWith('local_')) {
+      throw new LocalPersistenceError('DATABASE_CORRUPTED', '只能通过本地入口删除游客画板');
+    }
+    const transaction = this.database.transaction(
+      ['boards', 'assets', 'outbox', 'conflictCopies'],
+      'readwrite',
+    );
+    try {
+      const [assetKeys, outboxKeys, conflictKeys] = await Promise.all([
+        transaction.objectStore('assets').index('by-board').getAllKeys(boardId),
+        transaction.objectStore('outbox').index('by-board').getAllKeys(boardId),
+        transaction.objectStore('conflictCopies').index('by-board').getAllKeys(boardId),
+      ]);
+      await Promise.all([
+        transaction.objectStore('boards').delete(boardId),
+        ...assetKeys.map((key) => transaction.objectStore('assets').delete(key)),
+        ...outboxKeys.map((key) => transaction.objectStore('outbox').delete(key)),
+        ...conflictKeys.map((key) => transaction.objectStore('conflictCopies').delete(key)),
+      ]);
+      await transaction.done;
+    } catch (error) {
+      transaction.abort();
+      await transaction.done.catch(() => undefined);
+      throw toLocalPersistenceError(error);
+    }
+  }
+
+  async clearAllLocalData(): Promise<void> {
+    const transaction = this.database.transaction(
+      ['boards', 'assets', 'outbox', 'preferences', 'migrationBackups', 'conflictCopies'],
+      'readwrite',
+    );
+    try {
+      await Promise.all([
+        transaction.objectStore('boards').clear(),
+        transaction.objectStore('assets').clear(),
+        transaction.objectStore('outbox').clear(),
+        transaction.objectStore('preferences').clear(),
+        transaction.objectStore('migrationBackups').clear(),
+        transaction.objectStore('conflictCopies').clear(),
+      ]);
+      await transaction.done;
+    } catch (error) {
+      transaction.abort();
+      await transaction.done.catch(() => undefined);
+      throw toLocalPersistenceError(error);
+    }
+  }
+
+  async prepareGuestMigration(
+    sourceBoardId: string,
+    targetBoardId: string,
+    ownerId: string,
+  ): Promise<{ board: StoredBoard; markerId: number }> {
+    if (!sourceBoardId.startsWith('local_') || targetBoardId.startsWith('local_')) {
+      throw new LocalPersistenceError('DATABASE_CORRUPTED', '游客草稿迁移的画板 ID 无效');
+    }
+    const transaction = this.database.transaction(
+      ['boards', 'assets', 'outbox', 'migrationBackups'],
+      'readwrite',
+    );
+    try {
+      const source = await transaction.objectStore('boards').get(sourceBoardId);
+      if (!source) throw new LocalPersistenceError('DATABASE_CORRUPTED', '找不到待迁移的游客草稿');
+      const assets = await transaction
+        .objectStore('assets')
+        .index('by-board')
+        .getAll(sourceBoardId);
+      const manifests = source.snapshot.assets.map((manifest) => ({
+        ...manifest,
+        objectPath: `${ownerId}/${targetBoardId}/${manifest.contentHash}`,
+      }));
+      const snapshot: PersistedCanvasV2 = {
+        ...source.snapshot,
+        boardId: targetBoardId,
+        revision: 0,
+        assets: manifests,
+        updatedAt: this.now().toISOString(),
+      };
+      const board: StoredBoard = {
+        boardId: targetBoardId,
+        snapshot,
+        localRevision: 1,
+        remoteRevision: 0,
+        dirty: true,
+        updatedAt: this.now().toISOString(),
+      };
+      await transaction.objectStore('boards').put(board);
+      for (const asset of assets) {
+        await transaction.objectStore('assets').put({
+          ...asset,
+          boardId: targetBoardId,
+          objectPath: `${ownerId}/${targetBoardId}/${asset.contentHash}`,
+          uploadState: 'local',
+        });
+      }
+      await transaction.objectStore('outbox').add({
+        boardId: targetBoardId,
+        baseRevision: 0,
+        localRevision: 1,
+        operation: 'migration',
+        attempts: 0,
+        nextAttemptAt: this.now().getTime(),
+        createdAt: this.now().toISOString(),
+      });
+      const markerId = await transaction.objectStore('migrationBackups').add({
+        rawData: { sourceBoardId, targetBoardId },
+        source: `guest-board:${sourceBoardId}`,
+        createdAt: this.now().toISOString(),
+        cleanupAt: new Date(this.now().getTime() + 7 * 24 * 60 * 60 * 1_000).toISOString(),
+        status: 'pending',
+      });
+      await transaction.done;
+      return { board, markerId };
+    } catch (error) {
+      transaction.abort();
+      await transaction.done.catch(() => undefined);
+      throw toLocalPersistenceError(error);
+    }
+  }
+
+  async markMigration(markerId: number, status: MigrationBackup['status']): Promise<void> {
+    const marker = await this.database.get('migrationBackups', markerId);
+    if (marker) await this.database.put('migrationBackups', { ...marker, status });
+  }
+
+  async findGuestMigration(sourceBoardId: string): Promise<MigrationBackup | null> {
+    const markers = await this.database.getAll('migrationBackups');
+    return (
+      markers
+        .filter(({ source }) => source === `guest-board:${sourceBoardId}`)
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null
+    );
+  }
+
+  async cleanupExpiredGuestMigrations(): Promise<number> {
+    const markers = await this.database.getAll('migrationBackups');
+    const expired = markers.filter(
+      ({ source, status, cleanupAt, id }) =>
+        id !== undefined &&
+        source.startsWith('guest-board:local_') &&
+        status === 'migrated' &&
+        Date.parse(cleanupAt) <= this.now().getTime(),
+    );
+    for (const marker of expired) {
+      const sourceBoardId = marker.source.slice('guest-board:'.length);
+      await this.deleteLocalBoard(sourceBoardId);
+      await this.database.delete('migrationBackups', marker.id!);
+    }
+    return expired.length;
+  }
+
   getAssets(boardId: string): Promise<StoredAsset[]> {
     return this.database.getAllFromIndex('assets', 'by-board', boardId);
   }
