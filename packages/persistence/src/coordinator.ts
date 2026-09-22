@@ -5,6 +5,7 @@ export interface SyncLease {
 
 type SyncMessage =
   | { type: 'claim'; boardId: string; writerId: string; expiresAt: number }
+  | { type: 'ack'; boardId: string; writerId: string; expiresAt: number }
   | { type: 'release'; boardId: string; writerId: string };
 
 export class BroadcastSyncCoordinator {
@@ -12,7 +13,7 @@ export class BroadcastSyncCoordinator {
   private readonly channel: BroadcastChannel;
 
   constructor(
-    private readonly writerId = crypto.randomUUID(),
+    private readonly writerId: string = crypto.randomUUID(),
     channelName = 'easy-to-learn-sync',
     private readonly leaseMs = 5_000,
     private readonly settleMs = 75,
@@ -48,13 +49,13 @@ export class BroadcastSyncCoordinator {
   }
 
   private receive(message: SyncMessage): void {
-    if (message.type === 'claim') {
+    if (message.type === 'claim' || message.type === 'ack') {
       this.remember(message.boardId, message.writerId, message.expiresAt);
-      if (this.claims.get(message.boardId)?.has(this.writerId)) {
+      if (message.type === 'claim' && this.claims.get(message.boardId)?.has(this.writerId)) {
         const expiresAt = Date.now() + this.leaseMs;
         this.remember(message.boardId, this.writerId, expiresAt);
         this.channel.postMessage({
-          type: 'claim',
+          type: 'ack',
           boardId: message.boardId,
           writerId: this.writerId,
           expiresAt,

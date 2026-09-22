@@ -56,4 +56,88 @@ describe('TutorApiClient', () => {
       client.uploadImage('request-1', new Blob(['x'], { type: 'image/webp' })),
     ).rejects.toThrow('仅支持 PNG 或 JPEG');
   });
+
+  it('登录用户携带 Bearer 并校验 Tutor DSL 响应', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        data: {
+          requestId: 'request-1',
+          result: {
+            schemaVersion: 1,
+            mode: 'solve',
+            title: '解题',
+            steps: [
+              {
+                id: 'step-1',
+                title: '观察',
+                blocks: [{ type: 'paragraph', text: '先观察等式两边。' }],
+              },
+            ],
+            metadata: {
+              model: 'test-model',
+              promptVersion: 'v1',
+              generatedAt: '2026-09-22T00:00:00.000Z',
+            },
+          },
+          quota: {
+            dailyLimit: 3,
+            remaining: 2,
+            nextAllowedAt: '2026-09-22T00:05:00.000Z',
+          },
+        },
+      }),
+    );
+    const request = {
+      requestId: 'request-1',
+      schemaVersion: 1 as const,
+      boardId: '00000000-0000-4000-8000-000000000001',
+      mode: 'solve' as const,
+      text: '2x + 3 = 11',
+      locale: 'zh-CN' as const,
+      source: {
+        elementIds: ['element-1'],
+        selectionBounds: { x: 0, y: 0, width: 100, height: 40 },
+        contentHash: 'hash',
+      },
+    };
+
+    await expect(
+      new TutorApiClient(async () => 'jwt', fetcher).execute(request),
+    ).resolves.toMatchObject({
+      requestId: 'request-1',
+      result: { mode: 'solve' },
+    });
+    const options = fetcher.mock.calls[0]?.[1];
+    expect(new Headers(options?.headers).get('Authorization')).toBe('Bearer jwt');
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it('优先显示结构化 API 错误并拒绝非法模型响应', async () => {
+    const request = {
+      requestId: 'request-1',
+      schemaVersion: 1 as const,
+      boardId: 'local_board-1',
+      mode: 'solve' as const,
+      text: '题目',
+      locale: 'zh-CN' as const,
+      source: {
+        elementIds: ['element-1'],
+        selectionBounds: { x: 0, y: 0, width: 20, height: 20 },
+        contentHash: 'hash',
+      },
+    };
+    const limited = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ code: 'RATE_LIMITED', message: '请稍后再试' }), {
+        status: 429,
+      }),
+    );
+    await expect(new TutorApiClient(async () => 'jwt', limited).execute(request)).rejects.toThrow(
+      '请稍后再试',
+    );
+
+    const invalid = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json({ data: { html: '<b>x</b>' } }));
+    await expect(new TutorApiClient(async () => 'jwt', invalid).execute(request)).rejects.toThrow();
+  });
 });

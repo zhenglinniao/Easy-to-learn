@@ -46,6 +46,18 @@ afterEach(async () => {
 });
 
 describe('LocalBoardRepository', () => {
+  it('缓存远端快照时保持干净状态且不创建 outbox', async () => {
+    const { repository } = await createRepository();
+    const remoteSnapshot = { ...emptySnapshot(), revision: 6 };
+
+    await expect(repository.storeRemoteSnapshot(remoteSnapshot)).resolves.toMatchObject({
+      remoteRevision: 6,
+      dirty: false,
+      snapshot: { revision: 6 },
+    });
+    expect(await repository.getOutbox('board-1')).toEqual([]);
+  });
+
   it('在同一事务保存画板并把同画板快照任务合并为一个', async () => {
     const { repository } = await createRepository();
 
