@@ -1,0 +1,20 @@
+{
+  "name": "@easy-to-learn/persistence",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@easy-to-learn/domain": "workspace:*",
+    "idb": "8.0.3"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "6.2.5",
+    "typescript": "6.0.3"
+  }
+}
