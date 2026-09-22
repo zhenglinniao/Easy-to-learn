@@ -49,7 +49,9 @@ create table public.ai_feedback (
   request_id uuid not null unique,
   actor_hash text not null,
   rating smallint not null check (rating in (-1, 1)),
-  category text,
+  category text check (
+    category is null or category in ('incorrect_answer', 'unclear_explanation', 'unsafe_content', 'other')
+  ),
   model text not null,
   prompt_version text not null,
   schema_version integer not null check (schema_version > 0),
@@ -174,6 +176,55 @@ grant all on table public.account_deletion_requests to service_role;
 grant all on table public.ai_feedback to service_role;
 grant all on table public.security_audit_events to service_role;
 grant all on table public.asset_cleanup_jobs to service_role;
+
+create function public.upsert_ai_feedback(
+  p_request_id uuid,
+  p_actor_hash text,
+  p_rating smallint,
+  p_category text,
+  p_model text,
+  p_prompt_version text,
+  p_schema_version integer
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  insert into public.ai_feedback (
+    request_id,
+    actor_hash,
+    rating,
+    category,
+    model,
+    prompt_version,
+    schema_version
+  ) values (
+    p_request_id,
+    p_actor_hash,
+    p_rating,
+    p_category,
+    p_model,
+    p_prompt_version,
+    p_schema_version
+  )
+  on conflict (request_id) do update
+  set rating = excluded.rating,
+      category = excluded.category
+  where public.ai_feedback.actor_hash = excluded.actor_hash
+  returning id into v_id;
+
+  return v_id is not null;
+end;
+$$;
+
+revoke all on function public.upsert_ai_feedback(uuid, text, smallint, text, text, text, integer)
+from public, anon, authenticated;
+grant execute on function public.upsert_ai_feedback(uuid, text, smallint, text, text, text, integer)
+to service_role;
 
 create function public.create_board(p_title text default '未命名画板')
 returns table (

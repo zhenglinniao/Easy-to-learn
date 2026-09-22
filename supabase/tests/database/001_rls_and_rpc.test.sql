@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(40);
+select plan(43);
 
 select has_table('public', 'boards', '存在 boards 表');
 select has_table('public', 'board_assets', '存在 board_assets 表');
@@ -24,6 +24,28 @@ select has_function(
   'purge_expired_operational_records',
   array[]::text[],
   '存在运行数据保留期清理函数'
+);
+select has_function(
+  'public',
+  'upsert_ai_feedback',
+  array['uuid', 'text', 'smallint', 'text', 'text', 'text', 'integer'],
+  '存在 AI 反馈幂等写入函数'
+);
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.upsert_ai_feedback(uuid, text, smallint, text, text, text, integer)',
+    'execute'
+  ),
+  '游客不能直接调用 AI 反馈写入函数'
+);
+select ok(
+  has_function_privilege(
+    'service_role',
+    'public.upsert_ai_feedback(uuid, text, smallint, text, text, text, integer)',
+    'execute'
+  ),
+  '服务端角色可以调用 AI 反馈写入函数'
 );
 
 select ok(

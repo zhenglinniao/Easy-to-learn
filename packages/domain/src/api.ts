@@ -142,6 +142,19 @@ export const tutorResponseSchema = createDataResponseSchema(
   }),
 );
 
+export const aiFeedbackCategorySchema = z.enum([
+  'incorrect_answer',
+  'unclear_explanation',
+  'unsafe_content',
+  'other',
+]);
+
+export const aiFeedbackInputSchema = z.strictObject({
+  requestId: z.uuid(),
+  rating: z.union([z.literal(-1), z.literal(1)]),
+  category: aiFeedbackCategorySchema.optional(),
+});
+
 export const anonymousSessionResponseSchema = createDataResponseSchema(
   z.strictObject({ expiresAt: isoDateTimeSchema, quota: quotaStatusSchema }),
 );
@@ -150,4 +163,6 @@ export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 export type QuotaStatus = z.infer<typeof quotaStatusSchema>;
 export type TutorRequest = z.infer<typeof tutorRequestSchema>;
 export type TutorResponse = z.infer<typeof tutorResponseSchema>;
+export type AiFeedbackCategory = z.infer<typeof aiFeedbackCategorySchema>;
+export type AiFeedbackInput = z.infer<typeof aiFeedbackInputSchema>;
 export type AnonymousSessionResponse = z.infer<typeof anonymousSessionResponseSchema>;

@@ -13,6 +13,7 @@ import {
   SupabaseAccountDeletionStore,
   type AuthenticatedAccount,
 } from './account-deletion';
+import { AiFeedbackService, SupabaseAiFeedbackStore } from './ai-feedback';
 
 const required = (name: string): string => {
   const value = process.env[name];
@@ -36,6 +37,13 @@ export const createAiStateStore = (): RedisAiStateStore =>
     Redis.fromEnv(),
     required('ACTOR_HASH_SECRET'),
     required('AI_CACHE_ENCRYPTION_KEY'),
+  );
+
+export const createAiFeedbackService = (): AiFeedbackService =>
+  new AiFeedbackService(
+    createAiStateStore(),
+    new SupabaseAiFeedbackStore(required('SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY')),
+    required('ACTOR_HASH_SECRET'),
   );
 
 export const createUploadTicketService = (): UploadTicketService =>
