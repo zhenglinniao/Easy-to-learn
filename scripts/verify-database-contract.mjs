@@ -54,6 +54,16 @@ for (const signature of rpcSignatures) {
   );
 }
 
+assert(
+  migration.includes(
+    'revoke all on function public.upsert_ai_feedback(uuid, text, smallint, text, text, text, integer)',
+  ) &&
+    migration.includes(
+      'grant execute on function public.upsert_ai_feedback(uuid, text, smallint, text, text, text, integer)',
+    ),
+  'AI 反馈写入函数必须仅授权 service_role',
+);
+
 const functionStatements = migration.match(/create function[\s\S]*?\$\$;/g) ?? [];
 for (const statement of functionStatements) {
   if (statement.includes('security definer')) {
