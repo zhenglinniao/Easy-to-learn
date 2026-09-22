@@ -1,0 +1,97 @@
+import { createClient } from '@supabase/supabase-js';
+import { Redis } from '@upstash/redis';
+
+import { ApiFault } from './fault';
+import { GeminiTutorModel } from './gemini-model';
+import { cookieValue, header, type HttpRequest } from './http';
+import { RedisAiStateStore } from './redis-ai-state';
+import { verifyAnonymousSession, type SessionKey } from './session';
+import { TutorService, type BoardAuthorizer, type TutorActor } from './tutor-service';
+import { UploadTicketService } from './upload-ticket';
+
+const required = (name: string): string => {
+  const value = process.env[name];
+  if (!value) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '服务配置尚未完成');
+  return value;
+};
+
+export const sessionKeysFromEnvironment = (): SessionKey[] =>
+  required('ANON_SESSION_KEYS')
+    .split(',')
+    .map((item) => {
+      const separator = item.indexOf(':');
+      if (separator <= 0) throw new Error('ANON_SESSION_KEYS 格式错误');
+      const key = { version: item.slice(0, separator), secret: item.slice(separator + 1) };
+      if (key.secret.length < 32) throw new Error('匿名会话密钥至少需要 32 个字符');
+      return key;
+    });
+
+export const createAiStateStore = (): RedisAiStateStore =>
+  new RedisAiStateStore(
+    Redis.fromEnv(),
+    required('ACTOR_HASH_SECRET'),
+    required('AI_CACHE_ENCRYPTION_KEY'),
+  );
+
+export const createUploadTicketService = (): UploadTicketService =>
+  new UploadTicketService(
+    Redis.fromEnv(),
+    required('ACTOR_HASH_SECRET'),
+    required('SUPABASE_URL'),
+    required('SUPABASE_SERVICE_ROLE_KEY'),
+  );
+
+export const resolveActor = async (
+  request: HttpRequest,
+): Promise<{ actor: TutorActor; accessToken?: string }> => {
+  const authorization = header(request, 'authorization');
+  if (authorization) {
+    if (!authorization.startsWith('Bearer ')) {
+      throw new ApiFault('AUTH_REQUIRED', '登录凭据无效');
+    }
+    const accessToken = authorization.slice(7);
+    const supabase = createClient(required('SUPABASE_URL'), required('SUPABASE_ANON_KEY'), {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await supabase.auth.getUser(accessToken);
+    if (error || !data.user) throw new ApiFault('AUTH_REQUIRED', '登录已失效，请重新登录');
+    return { actor: { kind: 'user', id: data.user.id }, accessToken };
+  }
+  const anonymousCookie = cookieValue(request, 'etl_anon');
+  if (!anonymousCookie) {
+    throw new ApiFault('INVALID_ANON_SESSION', '请先建立游客会话');
+  }
+  const session = verifyAnonymousSession(anonymousCookie, sessionKeysFromEnvironment());
+  return { actor: { kind: 'anonymous', id: session.id } };
+};
+
+class SupabaseBoardAuthorizer implements BoardAuthorizer {
+  constructor(private readonly accessToken?: string) {}
+
+  async canAccess(actor: TutorActor, boardId: string): Promise<boolean> {
+    if (actor.kind === 'anonymous') return boardId.startsWith('local_');
+    if (!this.accessToken) return false;
+    const supabase = createClient(required('SUPABASE_URL'), required('SUPABASE_ANON_KEY'), {
+      global: { headers: { Authorization: `Bearer ${this.accessToken}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await supabase
+      .from('boards')
+      .select('id')
+      .eq('id', boardId)
+      .maybeSingle();
+    if (error) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '画板权限服务暂时不可用');
+    return data !== null;
+  }
+}
+
+export const createTutorService = (actor: TutorActor, accessToken?: string): TutorService => {
+  const tickets = createUploadTicketService();
+  return new TutorService(
+    createAiStateStore(),
+    new GeminiTutorModel(required('GEMINI_API_KEY'), 30_000, undefined, (...args) =>
+      tickets.resolve(actor, ...args),
+    ),
+    new SupabaseBoardAuthorizer(accessToken),
+  );
+};
