@@ -1,11 +1,7 @@
-.env
-.env.*
-!.env.example
 node_modules/
 dist/
 coverage/
 playwright-report/
 test-results/
-.playwright-cli/
-.DS_Store
-Thumbs.db
+docs/**/*.md
+pnpm-lock.yaml

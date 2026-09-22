@@ -1,0 +1,20 @@
+{
+  "name": "@easy-to-learn/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "react": "catalog:",
+    "typescript": "6.0.3"
+  },
+  "peerDependencies": {
+    "react": "19.3.0"
+  }
+}

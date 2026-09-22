@@ -1,0 +1,20 @@
+{
+  "name": "@easy-to-learn/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@easy-to-learn/domain": "workspace:*",
+    "@google/genai": "2.24.0",
+    "@supabase/supabase-js": "2.116.0",
+    "@upstash/redis": "1.39.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.2",
+    "typescript": "6.0.3"
+  }
+}
