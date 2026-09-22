@@ -8,6 +8,11 @@ import { RedisAiStateStore } from './redis-ai-state';
 import { verifyAnonymousSession, type SessionKey } from './session';
 import { TutorService, type BoardAuthorizer, type TutorActor } from './tutor-service';
 import { UploadTicketService } from './upload-ticket';
+import {
+  AccountDeletionService,
+  SupabaseAccountDeletionStore,
+  type AuthenticatedAccount,
+} from './account-deletion';
 
 const required = (name: string): string => {
   const value = process.env[name];
@@ -95,3 +100,30 @@ export const createTutorService = (actor: TutorActor, accessToken?: string): Tut
     new SupabaseBoardAuthorizer(accessToken),
   );
 };
+
+export const resolveAuthenticatedAccount = async (
+  request: HttpRequest,
+): Promise<AuthenticatedAccount> => {
+  const authorization = header(request, 'authorization');
+  if (!authorization?.startsWith('Bearer ')) throw new ApiFault('AUTH_REQUIRED', '请先登录');
+  const accessToken = authorization.slice(7);
+  const supabase = createClient(required('SUPABASE_URL'), required('SUPABASE_ANON_KEY'), {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await supabase.auth.getUser(accessToken);
+  if (error || !data.user) throw new ApiFault('AUTH_REQUIRED', '登录已失效，请重新登录');
+  const payload = JSON.parse(
+    Buffer.from(accessToken.split('.')[1] ?? '', 'base64url').toString('utf8'),
+  ) as { auth_time?: number; iat?: number };
+  const authenticatedAt = new Date((payload.auth_time ?? payload.iat ?? 0) * 1_000);
+  return { userId: data.user.id, authenticatedAt };
+};
+
+export const createAccountDeletionService = (): AccountDeletionService =>
+  new AccountDeletionService(
+    new SupabaseAccountDeletionStore(
+      required('SUPABASE_URL'),
+      required('SUPABASE_SERVICE_ROLE_KEY'),
+      required('ACTOR_HASH_SECRET'),
+    ),
+  );
