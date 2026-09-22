@@ -44,6 +44,12 @@ a {
   color: inherit;
 }
 
+.route-loading {
+  margin: 40vh auto 0;
+  color: var(--muted);
+  text-align: center;
+}
+
 .app-shell {
   width: min(1120px, calc(100% - 40px));
   margin: 0 auto;

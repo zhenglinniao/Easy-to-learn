@@ -6,6 +6,11 @@ export default defineConfig({
     globals: true,
     include: ['apps/**/*.test.{ts,tsx}', 'packages/**/*.test.{ts,tsx}', 'api/**/*.test.ts'],
     setupFiles: ['./vitest.setup.ts'],
+    server: {
+      deps: {
+        inline: ['@excalidraw/excalidraw', 'open-color'],
+      },
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

@@ -1,6 +1,11 @@
+import { lazy, Suspense } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+
+const CanvasSpikePage = lazy(() => import('../spikes/CanvasSpikePage'));
+
 const completedFoundations = ['工作区已建立', '依赖已锁定', '质量门禁已启用'] as const;
 
-export function App() {
+function FoundationPage() {
   return (
     <main className="app-shell">
       <header className="site-header" aria-label="主导航">
@@ -30,5 +35,19 @@ export function App() {
         </ul>
       </section>
     </main>
+  );
+}
+
+export function App() {
+  return (
+    <BrowserRouter>
+      <Suspense fallback={<p className="route-loading">正在加载验证页面…</p>}>
+        <Routes>
+          <Route path="/" element={<FoundationPage />} />
+          <Route path="/spikes/excalidraw" element={<CanvasSpikePage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
   );
 }
