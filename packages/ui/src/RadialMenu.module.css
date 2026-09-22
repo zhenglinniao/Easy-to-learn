@@ -101,28 +101,26 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .menu {
-    color: #f4eee5;
-  }
+:global(html[data-theme='dark']) .menu {
+  color: #f4eee5;
+}
 
-  .action {
-    border-color: rgba(255, 255, 255, 0.12);
-    color: #f5eee5;
-    background: rgba(39, 36, 32, 0.98);
-    box-shadow:
-      0 14px 32px rgba(0, 0, 0, 0.34),
-      0 2px 7px rgba(0, 0, 0, 0.28);
-  }
+:global(html[data-theme='dark']) .action {
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f5eee5;
+  background: rgba(39, 36, 32, 0.98);
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.34),
+    0 2px 7px rgba(0, 0, 0, 0.28);
+}
 
-  .actionEnglish {
-    color: #aaa196;
-  }
+:global(html[data-theme='dark']) .actionEnglish {
+  color: #aaa196;
+}
 
-  .center {
-    color: #2c261f;
-    background: #f2eae0;
-  }
+:global(html[data-theme='dark']) .center {
+  color: #2c261f;
+  background: #f2eae0;
 }
 
 @media (prefers-reduced-motion: reduce) {

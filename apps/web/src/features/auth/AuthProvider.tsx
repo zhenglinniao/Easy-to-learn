@@ -3,15 +3,18 @@ import { useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 
 import { AuthContext, type AuthContextValue } from './context';
 import { parseSafeRedirect } from './redirect';
-import { getSupabaseClient } from './supabase';
+import { getOptionalSupabaseClient } from './supabase';
 
 export function AuthProvider({
   children,
-  client = getSupabaseClient(),
-}: PropsWithChildren<{ client?: SupabaseClient }>) {
+  client = getOptionalSupabaseClient(),
+}: PropsWithChildren<{ client?: SupabaseClient | null }>) {
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(client));
   useEffect(() => {
+    if (!client) {
+      return;
+    }
     let active = true;
     void client.auth.getSession().then(({ data }) => {
       if (active) {
@@ -36,14 +39,17 @@ export function AuthProvider({
       session,
       user: session?.user ?? null,
       async signIn(email, password) {
+        if (!client) throw new Error('Supabase 尚未配置');
         const { error } = await client.auth.signInWithPassword({ email, password });
         if (error) throw error;
       },
       async signUp(email, password) {
+        if (!client) throw new Error('Supabase 尚未配置');
         const { error } = await client.auth.signUp({ email, password });
         if (error) throw error;
       },
       async signInWithOAuth(provider, redirect) {
+        if (!client) throw new Error('Supabase 尚未配置');
         const target = parseSafeRedirect(redirect);
         const callback = new URL('/auth/callback', window.location.origin);
         callback.searchParams.set('redirect', target);
@@ -54,6 +60,7 @@ export function AuthProvider({
         if (error) throw error;
       },
       async signOut() {
+        if (!client) return;
         const { error } = await client.auth.signOut();
         if (error) throw error;
         setSession(null);

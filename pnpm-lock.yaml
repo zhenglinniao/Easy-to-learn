@@ -125,6 +125,9 @@ importers:
       '@easy-to-learn/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@easy-to-learn/persistence':
+        specifier: workspace:*
+        version: link:../../packages/persistence
       '@easy-to-learn/ui':
         specifier: workspace:*
         version: link:../../packages/ui

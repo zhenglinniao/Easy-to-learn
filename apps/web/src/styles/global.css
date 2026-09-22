@@ -202,35 +202,33 @@ h1 {
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f4eee3;
-    background: #181713;
-    --ink: #f4eee3;
-    --muted: #aaa297;
-    --paper: rgba(34, 32, 28, 0.94);
-    --line: rgba(255, 248, 235, 0.12);
-    --accent: #ff8a6c;
-    --accent-soft: rgba(238, 108, 77, 0.13);
-    --success: #75c7a6;
-    --shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
-  }
+html[data-theme='dark'] {
+  color: #f4eee3;
+  background: #181713;
+  --ink: #f4eee3;
+  --muted: #aaa297;
+  --paper: rgba(34, 32, 28, 0.94);
+  --line: rgba(255, 248, 235, 0.12);
+  --accent: #ff8a6c;
+  --accent-soft: rgba(238, 108, 77, 0.13);
+  --success: #75c7a6;
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+}
 
-  body {
-    background:
-      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px), #181713;
-    background-size: 32px 32px;
-  }
+html[data-theme='dark'] body {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px), #181713;
+  background-size: 32px 32px;
+}
 
-  .brand-mark {
-    color: #211e19;
-    background: #f4eee3;
-  }
+html[data-theme='dark'] .brand-mark {
+  color: #211e19;
+  background: #f4eee3;
+}
 
-  .foundation-list li {
-    color: #d1c9bd;
-  }
+html[data-theme='dark'] .foundation-list li {
+  color: #d1c9bd;
 }
 
 @media (prefers-reduced-motion: reduce) {

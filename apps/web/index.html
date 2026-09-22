@@ -4,8 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Easy to learn 是一个把 AI 导师放进无限画布的中文学习工具。" />
+    <meta property="og:title" content="Easy to learn · AI 学习画布" />
+    <meta property="og:description" content="画题、圈选，在原题旁获得中文分步讲解。" />
+    <meta property="og:type" content="website" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>Easy to learn</title>
+    <script>
+      (() => {
+        const key = 'easy-to-learn-theme';
+        const stored = localStorage.getItem(key);
+        const theme =
+          stored === 'light' || stored === 'dark'
+            ? stored
+            : matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Easy to learn",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Web"
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

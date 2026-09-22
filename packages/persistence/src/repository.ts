@@ -121,6 +121,25 @@ export class LocalBoardRepository {
     }
   }
 
+  async storeRemoteSnapshot(snapshotInput: PersistedCanvasV2): Promise<StoredBoard> {
+    const snapshot = parsePersistedCanvas(snapshotInput);
+    const existing = await this.database.get('boards', snapshot.boardId);
+    const board: StoredBoard = {
+      boardId: snapshot.boardId,
+      snapshot,
+      localRevision: existing?.localRevision ?? 0,
+      remoteRevision: snapshot.revision,
+      dirty: false,
+      updatedAt: this.now().toISOString(),
+    };
+    try {
+      await this.database.put('boards', board);
+      return board;
+    } catch (error) {
+      throw toLocalPersistenceError(error);
+    }
+  }
+
   async queueDelete(boardId: string): Promise<void> {
     const transaction = this.database.transaction(['boards', 'outbox'], 'readwrite');
     try {

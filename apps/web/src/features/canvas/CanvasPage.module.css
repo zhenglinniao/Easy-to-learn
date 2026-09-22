@@ -68,7 +68,16 @@
   font-size: 10px;
 }
 
-.mode {
+.userBar {
+  display: flex;
+  justify-self: end;
+  align-items: center;
+  gap: 7px;
+}
+
+.userBar a,
+.userBar button,
+.saveState {
   justify-self: end;
   padding: 7px 10px;
   border: 1px solid rgba(53, 46, 38, 0.1);
@@ -77,6 +86,16 @@
   background: #fffdf9;
   font-size: 11px;
   font-weight: 680;
+}
+
+.userBar a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.userBar button {
+  font-family: inherit;
+  cursor: pointer;
 }
 
 .workspace,
@@ -166,37 +185,37 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .page {
-    color: #f4eee5;
-    background: #191815;
-  }
+:global(html[data-theme='dark']) .page {
+  color: #f4eee5;
+  background: #191815;
+}
 
-  .header {
-    border-color: rgba(255, 255, 255, 0.1);
-    background: rgba(31, 29, 26, 0.94);
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
-  }
+:global(html[data-theme='dark']) .header {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(31, 29, 26, 0.94);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
+}
 
-  .brand > span {
-    color: #2c261f;
-    background: #f2eae0;
-  }
+:global(html[data-theme='dark']) .brand > span {
+  color: #2c261f;
+  background: #f2eae0;
+}
 
-  .context span,
-  .mode,
-  .guide p {
-    color: #aaa197;
-  }
+:global(html[data-theme='dark']) .context span,
+:global(html[data-theme='dark']) .userBar a,
+:global(html[data-theme='dark']) .userBar button,
+:global(html[data-theme='dark']) .saveState,
+:global(html[data-theme='dark']) .guide p {
+  color: #aaa197;
+}
 
-  .mode,
-  .guide,
-  .notice {
-    border-color: rgba(255, 255, 255, 0.1);
-    background: rgba(40, 37, 33, 0.94);
-  }
+:global(html[data-theme='dark']) .mode,
+:global(html[data-theme='dark']) .guide,
+:global(html[data-theme='dark']) .notice {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(40, 37, 33, 0.94);
+}
 
-  .notice {
-    color: #c1b8ae;
-  }
+:global(html[data-theme='dark']) .notice {
+  color: #c1b8ae;
 }

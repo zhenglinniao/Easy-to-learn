@@ -2,6 +2,9 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 let singleton: SupabaseClient | null = null;
 
+export const isSupabaseConfigured = (): boolean =>
+  Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
+
 export const getSupabaseClient = (): SupabaseClient => {
   if (singleton) return singleton;
   const url = import.meta.env.VITE_SUPABASE_URL;
@@ -17,6 +20,9 @@ export const getSupabaseClient = (): SupabaseClient => {
   });
   return singleton;
 };
+
+export const getOptionalSupabaseClient = (): SupabaseClient | null =>
+  isSupabaseConfigured() ? getSupabaseClient() : null;
 
 export const completeOAuthCallback = async (
   client: SupabaseClient,

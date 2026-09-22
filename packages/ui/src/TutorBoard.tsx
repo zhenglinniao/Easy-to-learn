@@ -6,12 +6,21 @@ import styles from './TutorBoard.module.css';
 
 export interface TutorBoardProps {
   board: PersistedTutorBoardV2;
+  screenPosition?: { x: number; y: number };
+  sceneUnitsPerClientPixel?: number;
   onChange(board: PersistedTutorBoardV2): void;
   onClose(boardId: string): void;
   onExplainStep?(boardId: string, stepId: string): void;
 }
 
-export function TutorBoard({ board, onChange, onClose, onExplainStep }: TutorBoardProps) {
+export function TutorBoard({
+  board,
+  screenPosition,
+  sceneUnitsPerClientPixel = 1,
+  onChange,
+  onClose,
+  onExplainStep,
+}: TutorBoardProps) {
   const elementRef = useRef<HTMLElement>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -48,8 +57,8 @@ export function TutorBoard({ board, onChange, onClose, onExplainStep }: TutorBoa
     onChange({
       ...board,
       sceneAnchor: {
-        sceneX: drag.sceneX + event.clientX - drag.startX,
-        sceneY: drag.sceneY + event.clientY - drag.startY,
+        sceneX: drag.sceneX + (event.clientX - drag.startX) * sceneUnitsPerClientPixel,
+        sceneY: drag.sceneY + (event.clientY - drag.startY) * sceneUnitsPerClientPixel,
       },
       updatedAt: new Date().toISOString(),
     });
@@ -61,7 +70,10 @@ export function TutorBoard({ board, onChange, onClose, onExplainStep }: TutorBoa
     <article
       ref={elementRef}
       className={styles.board}
-      style={{ left: board.sceneAnchor.sceneX, top: board.sceneAnchor.sceneY }}
+      style={{
+        left: screenPosition?.x ?? board.sceneAnchor.sceneX,
+        top: screenPosition?.y ?? board.sceneAnchor.sceneY,
+      }}
       aria-label={`AI 辅导：${board.title}`}
     >
       <header
