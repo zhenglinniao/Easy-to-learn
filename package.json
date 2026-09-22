@@ -18,9 +18,16 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:lint": "supabase db lint --local --level error",
+    "db:test": "supabase test db --local",
+    "db:static": "node scripts/verify-database-contract.mjs",
+    "db:verify": "pnpm db:reset && pnpm db:lint && pnpm db:test",
     "check:peers": "pnpm peers check",
     "audit:dependencies": "pnpm audit --audit-level high",
-    "check": "pnpm check:peers && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm format:check"
+    "check": "pnpm check:peers && pnpm lint && pnpm typecheck && pnpm test && pnpm db:static && pnpm build && pnpm format:check"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -40,6 +47,7 @@
     "jsdom": "30.1.1",
     "msw": "2.15.0",
     "prettier": "3.9.8",
+    "supabase": "2.117.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.1",
     "vite": "8.3.0",

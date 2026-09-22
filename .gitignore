@@ -7,5 +7,7 @@ coverage/
 playwright-report/
 test-results/
 .playwright-cli/
+supabase/.temp/
+supabase/.branches/
 .DS_Store
 Thumbs.db
