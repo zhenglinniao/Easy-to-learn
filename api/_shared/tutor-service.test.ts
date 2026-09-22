@@ -1,0 +1,167 @@
+import type { TutorRequest, TutorResultV1 } from '@easy-to-learn/domain';
+import { describe, expect, it, vi } from 'vitest';
+
+import { MemoryAiStateStore } from './ai-state';
+import { ApiFault } from './fault';
+import { issueAnonymousSession, verifyAnonymousSession } from './session';
+import {
+  ProviderTimeoutError,
+  TutorService,
+  type BoardAuthorizer,
+  type TutorModel,
+} from './tutor-service';
+
+const request: TutorRequest = {
+  requestId: 'request-1',
+  schemaVersion: 1,
+  boardId: 'local_board-1',
+  mode: 'solve',
+  text: '2x + 3 = 11',
+  locale: 'zh-CN',
+  source: {
+    elementIds: ['element-1'],
+    selectionBounds: { x: 0, y: 0, width: 100, height: 40 },
+    contentHash: 'content-hash',
+  },
+};
+
+const result: TutorResultV1 = {
+  schemaVersion: 1,
+  mode: 'solve',
+  title: '一元一次方程',
+  steps: [
+    {
+      id: 'step-1',
+      title: '移项',
+      blocks: [{ type: 'paragraph', text: '先把常数项移到右边。' }],
+    },
+  ],
+  metadata: {
+    model: 'gemini-3.6-flash',
+    promptVersion: 'v1',
+    generatedAt: '2026-09-22T00:00:00.000Z',
+  },
+};
+
+const boards: BoardAuthorizer = { canAccess: vi.fn().mockResolvedValue(true) };
+const actor = { kind: 'anonymous' as const, id: 'anon-1' };
+
+describe('anonymous session', () => {
+  it('签发 30 天会话并拒绝篡改或过期 cookie', () => {
+    const key = { version: 'v1', secret: 'test-secret-at-least-32-characters' };
+    const now = new Date('2026-09-22T00:00:00.000Z');
+    const issued = issueAnonymousSession(key, now);
+
+    expect(verifyAnonymousSession(issued.cookieValue, [key], now)).toEqual(issued.session);
+    expect(() => verifyAnonymousSession(`${issued.cookieValue}x`, [key], now)).toThrow(ApiFault);
+    expect(() =>
+      verifyAnonymousSession(issued.cookieValue, [key], new Date('2026-10-23T00:00:00.000Z')),
+    ).toThrow(ApiFault);
+  });
+});
+
+describe('TutorService', () => {
+  it('相同 requestId 返回同一结果且不重复调用模型或扣配额', async () => {
+    const model: TutorModel = { generate: vi.fn().mockResolvedValue(result) };
+    const now = new Date('2026-09-22T00:00:00.000Z');
+    const service = new TutorService(new MemoryAiStateStore(), model, boards, () => now);
+
+    const first = await service.execute(actor, request);
+    const second = await service.execute(actor, request);
+
+    expect(second).toEqual(first);
+    expect(model.generate).toHaveBeenCalledOnce();
+    expect(first.data.quota).toMatchObject({ dailyLimit: 3, remaining: 2 });
+  });
+
+  it('执行一次同模型纠错，并拒绝第二次非法输出', async () => {
+    const generate = vi
+      .fn()
+      .mockResolvedValueOnce({ html: '<script />' })
+      .mockResolvedValue(result);
+    const service = new TutorService(
+      new MemoryAiStateStore(),
+      { generate },
+      boards,
+      () => new Date('2026-09-22T00:00:00.000Z'),
+    );
+
+    await expect(service.execute(actor, request)).resolves.toMatchObject({
+      data: { result: { schemaVersion: 1 } },
+    });
+    expect(generate).toHaveBeenNthCalledWith(2, request, expect.stringContaining('Tutor DSL'));
+
+    const invalid = new TutorService(
+      new MemoryAiStateStore(),
+      { generate: vi.fn().mockResolvedValue({ rawHtml: '<b>unsafe</b>' }) },
+      boards,
+      () => new Date('2026-09-22T00:00:00.000Z'),
+    );
+    await expect(invalid.execute(actor, request)).rejects.toMatchObject({
+      code: 'INVALID_MODEL_OUTPUT',
+      retryable: true,
+    });
+  });
+
+  it('执行五分钟间隔与上海自然日三次配额', async () => {
+    const state = new MemoryAiStateStore();
+    const model: TutorModel = { generate: vi.fn().mockResolvedValue(result) };
+    let now = new Date('2026-09-22T00:00:00.000Z');
+    const service = new TutorService(state, model, boards, () => now);
+
+    await service.execute(actor, request);
+    await expect(
+      service.execute(actor, { ...request, requestId: 'request-2' }),
+    ).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+    now = new Date(now.getTime() + 5 * 60 * 1_000);
+    await service.execute(actor, { ...request, requestId: 'request-2' });
+    now = new Date(now.getTime() + 5 * 60 * 1_000);
+    await service.execute(actor, { ...request, requestId: 'request-3' });
+    now = new Date(now.getTime() + 5 * 60 * 1_000);
+    await expect(
+      service.execute(actor, { ...request, requestId: 'request-4' }),
+    ).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
+  });
+
+  it('模型超时不扣配额，输入失败和游客越权不会调用模型', async () => {
+    const state = new MemoryAiStateStore();
+    const generate = vi
+      .fn()
+      .mockRejectedValueOnce(new ProviderTimeoutError())
+      .mockResolvedValue(result);
+    const service = new TutorService(
+      state,
+      { generate },
+      boards,
+      () => new Date('2026-09-22T00:00:00.000Z'),
+    );
+
+    await expect(service.execute(actor, request)).rejects.toMatchObject({ code: 'AI_TIMEOUT' });
+    await expect(service.execute(actor, request)).resolves.toMatchObject({
+      data: { quota: { remaining: 2 } },
+    });
+    await expect(service.execute(actor, {})).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    await expect(
+      service.execute(actor, { ...request, requestId: 'other', boardId: 'cloud-board' }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(generate).toHaveBeenCalledTimes(2);
+  });
+
+  it('在 Asia/Shanghai 自然日零点重置日配额', async () => {
+    const model: TutorModel = { generate: vi.fn().mockResolvedValue(result) };
+    let now = new Date('2026-09-22T15:40:00.000Z');
+    const service = new TutorService(new MemoryAiStateStore(), model, boards, () => now);
+    for (let index = 1; index <= 3; index += 1) {
+      await service.execute(actor, { ...request, requestId: `day-one-${index}` });
+      now = new Date(now.getTime() + 5 * 60 * 1_000);
+    }
+    await expect(
+      service.execute(actor, { ...request, requestId: 'day-one-4' }),
+    ).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
+
+    now = new Date('2026-09-22T16:00:00.000Z');
+    await expect(
+      service.execute(actor, { ...request, requestId: 'day-two-1' }),
+    ).resolves.toMatchObject({ data: { quota: { remaining: 2 } } });
+  });
+});
