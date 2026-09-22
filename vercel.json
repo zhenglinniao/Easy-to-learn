@@ -5,7 +5,7 @@
   "outputDirectory": "apps/web/dist",
   "regions": ["hkg1"],
   "functions": {
-    "api/ai/tutor.ts": { "maxDuration": 35 },
+    "api/ai/tutor.ts": { "maxDuration": 60 },
     "api/jobs/retention.ts": { "maxDuration": 60 }
   },
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],

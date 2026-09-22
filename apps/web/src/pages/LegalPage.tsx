@@ -11,7 +11,7 @@ export default function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
       <article className={styles.legalPage}>
         <p className={styles.eyebrow}>{privacy ? '隐私说明' : '使用条款'}</p>
         <h1>{privacy ? '我们怎样处理你的学习数据' : '使用 Easy to learn 前请了解'}</h1>
-        <p className={styles.legalUpdated}>更新日期：2026 年 9 月 22 日</p>
+        <p className={styles.legalUpdated}>更新日期：2026 年 9 月 23 日</p>
         {privacy ? <PrivacyContent /> : <TermsContent />}
         <p>
           <Link to="/">返回首页</Link>
@@ -32,8 +32,8 @@ function PrivacyContent() {
       <h2>用途与共享</h2>
       <p>
         数据仅用于认证、保存画板、提供 AI 辅导、限流、防滥用和故障排查。服务依赖
-        Supabase、Vercel、Upstash Redis 与 Google
-        Gemini；我们不出售个人数据，也不建立包含用户题图的人工审核队列。
+        Supabase、Vercel、Upstash Redis 与部署时选定的 AI
+        模型供应商；具体供应商可能随服务配置调整。我们不出售个人数据，也不建立包含用户题图的人工审核队列。
       </p>
       <h2>保留期限</h2>
       <ul>
