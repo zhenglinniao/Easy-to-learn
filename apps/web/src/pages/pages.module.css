@@ -374,6 +374,515 @@
   font-size: 13px;
   line-height: 1.65;
 }
+.sceneSection {
+  padding-top: 130px;
+}
+.sceneHeading {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.7fr);
+  align-items: end;
+  gap: 48px;
+  margin-bottom: 56px;
+}
+.sceneHeading h2 {
+  margin-bottom: 0;
+}
+.sceneHeading > p {
+  margin: 0 0 5px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.75;
+}
+.sceneList {
+  display: grid;
+  gap: 28px;
+}
+.sceneRow {
+  display: grid;
+  grid-template-columns: minmax(270px, 0.72fr) minmax(0, 1.28fr);
+  align-items: stretch;
+  gap: 28px;
+  min-height: 430px;
+}
+.sceneRow:nth-child(even) {
+  grid-template-columns: minmax(0, 1.28fr) minmax(270px, 0.72fr);
+}
+.sceneRow:nth-child(even) .sceneVisual {
+  order: -1;
+}
+.sceneCopy {
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  padding: clamp(24px, 4vw, 52px);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: rgba(255, 253, 247, 0.62);
+}
+.sceneCopy > span {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 820;
+  letter-spacing: 0.13em;
+}
+.sceneCopy h3 {
+  margin: 16px 0 14px;
+  color: var(--ink);
+  font:
+    500 clamp(27px, 3.3vw, 42px)/1.12 Georgia,
+    serif;
+  letter-spacing: -0.035em;
+}
+.sceneCopy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.75;
+}
+.sceneCopy small {
+  margin-top: 22px;
+  color: #9a755e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.sceneVisual {
+  position: relative;
+  min-height: 430px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background:
+    linear-gradient(rgba(80, 68, 52, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(80, 68, 52, 0.055) 1px, transparent 1px), #f8f3e9;
+  background-size: 24px 24px;
+  box-shadow: 0 20px 50px rgba(54, 44, 30, 0.08);
+}
+.miniWindowBar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  height: 43px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 15px;
+  border-bottom: 1px solid rgba(73, 64, 51, 0.1);
+  background: rgba(255, 253, 248, 0.82);
+}
+.miniWindowBar i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d8cbbd;
+}
+.miniWindowBar i:first-child {
+  background: #ee8a70;
+}
+.miniWindowBar span {
+  margin-left: 6px;
+  color: #8c8175;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+}
+.photoPaper {
+  position: absolute;
+  top: 86px;
+  left: 9%;
+  display: grid;
+  width: 58%;
+  gap: 11px;
+  padding: 30px 26px;
+  border-radius: 6px;
+  color: #534a42;
+  background: #fffef9;
+  box-shadow: 0 16px 34px rgba(67, 50, 34, 0.14);
+  transform: rotate(-2deg);
+}
+.photoPaper span {
+  font-size: 11px;
+}
+.photoPaper strong {
+  font:
+    500 19px/1.45 Georgia,
+    serif;
+}
+.photoPaper i {
+  display: block;
+  width: 82%;
+  height: 5px;
+  border-radius: 999px;
+  background: #eee7dc;
+}
+.photoPaper i:last-child {
+  width: 58%;
+}
+.sceneSelection {
+  position: absolute;
+  top: 128px;
+  left: 7%;
+  width: 62%;
+  height: 108px;
+  border: 2px dashed rgba(238, 108, 77, 0.78);
+  border-radius: 14px;
+  animation: sceneSelect 6400ms linear infinite;
+}
+.sceneAction {
+  position: absolute;
+  z-index: 2;
+  top: 216px;
+  left: 43%;
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: #fffaf3;
+  background: #302a25;
+  box-shadow: 0 9px 20px rgba(47, 39, 32, 0.22);
+  font-size: 10px;
+  font-weight: 800;
+  animation: sceneActionArrive 6400ms linear infinite;
+}
+.sceneHint {
+  position: absolute;
+  right: 7%;
+  bottom: 42px;
+  display: grid;
+  width: 46%;
+  gap: 7px;
+  padding: 17px;
+  border: 1px solid rgba(73, 64, 51, 0.12);
+  border-radius: 17px;
+  background: #fffdf8;
+  box-shadow: 0 16px 34px rgba(67, 50, 34, 0.15);
+  animation: sceneHintArrive 6400ms linear infinite;
+}
+.sceneHint span,
+.geometryTutor span {
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+}
+.sceneHint strong {
+  font-size: 12px;
+}
+.canvasTools {
+  position: absolute;
+  top: 22px;
+  left: 22px;
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  border: 1px solid rgba(73, 64, 51, 0.11);
+  border-radius: 13px;
+  background: rgba(255, 253, 248, 0.9);
+  box-shadow: 0 8px 18px rgba(54, 44, 30, 0.08);
+}
+.canvasTools i {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  color: #81766b;
+  font-size: 11px;
+  font-style: normal;
+}
+.canvasTools i:nth-child(2) {
+  color: #fffaf3;
+  background: #302a25;
+}
+.geometryDrawing {
+  position: absolute;
+  top: 84px;
+  left: 5%;
+  width: 53%;
+  overflow: visible;
+}
+.geometryDrawing path {
+  fill: none;
+  stroke: #62584e;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+.geometryDrawing text {
+  fill: #62584e;
+  font:
+    italic 16px Georgia,
+    serif;
+}
+.geometryDrawing circle {
+  fill: rgba(238, 108, 77, 0.22);
+  stroke: #ee6c4d;
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.geometryPointOne {
+  animation: geometryPoint 5600ms linear infinite;
+}
+.geometryPointTwo {
+  animation: geometryPoint 5600ms 2800ms linear infinite;
+}
+.geometryTutor {
+  position: absolute;
+  right: 6%;
+  bottom: 49px;
+  display: grid;
+  width: 45%;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid rgba(73, 64, 51, 0.12);
+  border-radius: 20px;
+  background: #fffdf8;
+  box-shadow: 0 18px 38px rgba(54, 44, 30, 0.14);
+  animation: geometryTutorFocus 5600ms cubic-bezier(0.77, 0, 0.175, 1) infinite;
+}
+.geometryTutor strong {
+  font-size: 14px;
+}
+.geometryTutor p {
+  margin: 0;
+  color: #756c63;
+  font-size: 11px;
+  line-height: 1.55;
+}
+.resumeScene {
+  display: grid;
+  align-items: center;
+}
+.desktopFrame {
+  position: relative;
+  width: 68%;
+  height: 286px;
+  margin-left: 7%;
+  overflow: hidden;
+  border: 1px solid rgba(73, 64, 51, 0.13);
+  border-radius: 19px;
+  background: #fffdf8;
+  box-shadow: 0 18px 40px rgba(54, 44, 30, 0.12);
+}
+.desktopFrame .miniWindowBar {
+  position: relative;
+}
+.boardPreview {
+  position: absolute;
+  top: 76px;
+  right: 24px;
+  left: 24px;
+  display: grid;
+  gap: 10px;
+  padding: 22px;
+  border: 1px solid rgba(73, 64, 51, 0.11);
+  border-radius: 16px;
+  background:
+    linear-gradient(rgba(80, 68, 52, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(80, 68, 52, 0.05) 1px, transparent 1px), #faf7ef;
+  background-size: 18px 18px;
+}
+.boardPreview span {
+  color: #8b7d70;
+  font-size: 10px;
+  font-weight: 750;
+}
+.boardPreview strong {
+  font:
+    500 24px Georgia,
+    serif;
+}
+.boardPreview div {
+  display: flex;
+  gap: 7px;
+}
+.boardPreview i {
+  width: 42px;
+  height: 5px;
+  border-radius: 999px;
+  background: #e4d8c9;
+}
+.boardPreview i:last-child {
+  width: 70px;
+}
+.savedStatus {
+  position: absolute;
+  right: 19px;
+  bottom: 15px;
+  color: #397659;
+  font-size: 10px;
+  font-weight: 800;
+  animation: savedPulse 5200ms linear infinite;
+}
+.syncTrack {
+  position: absolute;
+  z-index: 2;
+  right: 13%;
+  bottom: 104px;
+  width: 24%;
+  height: 2px;
+  background: rgba(238, 108, 77, 0.22);
+  transform: rotate(-18deg);
+}
+.syncTrack i {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ee6c4d;
+  box-shadow: 0 0 0 5px rgba(238, 108, 77, 0.13);
+  animation: syncTravel 5200ms cubic-bezier(0.77, 0, 0.175, 1) infinite;
+}
+.phoneFrame {
+  position: absolute;
+  right: 5%;
+  bottom: 27px;
+  display: grid;
+  width: 126px;
+  gap: 8px;
+  padding: 21px 14px;
+  border: 4px solid #302a25;
+  border-radius: 25px;
+  background: #fffdf8;
+  box-shadow: 0 18px 34px rgba(54, 44, 30, 0.18);
+  animation: phoneResume 5200ms cubic-bezier(0.77, 0, 0.175, 1) infinite;
+}
+.phoneFrame span {
+  color: var(--accent);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.09em;
+}
+.phoneFrame strong {
+  font-size: 11px;
+}
+.phoneFrame > i {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: #e8ded2;
+}
+.phoneFrame > i:last-child {
+  width: 58%;
+}
+@keyframes sceneSelect {
+  0%,
+  8%,
+  100% {
+    opacity: 0.34;
+    transform: scale(0.97);
+  }
+  16%,
+  34% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  42% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+}
+@keyframes sceneActionArrive {
+  0%,
+  21%,
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.96);
+  }
+  29%,
+  48% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  56% {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0) scale(0.98);
+  }
+}
+@keyframes sceneHintArrive {
+  0%,
+  42%,
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.97);
+  }
+  51%,
+  90% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+@keyframes geometryPoint {
+  0%,
+  12%,
+  100% {
+    opacity: 0.38;
+    transform: scale(0.92);
+  }
+  20%,
+  38% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  48% {
+    opacity: 0.38;
+    transform: scale(0.92);
+  }
+}
+@keyframes geometryTutorFocus {
+  0%,
+  35%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50%,
+  72% {
+    transform: translate3d(-7px, -5px, 0);
+  }
+}
+@keyframes savedPulse {
+  0%,
+  20%,
+  100% {
+    opacity: 0.48;
+  }
+  32%,
+  82% {
+    opacity: 1;
+  }
+}
+@keyframes syncTravel {
+  0%,
+  25%,
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+  36% {
+    opacity: 1;
+  }
+  62% {
+    opacity: 1;
+    transform: translate3d(105px, 0, 0);
+  }
+  72% {
+    opacity: 0;
+    transform: translate3d(105px, 0, 0);
+  }
+}
+@keyframes phoneResume {
+  0%,
+  52%,
+  100% {
+    transform: translate3d(0, 3px, 0);
+  }
+  65%,
+  84% {
+    transform: translate3d(0, -5px, 0);
+  }
+}
 .steps {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -730,6 +1239,17 @@
   .boardGrid {
     grid-template-columns: repeat(2, 1fr);
   }
+  .sceneHeading,
+  .sceneRow,
+  .sceneRow:nth-child(even) {
+    grid-template-columns: 1fr;
+  }
+  .sceneHeading {
+    gap: 18px;
+  }
+  .sceneRow:nth-child(even) .sceneVisual {
+    order: initial;
+  }
   .authLayout {
     gap: 30px;
     padding: 70px 0;
@@ -778,6 +1298,50 @@
   .section {
     padding-top: 70px;
   }
+  .sceneSection {
+    padding-top: 92px;
+  }
+  .sceneHeading {
+    margin-bottom: 30px;
+  }
+  .sceneRow {
+    gap: 12px;
+  }
+  .sceneCopy {
+    min-height: 300px;
+    border-radius: 22px;
+  }
+  .sceneVisual {
+    min-height: 390px;
+    border-radius: 22px;
+  }
+  .photoPaper {
+    left: 6%;
+    width: 67%;
+  }
+  .sceneSelection {
+    left: 4%;
+    width: 71%;
+  }
+  .sceneHint {
+    right: 5%;
+    width: 54%;
+  }
+  .geometryDrawing {
+    left: 2%;
+    width: 62%;
+  }
+  .geometryTutor {
+    right: 5%;
+    width: 53%;
+  }
+  .desktopFrame {
+    width: 75%;
+    margin-left: 4%;
+  }
+  .phoneFrame {
+    right: 3%;
+  }
   .dashboardHeader,
   .accountCard {
     align-items: flex-start;
@@ -792,7 +1356,15 @@
   .companion,
   .companionEyes,
   .companionArm,
-  .tutorProgress i {
+  .tutorProgress i,
+  .sceneSelection,
+  .sceneAction,
+  .sceneHint,
+  .geometryDrawing circle,
+  .geometryTutor,
+  .savedStatus,
+  .syncTrack i,
+  .phoneFrame {
     animation: none;
   }
   .primaryButton,
