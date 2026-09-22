@@ -15,6 +15,7 @@ Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无�
 - 多标签页竞争单写入者，冲突时保留本地副本，不静默覆盖云端。
 - 支持标准 `.excalidraw` 与包含辅导板和图片的 `.easy-to-learn.json` 完整备份。
 - 支持 light/dark、窄屏布局、键盘焦点和 reduced motion。
+- 可选启用 Sentry 浏览器异常采集；服务端 API 输出不含题目和身份信息的结构化错误日志。
 - 游客与登录用户每天各 3 次有效 AI 请求，同一身份每 5 分钟最多 1 次。
 
 ## 技术栈
@@ -69,12 +70,12 @@ Copy-Item .env.example .env.local
 
 浏览器仅允许以下公开变量：
 
-| 变量                     | 用途                                      |
-| ------------------------ | ----------------------------------------- |
-| `VITE_SUPABASE_URL`      | Supabase 项目 URL                         |
-| `VITE_SUPABASE_ANON_KEY` | 浏览器 anon key，不是 service role        |
-| `VITE_APP_ENV`           | `local`、`preview` 或 `production`        |
-| `VITE_SENTRY_DSN`        | 可选的公开 Sentry DSN；当前未配置时不启用 |
+| 变量                     | 用途                                        |
+| ------------------------ | ------------------------------------------- |
+| `VITE_SUPABASE_URL`      | Supabase 项目 URL                           |
+| `VITE_SUPABASE_ANON_KEY` | 浏览器 anon key，不是 service role          |
+| `VITE_APP_ENV`           | `local`、`preview` 或 `production`          |
+| `VITE_SENTRY_DSN`        | 可选的公开 Sentry DSN；未配置时监控保持禁用 |
 
 服务端变量：
 

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { ApiFault, asApiFault } from './fault';
+import { logApiError } from './logger';
 
 export interface HttpRequest {
   method?: string;
@@ -42,6 +43,7 @@ export const requireAllowedOrigin = (request: HttpRequest): void => {
 export const sendError = (response: HttpResponse, error: unknown, requestId?: string): void => {
   const fault = asApiFault(error);
   const id = requestId || randomUUID();
+  logApiError(fault, id);
   response.setHeader('X-Request-Id', id);
   response.status(fault.httpStatus).json(fault.toResponse(id));
 };
