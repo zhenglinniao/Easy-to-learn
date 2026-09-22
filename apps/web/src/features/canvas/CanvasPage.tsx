@@ -20,6 +20,8 @@ import {
 import {
   BoardSyncEngine,
   BroadcastSyncCoordinator,
+  createCompleteExport,
+  createExcalidrawExport,
   LocalBoardRepository,
   openLocalDatabase,
   type SyncState,
@@ -31,6 +33,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getOptionalSupabaseClient, useAuth } from '../auth';
 import { TutorApiClient } from '../ai-tutor';
 import { RemoteBoardRepository, SupabaseBoardGateway } from '../boards';
+import { downloadJson } from '../account';
 import { ThemeToggle, useTheme } from '../theme';
 
 import '@excalidraw/excalidraw/index.css';
@@ -449,6 +452,40 @@ export default function CanvasPage() {
       .catch(() => setPreparationError('辅导板本地保存失败，请导出副本后再继续。'));
   };
 
+  const exportBoard = async (format: 'excalidraw' | 'complete') => {
+    if (!api || !repositoryRef.current) return;
+    setPreparationError(null);
+    try {
+      await persistBoard(
+        repositoryRef.current,
+        boardId,
+        api.getSceneElementsIncludingDeleted(),
+        api.getAppState(),
+        api.getFiles(),
+        tutorBoards,
+        user?.id ?? 'local',
+      );
+      const [stored, assets] = await Promise.all([
+        repositoryRef.current.getBoard(boardId),
+        repositoryRef.current.getAssets(boardId),
+      ]);
+      if (!stored) throw new Error('画板尚未完成本地保存');
+      if (format === 'complete') {
+        downloadJson(
+          `easy-to-learn-${boardId}.easy-to-learn.json`,
+          await createCompleteExport(stored.snapshot, assets),
+        );
+      } else {
+        downloadJson(
+          `easy-to-learn-${boardId}.excalidraw`,
+          await createExcalidrawExport(stored.snapshot, assets),
+        );
+      }
+    } catch (error) {
+      setPreparationError(error instanceof Error ? error.message : '画板导出失败，请稍后重试。');
+    }
+  };
+
   const handleAction = async (action: RadialMenuAction) => {
     if (!api || loadingAction) return;
     setLoadingAction(action);
@@ -624,6 +661,12 @@ export default function CanvasPage() {
         <div className={styles.userBar}>
           <ThemeToggle />
           <span className={styles.saveState}>{syncLabel(syncState, Boolean(user))}</span>
+          <button type="button" onClick={() => void exportBoard('excalidraw')}>
+            导出
+          </button>
+          <button type="button" onClick={() => void exportBoard('complete')}>
+            备份
+          </button>
           {user ? (
             <>
               <Link to="/boards">{user.user_metadata?.name ?? user.email ?? '账户'}</Link>

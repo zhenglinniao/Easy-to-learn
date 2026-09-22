@@ -78,6 +78,10 @@ export default function LandingPage() {
       <footer className={styles.footer}>
         <strong>Easy to learn</strong>
         <span>让答案靠近问题，让学习留在画布。</span>
+        <nav aria-label="法律信息">
+          <Link to="/privacy">隐私说明</Link>
+          <Link to="/terms">使用条款</Link>
+        </nav>
       </footer>
     </main>
   );

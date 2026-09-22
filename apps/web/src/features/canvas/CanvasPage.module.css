@@ -180,6 +180,10 @@
     display: none;
   }
 
+  .saveState {
+    display: none;
+  }
+
   .guide {
     bottom: 78px;
   }

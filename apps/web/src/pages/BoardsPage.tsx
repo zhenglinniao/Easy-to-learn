@@ -16,6 +16,8 @@ export default function BoardsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BoardSummary | null>(null);
+  const [renameBoard, setRenameBoard] = useState<BoardSummary | null>(null);
+  const [renameTitle, setRenameTitle] = useState('');
   const [pendingDeletion, setPendingDeletion] = useState<string | null>(null);
   useEffect(() => {
     if (!user || !repository || !account) return;
@@ -49,6 +51,23 @@ export default function BoardsPage() {
       setConfirmDelete(null);
     } catch {
       setError('删除失败，画板没有被改动。');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const rename = async () => {
+    if (!repository || !renameBoard || !renameTitle.trim()) return;
+    setBusy(true);
+    try {
+      await repository.rename(renameBoard.id, renameTitle);
+      setBoards((items) =>
+        items.map((board) =>
+          board.id === renameBoard.id ? { ...board, title: renameTitle.trim() } : board,
+        ),
+      );
+      setRenameBoard(null);
+    } catch {
+      setError('重命名失败，原名称已保留。');
     } finally {
       setBusy(false);
     }
@@ -93,9 +112,20 @@ export default function BoardsPage() {
                 <strong>{board.title}</strong>
                 <small>{new Date(board.updatedAt).toLocaleString('zh-CN')}</small>
               </LinkLike>
-              <button type="button" onClick={() => setConfirmDelete(board)}>
-                删除
-              </button>
+              <div className={styles.boardActions}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRenameBoard(board);
+                    setRenameTitle(board.title);
+                  }}
+                >
+                  重命名
+                </button>
+                <button type="button" onClick={() => setConfirmDelete(board)}>
+                  删除
+                </button>
+              </div>
             </article>
           ))
         )}
@@ -155,6 +185,38 @@ export default function BoardsPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {renameBoard && (
+        <div className={styles.dialogBackdrop} role="presentation">
+          <form
+            className={styles.dialog}
+            aria-labelledby="rename-title"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void rename();
+            }}
+          >
+            <h2 id="rename-title">重命名画板</h2>
+            <label>
+              画板名称
+              <input
+                autoFocus
+                maxLength={120}
+                required
+                value={renameTitle}
+                onChange={(event) => setRenameTitle(event.target.value)}
+              />
+            </label>
+            <div>
+              <button type="button" onClick={() => setRenameBoard(null)}>
+                取消
+              </button>
+              <button type="submit" disabled={busy || !renameTitle.trim()}>
+                保存名称
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </main>

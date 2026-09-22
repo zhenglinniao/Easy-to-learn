@@ -71,6 +71,18 @@ describe('RemoteBoardRepository', () => {
 
     await expect(new RemoteBoardRepository(client).read(snapshot.boardId)).rejects.toThrow();
   });
+
+  it('重命名时去除首尾空白并传给受控 RPC', async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    const client = { rpc } as unknown as SupabaseClient;
+
+    await new RemoteBoardRepository(client).rename(snapshot.boardId, '  几何练习  ');
+
+    expect(rpc).toHaveBeenCalledWith('rename_board', {
+      p_board_id: snapshot.boardId,
+      p_title: '几何练习',
+    });
+  });
 });
 
 describe('SupabaseBoardGateway', () => {

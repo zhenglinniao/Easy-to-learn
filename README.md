@@ -1,0 +1,241 @@
+# Easy to learn
+
+Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无限画布中书写、绘图或粘贴题图，圈选内容后就地获取分步解答、递进提示或步骤解释。
+
+当前仓库已完成可运行的本地 MVP 代码、单元测试和 Vercel 部署配置。由于仓库尚未配置真实 Supabase、Upstash Redis、Gemini、OAuth、Sentry、Vercel 项目和域名，云登录、云同步与真实 AI 请求不能视为已经上线或完成供应商 E2E 验证。
+
+## 功能
+
+- 游客无需登录即可使用画布，草稿与图片保存在当前浏览器 IndexedDB。
+- 登录用户可创建、重命名、打开和删除多个私有画板。
+- 文字、手写、图形和图片混合选区可调用 Solve、Hint 与 Explain step。
+- AI 输出使用受控 Tutor DSL、KaTeX 与受限图表渲染，不注入模型 HTML。
+- 本地事务完成后再同步云端；资产先上传，快照使用 revision 乐观锁。
+- 多标签页竞争单写入者，冲突时保留本地副本，不静默覆盖云端。
+- 支持标准 `.excalidraw` 与包含辅导板和图片的 `.easy-to-learn.json` 完整备份。
+- 支持 light/dark、窄屏布局、键盘焦点和 reduced motion。
+- 游客与登录用户每天各 3 次有效 AI 请求，同一身份每 5 分钟最多 1 次。
+
+## 技术栈
+
+- Node.js 24.21.0、pnpm 11.25.0
+- React 19、TypeScript 6、Vite 8、React Router 7
+- Excalidraw 0.18、Zod 4、KaTeX 0.18、IndexedDB (`idb`)
+- Supabase Auth / Postgres / Storage
+- Vercel Functions、Upstash Redis、Google Gemini
+- Vitest、Testing Library、fake-indexeddb、pgTAP
+
+所有依赖使用精确版本并写入 lockfile。请使用仓库冻结版本，不要用 `latest` 替换。
+
+## 目录
+
+```text
+apps/web/                  React/Vite 前端
+api/                       Vercel Node Functions
+packages/domain/           领域模型与 Zod 协议
+packages/canvas-adapter/   Excalidraw 选区、坐标和导出适配
+packages/persistence/      IndexedDB、outbox、同步和导出
+packages/ui/               径向菜单、辅导板与安全 DSL 渲染
+supabase/migrations/       数据库、RLS、RPC、Storage policy
+supabase/tests/            pgTAP 权限与契约测试
+docs/                      需求、方案、进度和测试报告
+```
+
+## 环境依赖
+
+必需：
+
+- Node.js `24.21.0`（仓库包含 `.nvmrc` 和 `.node-version`）
+- pnpm `11.25.0`
+
+需要运行本地 Supabase 或数据库测试时，还需：
+
+- Docker Desktop
+- Supabase CLI（已作为项目开发依赖安装，可通过 pnpm 脚本调用）
+
+## 安装
+
+```powershell
+corepack enable
+corepack prepare pnpm@11.25.0 --activate
+pnpm install --frozen-lockfile
+Copy-Item .env.example .env.local
+```
+
+`.env.local` 只保存在本机，禁止提交任何真实密钥。
+
+## 环境变量
+
+浏览器仅允许以下公开变量：
+
+| 变量                     | 用途                                      |
+| ------------------------ | ----------------------------------------- |
+| `VITE_SUPABASE_URL`      | Supabase 项目 URL                         |
+| `VITE_SUPABASE_ANON_KEY` | 浏览器 anon key，不是 service role        |
+| `VITE_APP_ENV`           | `local`、`preview` 或 `production`        |
+| `VITE_SENTRY_DSN`        | 可选的公开 Sentry DSN；当前未配置时不启用 |
+
+服务端变量：
+
+| 变量                                                  | 用途                                             |
+| ----------------------------------------------------- | ------------------------------------------------ |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY`                  | JWT 校验与用户级访问                             |
+| `SUPABASE_SERVICE_ROLE_KEY`                           | 临时 AI 图片、账户删除和保留任务；禁止传到浏览器 |
+| `GEMINI_API_KEY`                                      | Gemini 服务端调用                                |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 配额、限流、票据和幂等缓存                       |
+| `ANON_SESSION_KEYS`                                   | `v2:至少32字符密钥,v1:旧密钥`，第一项用于签发    |
+| `ACTOR_HASH_SECRET`                                   | actor 不可逆摘要和上传路径隔离                   |
+| `AI_CACHE_ENCRYPTION_KEY`                             | 32 字节随机值的 Base64，保护 24 小时幂等响应     |
+| `CRON_SECRET`                                         | Vercel Cron 调用保留任务的 Bearer 密钥           |
+| `APP_ORIGINS`                                         | 逗号分隔的完整允许 origin                        |
+
+建议用密码管理器生成独立随机密钥；不要复用 Supabase、Redis 或 Gemini 凭据。
+
+## 启动
+
+只预览前端（登录和 AI API 不可用）：
+
+```powershell
+pnpm dev
+```
+
+浏览器打开 `http://127.0.0.1:5173/`。
+
+运行本地 Supabase：
+
+```powershell
+pnpm db:start
+pnpm db:verify
+```
+
+`db:start` 输出的本地 URL 与 anon/service-role key 需要填入 `.env.local`。运行包含 Vercel Functions 的完整本地栈可使用：
+
+```powershell
+pnpm dlx vercel@latest dev
+```
+
+完整栈的实际端口以 Vercel CLI 输出为准，并将该 origin 写入 `APP_ORIGINS`。
+
+## 调用示例
+
+健康检查：
+
+```powershell
+Invoke-RestMethod http://localhost:3000/api/health
+```
+
+建立游客会话：
+
+```powershell
+Invoke-WebRequest http://localhost:3000/api/anonymous/session `
+  -Method Post `
+  -Headers @{ Origin = "http://localhost:3000" } `
+  -SessionVariable EasySession
+```
+
+使用游客 cookie 请求文字解题：
+
+```powershell
+$Body = @{
+  requestId = [guid]::NewGuid().ToString()
+  schemaVersion = 1
+  boardId = "local_demo"
+  mode = "solve"
+  text = "2x + 3 = 11"
+  locale = "zh-CN"
+  source = @{
+    elementIds = @("element-1")
+    selectionBounds = @{ x = 0; y = 0; width = 120; height = 40 }
+    contentHash = "demo-hash"
+  }
+} | ConvertTo-Json -Depth 6
+
+Invoke-RestMethod http://localhost:3000/api/ai/tutor `
+  -Method Post `
+  -Headers @{ Origin = "http://localhost:3000" } `
+  -ContentType "application/json" `
+  -WebSession $EasySession `
+  -Body $Body
+```
+
+真实调用会消耗一次有效配额；相同 `requestId` 的幂等重试不会重复扣减。
+
+## 质量检查
+
+```powershell
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:coverage
+pnpm db:static
+pnpm db:verify       # 需要 Docker 与本地 Supabase
+pnpm build
+pnpm audit:dependencies
+pnpm check
+```
+
+当前本地结果：15 个测试文件、65 个测试用例通过；数据库静态契约覆盖 6 张表和 40 项 pgTAP 断言。详细范围见 [单元测试报告](docs/04-单元测试报告.md)。
+
+## Vercel 部署
+
+1. 创建独立的 Preview 与 Production Supabase/Redis 资源，不允许 Preview 连接生产数据。
+2. 在 Supabase 应用迁移并执行 RLS/Storage 测试。
+3. 在 Vercel 分环境录入 `.env.example` 中的变量，确认 service role 没有 `VITE_` 前缀。
+4. 配置 Supabase Site URL、OAuth callback 和允许 origin；启用所需 Google/GitHub provider。
+5. 从 Preview 部署开始，验证 `/api/health`、登录、画板 CRUD、图片恢复、AI 配额和账户删除冷静期。
+6. 检查 CSP、HSTS、Referrer-Policy、Permissions-Policy、`nosniff` 和静态资源缓存头。
+7. 完成数据库备份恢复、应用回滚、migration 回滚兼容和账户删除演练后，再逐步放量。
+
+仓库的 `vercel.json` 提供 SPA deep link、函数时限、小时级保留任务、安全响应头和静态资源缓存。该配置依据 Vercel 官方 Vite SPA 与项目配置格式编写；生产发布仍需在实际 Preview 域名验证。
+
+## 数据保留摘要
+
+- 活跃画板与图片：保留至用户删除画板或账户。
+- 已删除画板关联图片：24 小时内清理。
+- 账户删除：7 天冷静期；期满后主数据 24 小时内删除。
+- 已删除账户的灾难恢复备份：最长 30 天。
+- AI 运行元数据：90 天；安全与权限审计日志：180 天。
+- 匿名限流标识：最后活动后 48 小时；幂等响应：最长 24 小时。
+
+详细说明见应用内 `/privacy` 与 [需求决策记录](docs/01-需求评审与决策记录.md)。
+
+## 常见问题
+
+### 页面能打开，但登录按钮不可用
+
+未设置 `VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY`。这是预期的安全降级，界面会保留预览但不会伪造登录。
+
+### 画布能用，但 AI 请求返回服务未配置
+
+前端 Vite 服务不包含 `/api` Functions，或 Gemini/Redis/Supabase 服务端变量不完整。使用 Vercel CLI 启动完整栈，并检查 `/api/health` 的 `degraded` 项。
+
+### 为什么本地 Node 会出现 engine 警告
+
+仓库固定 Node `24.21.0`。其他 24.x 版本可能暂时能运行，但正式检查和部署应切换到冻结版本，避免原生 API 或构建行为差异。
+
+### 离线编辑会丢失吗
+
+画布先写 IndexedDB，再尝试云同步。离线时 outbox 保留，恢复网络后重试；本地写失败会阻断云覆盖并提示先导出副本。
+
+### revision 冲突如何处理
+
+应用不会强制覆盖云端，会保存本地冲突副本。MVP 的恢复路径是打开云端版本、把本地版本另存为新画板，或下载本地完整备份。
+
+### 如何清理本地 Supabase
+
+```powershell
+pnpm db:stop
+```
+
+不要手工删除仓库或 Docker 数据目录来代替正常停止流程。
+
+## 文档
+
+- [需求评审与决策记录](docs/01-需求评审与决策记录.md)
+- [系统方案设计](docs/02-方案设计.md)
+- [单元测试报告](docs/04-单元测试报告.md)
+- [开发节点记录](docs/progress/03-10-官网登录与桌面体验.md)
+
+## 当前发布边界
+
+本地代码完成不等于生产发布完成。缺少真实供应商凭据时，以下事项仍是外部阻塞：OAuth、云端 RLS/Storage E2E、Gemini 黄金题集、Redis 配额、Sentry 告警、Vercel Preview 安全头、备份恢复和灰度观察。所有这些必须用对应环境的证据单独验收。

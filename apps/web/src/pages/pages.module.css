@@ -267,6 +267,40 @@
   color: var(--muted);
   font-size: 12px;
 }
+.footer nav {
+  display: flex;
+  gap: 14px;
+}
+.footer a,
+.legalPage a {
+  color: var(--muted);
+  text-underline-offset: 3px;
+}
+.legalPage {
+  width: min(760px, 100%);
+  margin: 90px auto 0;
+  padding: 42px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+.legalPage h1 {
+  font-size: clamp(36px, 6vw, 58px);
+}
+.legalPage h2 {
+  margin: 38px 0 10px;
+  font-size: 20px;
+}
+.legalPage p,
+.legalPage li {
+  color: var(--muted);
+  line-height: 1.75;
+}
+.legalUpdated {
+  margin-top: 18px;
+  font-size: 12px;
+}
 .authLayout {
   display: grid;
   grid-template-columns: 1fr 430px;
@@ -423,16 +457,36 @@
     500 22px Georgia,
     serif;
 }
-.boardCard > button {
+.boardActions {
   position: absolute;
   top: 12px;
   right: 12px;
+  display: flex;
+  gap: 2px;
+}
+.boardActions button {
   padding: 7px 9px;
   border: 0;
   border-radius: 9px;
   color: var(--muted);
   background: transparent;
   cursor: pointer;
+}
+.dialog label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.dialog input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: var(--ink);
+  background: var(--paper);
+  font: inherit;
 }
 .emptyState {
   grid-column: 1/-1;
@@ -510,7 +564,7 @@
 @media (hover: hover) and (pointer: fine) {
   .siteHeader nav a:hover,
   .siteHeader nav button:hover,
-  .boardCard > button:hover {
+  .boardActions button:hover {
     color: var(--ink);
     background: rgba(80, 70, 58, 0.07);
   }
