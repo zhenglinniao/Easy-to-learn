@@ -9,29 +9,7 @@
     <meta property="og:type" content="website" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>Easy to learn</title>
-    <script>
-      (() => {
-        const key = 'easy-to-learn-theme';
-        const stored = localStorage.getItem(key);
-        const theme =
-          stored === 'light' || stored === 'dark'
-            ? stored
-            : matchMedia('(prefers-color-scheme: dark)').matches
-              ? 'dark'
-              : 'light';
-        document.documentElement.dataset.theme = theme;
-        document.documentElement.style.colorScheme = theme;
-      })();
-    </script>
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "Easy to learn",
-        "applicationCategory": "EducationalApplication",
-        "operatingSystem": "Web"
-      }
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>
