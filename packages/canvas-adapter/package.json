@@ -1,0 +1,22 @@
+{
+  "name": "@easy-to-learn/canvas-adapter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@easy-to-learn/domain": "workspace:*",
+    "@excalidraw/excalidraw": "0.18.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "6.0.3"
+  }
+}

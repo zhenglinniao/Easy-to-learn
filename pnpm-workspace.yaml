@@ -1,0 +1,46 @@
+packages:
+  - apps/*
+  - api
+  - packages/*
+
+allowBuilds:
+  '@google/genai': false
+  msw: false
+  protobufjs: false
+
+catalog:
+  react: 19.3.0
+  react-dom: 19.3.0
+  zod: 4.6.5
+
+peerDependencyRules:
+  allowedVersions:
+    react: 19.3.0
+    react-dom: 19.3.0
+
+overrides:
+  lodash-es@4.17.21: 4.18.1
+  nanoid@3.3.3: 3.3.19
+  nanoid@4.0.2: 5.1.16
+
+minimumReleaseAgeExclude:
+  - '@google/genai@2.24.0'
+  - '@sentry/browser-utils@10.75.2'
+  - '@sentry/browser@10.75.2'
+  - '@sentry/core@10.75.2'
+  - '@sentry/feedback@10.75.2'
+  - '@sentry/react@10.75.2'
+  - '@sentry/replay-canvas@10.75.2'
+  - '@sentry/replay@10.75.2'
+  - '@typescript-eslint/eslint-plugin@8.70.1'
+  - '@typescript-eslint/parser@8.70.1'
+  - '@typescript-eslint/project-service@8.70.1'
+  - '@typescript-eslint/scope-manager@8.70.1'
+  - '@typescript-eslint/tsconfig-utils@8.70.1'
+  - '@typescript-eslint/type-utils@8.70.1'
+  - '@typescript-eslint/types@8.70.1'
+  - '@typescript-eslint/typescript-estree@8.70.1'
+  - '@typescript-eslint/utils@8.70.1'
+  - '@typescript-eslint/visitor-keys@8.70.1'
+  - jsdom@30.1.1
+  - typescript-eslint@8.70.1
