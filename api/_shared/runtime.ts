@@ -1,12 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
 
+import { AiProviderConfigurationError } from './ai-provider-config';
+import { createTutorModelFromEnvironment } from './ai-provider';
 import { ApiFault } from './fault';
-import { GeminiTutorModel } from './gemini-model';
 import { cookieValue, header, type HttpRequest } from './http';
 import { RedisAiStateStore } from './redis-ai-state';
 import { verifyAnonymousSession, type SessionKey } from './session';
-import { TutorService, type BoardAuthorizer, type TutorActor } from './tutor-service';
+import {
+  TutorService,
+  type BoardAuthorizer,
+  type TutorActor,
+  type TutorModel,
+} from './tutor-service';
 import { UploadTicketService } from './upload-ticket';
 import {
   AccountDeletionService,
@@ -100,13 +106,16 @@ class SupabaseBoardAuthorizer implements BoardAuthorizer {
 
 export const createTutorService = (actor: TutorActor, accessToken?: string): TutorService => {
   const tickets = createUploadTicketService();
-  return new TutorService(
-    createAiStateStore(),
-    new GeminiTutorModel(required('GEMINI_API_KEY'), 30_000, undefined, (...args) =>
-      tickets.resolve(actor, ...args),
-    ),
-    new SupabaseBoardAuthorizer(accessToken),
-  );
+  let model: TutorModel;
+  try {
+    model = createTutorModelFromEnvironment((...args) => tickets.resolve(actor, ...args));
+  } catch (error) {
+    if (error instanceof AiProviderConfigurationError) {
+      throw new ApiFault('DEPENDENCY_UNAVAILABLE', 'AI 服务配置尚未完成');
+    }
+    throw error;
+  }
+  return new TutorService(createAiStateStore(), model, new SupabaseBoardAuthorizer(accessToken));
 };
 
 export const resolveAuthenticatedAccount = async (

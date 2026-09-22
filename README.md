@@ -2,7 +2,7 @@
 
 Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无限画布中书写、绘图或粘贴题图，圈选内容后就地获取分步解答、递进提示或步骤解释。
 
-当前仓库已完成可运行的本地 MVP 代码、单元测试和 Vercel 部署配置。由于仓库尚未配置真实 Supabase、Upstash Redis、Gemini、OAuth、Sentry、Vercel 项目和域名，云登录、云同步与真实 AI 请求不能视为已经上线或完成供应商 E2E 验证。
+当前仓库已完成可运行的本地 MVP 代码、单元测试和 Vercel 部署配置。由于仓库尚未配置真实 Supabase、Upstash Redis、AI 模型供应商、OAuth、Sentry、Vercel 项目和域名，云登录、云同步与真实 AI 请求不能视为已经上线或完成供应商 E2E 验证。
 
 ## 功能
 
@@ -10,6 +10,7 @@ Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无�
 - 登录用户可创建、重命名、打开和删除多个私有画板。
 - 文字、手写、图形和图片混合选区可调用 Solve、Hint 与 Explain step。
 - AI 输出使用受控 Tutor DSL、KaTeX 与受限图表渲染，不注入模型 HTML。
+- AI Provider 可按顺序配置 Gemini 或 OpenAI-compatible 模型，并在超时、网络错误或供应商故障时自动回退。
 - 辅导板支持“有帮助”或预定义问题分类反馈，不采集自由文本与原题内容。
 - 本地事务完成后再同步云端；资产先上传，快照使用 revision 乐观锁。
 - 多标签页竞争单写入者，冲突时保留本地副本，不静默覆盖云端。
@@ -26,7 +27,7 @@ Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无�
 - React 19、TypeScript 6、Vite 8、React Router 7
 - Excalidraw 0.18、Zod 4、KaTeX 0.18、IndexedDB (`idb`)
 - Supabase Auth / Postgres / Storage
-- Vercel Functions、Upstash Redis、Google Gemini
+- Vercel Functions、Upstash Redis、Gemini / OpenAI-compatible AI Provider
 - Vitest、Testing Library、fake-indexeddb、pgTAP
 
 所有依赖使用精确版本并写入 lockfile。请使用仓库冻结版本，不要用 `latest` 替换。
@@ -85,7 +86,14 @@ Copy-Item .env.example .env.local
 | ----------------------------------------------------- | ------------------------------------------------ |
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY`                  | JWT 校验与用户级访问                             |
 | `SUPABASE_SERVICE_ROLE_KEY`                           | 临时 AI 图片、账户删除和保留任务；禁止传到浏览器 |
-| `GEMINI_API_KEY`                                      | Gemini 服务端调用                                |
+| `AI_PROVIDERS`                                        | Provider 标识的有序列表，如 `primary,backup`     |
+| `AI_PROMPT_VERSION`                                   | 服务端提示词版本，默认 `v1`                      |
+| `AI_PROVIDER_<ID>_TYPE`                               | `gemini` 或 `openai-compatible`                  |
+| `AI_PROVIDER_<ID>_MODEL`                              | 该 Provider 使用的模型名                         |
+| `AI_PROVIDER_<ID>_API_KEY`                            | 该 Provider 的服务端密钥；本地服务可以留空       |
+| `AI_PROVIDER_<ID>_BASE_URL`                           | OpenAI-compatible API 的 `/v1` 基础地址          |
+| `AI_PROVIDER_<ID>_RESPONSE_FORMAT`                    | `json_schema`、`json_object` 或 `prompt`         |
+| `AI_PROVIDER_<ID>_TIMEOUT_MS`                         | 单个 Provider 超时，范围 1000–25000 毫秒         |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 配额、限流、票据和幂等缓存                       |
 | `ANON_SESSION_KEYS`                                   | `v2:至少32字符密钥,v1:旧密钥`，第一项用于签发    |
 | `ACTOR_HASH_SECRET`                                   | actor 不可逆摘要和上传路径隔离                   |
@@ -93,7 +101,13 @@ Copy-Item .env.example .env.local
 | `CRON_SECRET`                                         | Vercel Cron 调用保留任务的 Bearer 密钥           |
 | `APP_ORIGINS`                                         | 逗号分隔的完整允许 origin                        |
 
-建议用密码管理器生成独立随机密钥；不要复用 Supabase、Redis 或 Gemini 凭据。
+Provider 按 `AI_PROVIDERS` 的声明顺序尝试。仅当当前 Provider 超时、网络失败或返回供应商错误时才切换；模型成功返回但 DSL 非法时，仍由现有的一次纠错流程处理。`GEMINI_API_KEY`、`AI_MODEL` 和 `AI_TIMEOUT_MS` 仅用于兼容旧部署；声明 `AI_PROVIDERS` 后不再读取它们。
+
+Provider 链最多配置 3 个节点，累计超时预算不得超过 25 秒；未单独设置超时时，预算会在节点间平均分配。Tutor Function 时限为 60 秒，用于容纳一次正常调用和至多一次既有格式纠错，不应依靠平台时限代替 Provider 超时。
+
+OpenAI、DeepSeek、通义千问、Moonshot、OpenRouter、Groq 与本地服务共用 `openai-compatible` 适配器。不同供应商对结构化输出的支持不同：优先使用 `json_schema`，不支持时改为 `json_object`，仍不支持时使用 `prompt`。所选模型必须支持图片输入，才能处理题图。
+
+建议用密码管理器生成独立随机密钥；不要复用 Supabase、Redis 或 AI Provider 凭据。
 
 ## 启动
 
@@ -211,7 +225,7 @@ pnpm check
 
 ### 画布能用，但 AI 请求返回服务未配置
 
-前端 Vite 服务不包含 `/api` Functions，或 Gemini/Redis/Supabase 服务端变量不完整。使用 Vercel CLI 启动完整栈，并检查 `/api/health` 的 `degraded` 项。
+前端 Vite 服务不包含 `/api` Functions，或 AI Provider/Redis/Supabase 服务端变量不完整。使用 Vercel CLI 启动完整栈，并检查 `/api/health` 的 `degraded` 项。
 
 ### 为什么本地 Node 会出现 engine 警告
 
@@ -242,4 +256,4 @@ pnpm db:stop
 
 ## 当前发布边界
 
-本地代码完成不等于生产发布完成。缺少真实供应商凭据时，以下事项仍是外部阻塞：OAuth、云端 RLS/Storage E2E、Gemini 黄金题集、Redis 配额、Sentry 告警、Vercel Preview 安全头、备份恢复和灰度观察。所有这些必须用对应环境的证据单独验收。
+本地代码完成不等于生产发布完成。缺少真实供应商凭据时，以下事项仍是外部阻塞：OAuth、云端 RLS/Storage E2E、各启用 AI Provider 的黄金题集与回退演练、Redis 配额、Sentry 告警、Vercel Preview 安全头、备份恢复和灰度观察。所有这些必须用对应环境的证据单独验收。

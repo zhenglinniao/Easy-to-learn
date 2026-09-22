@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { isAiProviderEnvironmentConfigured } from './_shared/ai-provider-config';
 import { ApiFault } from './_shared/fault';
 import { sendError, type HttpRequest, type HttpResponse } from './_shared/http';
 import { API_CONTRACT_VERSION } from './_shared/version';
@@ -19,7 +20,7 @@ export default async function handler(request: HttpRequest, response: HttpRespon
           redis: configured(['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'])
             ? 'ok'
             : 'degraded',
-          ai: process.env.GEMINI_API_KEY ? 'ok' : 'degraded',
+          ai: isAiProviderEnvironmentConfigured(process.env) ? 'ok' : 'degraded',
         },
       },
     });
