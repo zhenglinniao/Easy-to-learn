@@ -236,6 +236,96 @@ describe('LocalBoardRepository', () => {
       conflictCopies: [],
     });
   });
+
+  it('将最新本地冲突副本另存为全新云画板', async () => {
+    const { repository } = await createRepository();
+    const source = await repository.saveDurableChange(emptySnapshot('board-conflict'));
+    await repository.createConflictCopy(source, 7);
+
+    const copied = await repository.prepareConflictCopyAsNewBoard(
+      'board-conflict',
+      '66666666-6666-4666-8666-666666666666',
+      'user-1',
+    );
+
+    expect(copied).toMatchObject({
+      boardId: '66666666-6666-4666-8666-666666666666',
+      remoteRevision: 0,
+      dirty: true,
+      snapshot: { boardId: '66666666-6666-4666-8666-666666666666', revision: 0 },
+    });
+    expect(await repository.getOutbox(copied.boardId)).toEqual([
+      expect.objectContaining({ operation: 'snapshot', baseRevision: 0 }),
+    ]);
+    await expect(repository.getPreparedConflictTarget('board-conflict')).resolves.toBe(
+      copied.boardId,
+    );
+    expect(await repository.getConflictCopies('board-conflict')).toHaveLength(1);
+  });
+
+  it('选择远端版本后清理冲突与待同步任务并保存干净快照', async () => {
+    const { repository } = await createRepository();
+    const source = await repository.saveDurableChange(emptySnapshot('board-conflict'));
+    await repository.createConflictCopy(source, 7);
+    const remote = { ...emptySnapshot('board-conflict'), revision: 7 };
+
+    await expect(repository.resolveConflictWithRemote(remote)).resolves.toMatchObject({
+      boardId: 'board-conflict',
+      remoteRevision: 7,
+      dirty: false,
+    });
+    expect(await repository.getConflictCopies('board-conflict')).toEqual([]);
+    expect(await repository.getOutbox('board-conflict')).toEqual([]);
+  });
+
+  it('远端资产未全部下载校验前不覆盖本地冲突副本', async () => {
+    const { repository } = await createRepository();
+    const contentHash = '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824';
+    const blob = new Blob(['hello'], { type: 'image/png' });
+    const manifest = {
+      fileId: 'file-1',
+      objectPath: `user-1/board-conflict/${contentHash}`,
+      contentHash,
+      mimeType: 'image/png' as const,
+      byteSize: blob.size,
+      width: 1,
+      height: 1,
+    };
+    await repository.putAsset(manifest, blob);
+    const source = await repository.saveDurableChange({
+      ...emptySnapshot('board-conflict'),
+      assets: [manifest],
+    });
+    await repository.createConflictCopy(source, 7);
+
+    await expect(
+      repository.resolveConflictWithRemote({ ...source.snapshot, revision: 7 }),
+    ).rejects.toMatchObject({ code: 'MISSING_ASSET' });
+
+    expect(await repository.getConflictCopies('board-conflict')).toHaveLength(1);
+    expect(await repository.getBoard('board-conflict')).toMatchObject({ dirty: true });
+  });
+
+  it('本地副本另存成功后可只清理原云画板缓存', async () => {
+    const { repository } = await createRepository();
+    const source = await repository.saveDurableChange(emptySnapshot('board-conflict'));
+    await repository.createConflictCopy(source, 7);
+    await repository.prepareConflictCopyAsNewBoard(
+      'board-conflict',
+      '77777777-7777-4777-8777-777777777777',
+      'user-1',
+    );
+
+    await repository.clearCloudBoardCacheAfterConflict('board-conflict');
+
+    expect(await repository.getBoard('board-conflict')).toBeUndefined();
+    expect(await repository.getConflictCopies('board-conflict')).toEqual([]);
+    expect(await repository.getPreparedConflictTarget('board-conflict')).toBeNull();
+    expect(await repository.getBoard('77777777-7777-4777-8777-777777777777')).toBeDefined();
+    await expect(repository.clearCloudBoardCacheAfterConflict('local_guest')).rejects.toMatchObject(
+      { code: 'DATABASE_CORRUPTED' },
+    );
+  });
 });
 
 describe('BoardSyncEngine', () => {

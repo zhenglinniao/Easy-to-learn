@@ -421,6 +421,197 @@ export class LocalBoardRepository {
     return this.database.getAllFromIndex('conflictCopies', 'by-board', boardId);
   }
 
+  async prepareConflictCopyAsNewBoard(
+    sourceBoardId: string,
+    targetBoardId: string,
+    ownerId: string,
+  ): Promise<StoredBoard> {
+    if (sourceBoardId.startsWith('local_') || targetBoardId.startsWith('local_')) {
+      throw new LocalPersistenceError('DATABASE_CORRUPTED', '冲突副本画板 ID 无效');
+    }
+    const transaction = this.database.transaction(
+      ['boards', 'assets', 'outbox', 'preferences', 'conflictCopies'],
+      'readwrite',
+    );
+    try {
+      const conflicts = await transaction
+        .objectStore('conflictCopies')
+        .index('by-board')
+        .getAll(sourceBoardId);
+      const conflict = conflicts.sort((left, right) =>
+        right.createdAt.localeCompare(left.createdAt),
+      )[0];
+      if (!conflict) throw new LocalPersistenceError('DATABASE_CORRUPTED', '找不到本地冲突副本');
+      const sourceAssets = await transaction
+        .objectStore('assets')
+        .index('by-board')
+        .getAll(sourceBoardId);
+      const manifests = conflict.snapshot.assets.map((manifest) => ({
+        ...manifest,
+        objectPath: `${ownerId}/${targetBoardId}/${manifest.contentHash}`,
+      }));
+      const snapshot: PersistedCanvasV2 = {
+        ...conflict.snapshot,
+        boardId: targetBoardId,
+        revision: 0,
+        assets: manifests,
+        updatedAt: this.now().toISOString(),
+      };
+      const board: StoredBoard = {
+        boardId: targetBoardId,
+        snapshot,
+        localRevision: 1,
+        remoteRevision: 0,
+        dirty: true,
+        updatedAt: this.now().toISOString(),
+      };
+      for (const manifest of manifests) {
+        const source = sourceAssets.find(({ fileId }) => fileId === manifest.fileId);
+        if (!source || source.contentHash !== manifest.contentHash) {
+          throw new LocalPersistenceError(
+            'MISSING_ASSET',
+            `冲突副本缺少完整资产：${manifest.fileId}`,
+          );
+        }
+        await transaction.objectStore('assets').put({
+          ...source,
+          boardId: targetBoardId,
+          objectPath: manifest.objectPath,
+          uploadState: 'local',
+        });
+      }
+      await transaction.objectStore('boards').put(board);
+      await transaction.objectStore('outbox').add({
+        boardId: targetBoardId,
+        baseRevision: 0,
+        localRevision: 1,
+        operation: 'snapshot',
+        attempts: 0,
+        nextAttemptAt: this.now().getTime(),
+        createdAt: this.now().toISOString(),
+      });
+      await transaction.objectStore('preferences').put({
+        key: `conflict-target:${sourceBoardId}`,
+        value: targetBoardId,
+      });
+      await transaction.done;
+      return board;
+    } catch (error) {
+      transaction.abort();
+      await transaction.done.catch(() => undefined);
+      throw toLocalPersistenceError(error);
+    }
+  }
+
+  async getPreparedConflictTarget(sourceBoardId: string): Promise<string | null> {
+    const preference = await this.database.get('preferences', `conflict-target:${sourceBoardId}`);
+    if (
+      typeof preference?.value !== 'string' ||
+      preference.value.startsWith('local_') ||
+      !(await this.database.get('boards', preference.value))
+    ) {
+      return null;
+    }
+    return preference.value;
+  }
+
+  async resolveConflictWithRemote(
+    snapshotInput: PersistedCanvasV2,
+    downloads: ReadonlyArray<{ manifest: AssetManifestItem; blob: Blob }> = [],
+  ): Promise<StoredBoard> {
+    const snapshot = parsePersistedCanvas(snapshotInput);
+    const downloadedAssets: StoredAsset[] = [];
+    for (const manifest of snapshot.assets) {
+      const download = downloads.find(({ manifest: item }) => item.fileId === manifest.fileId);
+      if (!download || download.manifest.contentHash !== manifest.contentHash) {
+        throw new LocalPersistenceError(
+          'MISSING_ASSET',
+          `远端版本资产尚未完整下载：${manifest.fileId}`,
+        );
+      }
+      if (
+        download.blob.size !== manifest.byteSize ||
+        download.blob.type !== manifest.mimeType ||
+        (await sha256(download.blob)) !== manifest.contentHash
+      ) {
+        throw new LocalPersistenceError(
+          'ASSET_INTEGRITY_FAILED',
+          `远端版本资产校验失败：${manifest.fileId}`,
+        );
+      }
+      downloadedAssets.push({
+        boardId: snapshot.boardId,
+        fileId: manifest.fileId,
+        blob: download.blob,
+        contentHash: manifest.contentHash,
+        mimeType: manifest.mimeType,
+        byteSize: manifest.byteSize,
+        width: manifest.width,
+        height: manifest.height,
+        uploadState: 'uploaded',
+        objectPath: manifest.objectPath,
+      });
+    }
+    const transaction = this.database.transaction(
+      ['boards', 'assets', 'outbox', 'preferences', 'conflictCopies'],
+      'readwrite',
+    );
+    try {
+      const assets = transaction.objectStore('assets');
+      for (const asset of downloadedAssets) await assets.put(asset);
+      const referenced = new Set(snapshot.assets.map(({ fileId }) => fileId));
+      const assetKeys = await assets.index('by-board').getAllKeys(snapshot.boardId);
+      for (const key of assetKeys) {
+        if (!referenced.has(key[1])) await assets.delete(key);
+      }
+      const outbox = transaction.objectStore('outbox');
+      const outboxKeys = await outbox.index('by-board').getAllKeys(snapshot.boardId);
+      for (const key of outboxKeys) await outbox.delete(key);
+      const conflicts = transaction.objectStore('conflictCopies');
+      const conflictKeys = await conflicts.index('by-board').getAllKeys(snapshot.boardId);
+      for (const key of conflictKeys) await conflicts.delete(key);
+      await transaction.objectStore('preferences').delete(`conflict-target:${snapshot.boardId}`);
+      const board: StoredBoard = {
+        boardId: snapshot.boardId,
+        snapshot,
+        localRevision: 0,
+        remoteRevision: snapshot.revision,
+        dirty: false,
+        updatedAt: this.now().toISOString(),
+      };
+      await transaction.objectStore('boards').put(board);
+      await transaction.done;
+      return board;
+    } catch (error) {
+      transaction.abort();
+      await transaction.done.catch(() => undefined);
+      throw toLocalPersistenceError(error);
+    }
+  }
+
+  async clearCloudBoardCacheAfterConflict(boardId: string): Promise<void> {
+    if (boardId.startsWith('local_')) {
+      throw new LocalPersistenceError('DATABASE_CORRUPTED', '本地画板不能按云端冲突清理');
+    }
+    const transaction = this.database.transaction(
+      ['boards', 'assets', 'outbox', 'preferences', 'conflictCopies'],
+      'readwrite',
+    );
+    const [assetKeys, outboxKeys, conflictKeys] = await Promise.all([
+      transaction.objectStore('assets').index('by-board').getAllKeys(boardId),
+      transaction.objectStore('outbox').index('by-board').getAllKeys(boardId),
+      transaction.objectStore('conflictCopies').index('by-board').getAllKeys(boardId),
+    ]);
+    await Promise.all([
+      transaction.objectStore('boards').delete(boardId),
+      transaction.objectStore('preferences').delete(`conflict-target:${boardId}`),
+      ...assetKeys.map((key) => transaction.objectStore('assets').delete(key)),
+      ...outboxKeys.map((key) => transaction.objectStore('outbox').delete(key)),
+      ...conflictKeys.map((key) => transaction.objectStore('conflictCopies').delete(key)),
+    ]);
+    await transaction.done;
+  }
+
   async addMigrationBackup(backup: Omit<MigrationBackup, 'id'>): Promise<number> {
     return this.database.add('migrationBackups', backup);
   }
