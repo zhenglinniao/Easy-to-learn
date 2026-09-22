@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 const CanvasSpikePage = lazy(() => import('../spikes/CanvasSpikePage'));
 const CanvasPage = lazy(() => import('../features/canvas/CanvasPage'));
+const TutorBoardSpikePage = lazy(() => import('../spikes/TutorBoardSpikePage'));
 
 const completedFoundations = ['工作区已建立', '依赖已锁定', '质量门禁已启用'] as const;
 
@@ -48,6 +49,7 @@ export function App() {
           <Route path="/canvas" element={<CanvasPage />} />
           <Route path="/canvas/:boardId" element={<CanvasPage />} />
           <Route path="/spikes/excalidraw" element={<CanvasSpikePage />} />
+          <Route path="/spikes/tutor-board" element={<TutorBoardSpikePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

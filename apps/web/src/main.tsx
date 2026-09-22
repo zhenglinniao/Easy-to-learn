@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from './app/App';
+import 'katex/dist/katex.min.css';
 import './styles/global.css';
 
 const rootElement = document.getElementById('root');

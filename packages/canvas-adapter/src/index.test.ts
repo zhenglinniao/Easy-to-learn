@@ -44,9 +44,11 @@ import {
   getTutorSelection,
   hasVisualTutorInput,
   prepareTutorSelection,
+  resolveTutorSource,
   scenePointToClient,
   shouldOpenTutorMenu,
 } from './index';
+import type { PersistedTutorBoardV2 } from '@easy-to-learn/domain';
 
 const elements = [
   { id: 'question', type: 'text', text: '2x + 3 = 11', isDeleted: false },
@@ -67,6 +69,43 @@ describe('canvas adapter', () => {
     expect(selection.map((element) => element.id)).toEqual(['question', 'shape']);
     expect(extractTutorText(selection)).toBe('2x + 3 = 11');
     expect(hasVisualTutorInput(selection)).toBe(true);
+  });
+
+  it('原题整体移动时跟随，内容变化或删除时标记状态', () => {
+    const board = {
+      id: 't1',
+      title: '题解',
+      anchorMode: 'follow-source',
+      sceneAnchor: { sceneX: 150, sceneY: 80 },
+      source: {
+        elementIds: ['a'],
+        bounds: { x: 10, y: 20, width: 100, height: 40 },
+        contentHash: 'same',
+        status: 'active',
+      },
+    } as unknown as PersistedTutorBoardV2;
+    const moved = resolveTutorSource(board, {
+      elementIds: ['a'],
+      bounds: { x: 30, y: 50, width: 100, height: 40 },
+      contentHash: 'same',
+    });
+    expect(moved.sceneAnchor).toEqual({ sceneX: 170, sceneY: 110 });
+    expect(moved.source.status).toBe('active');
+    expect(
+      resolveTutorSource(board, {
+        elementIds: ['a'],
+        bounds: { x: 10, y: 20, width: 120, height: 40 },
+        contentHash: 'changed',
+      }).source.status,
+    ).toBe('stale');
+    expect(
+      resolveTutorSource(board, {
+        elementIds: [],
+        bounds: { x: 10, y: 20, width: 100, height: 40 },
+        contentHash: 'same',
+      }).source.status,
+    ).toBe('stale');
+    expect(resolveTutorSource(board, null).source.status).toBe('orphaned');
   });
 
   it('scene/client 坐标可以稳定往返', () => {

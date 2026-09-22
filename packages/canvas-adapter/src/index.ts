@@ -10,7 +10,7 @@ import type {
   NonDeletedExcalidrawElement,
 } from '@excalidraw/excalidraw/element/types';
 import type { AppState, BinaryFiles } from '@excalidraw/excalidraw/types';
-import { MAX_INLINE_IMAGE_BYTES } from '@easy-to-learn/domain';
+import { MAX_INLINE_IMAGE_BYTES, type PersistedTutorBoardV2 } from '@easy-to-learn/domain';
 
 export const CANVAS_ADAPTER_VERSION = 1 as const;
 
@@ -156,7 +156,7 @@ const normalizeForContentHash = (value: unknown): unknown => {
   return value;
 };
 
-const digestSelection = async (
+export const digestTutorSelection = async (
   elements: readonly NonDeletedExcalidrawElement[],
 ): Promise<string> => {
   const normalized = [...elements]
@@ -202,6 +202,55 @@ export const prepareTutorSelection = async (
         }
       : {}),
     selectionBounds: { x: x1, y: y1, width: x2 - x1, height: y2 - y1 },
-    contentHash: await digestSelection(elements),
+    contentHash: await digestTutorSelection(elements),
+  };
+};
+
+export interface TutorSourceSnapshot {
+  elementIds: string[];
+  bounds: { x: number; y: number; width: number; height: number };
+  contentHash: string;
+}
+
+export const inspectTutorSource = async (
+  allElements: readonly ExcalidrawElement[],
+  elementIds: readonly string[],
+): Promise<TutorSourceSnapshot | null> => {
+  const expected = new Set(elementIds);
+  const current = allElements.filter(
+    (element): element is NonDeletedExcalidrawElement =>
+      expected.has(element.id) && isTutorInputElement(element),
+  );
+  if (current.length === 0) return null;
+  const [x1, y1, x2, y2] = getCommonBounds(current);
+  return {
+    elementIds: current.map(({ id }) => id),
+    bounds: { x: x1, y: y1, width: x2 - x1, height: y2 - y1 },
+    contentHash: await digestTutorSelection(current),
+  };
+};
+
+export const resolveTutorSource = (
+  board: PersistedTutorBoardV2,
+  current: TutorSourceSnapshot | null,
+): PersistedTutorBoardV2 => {
+  if (!current) return { ...board, source: { ...board.source, status: 'orphaned' } };
+  const allElementsRemain = current.elementIds.length === board.source.elementIds.length;
+  const unchanged =
+    allElementsRemain &&
+    current.contentHash === board.source.contentHash &&
+    current.bounds.width === board.source.bounds.width &&
+    current.bounds.height === board.source.bounds.height;
+  if (!unchanged) return { ...board, source: { ...board.source, status: 'stale' } };
+
+  const dx = current.bounds.x - board.source.bounds.x;
+  const dy = current.bounds.y - board.source.bounds.y;
+  return {
+    ...board,
+    sceneAnchor:
+      board.anchorMode === 'follow-source'
+        ? { sceneX: board.sceneAnchor.sceneX + dx, sceneY: board.sceneAnchor.sceneY + dy }
+        : board.sceneAnchor,
+    source: { ...board.source, bounds: current.bounds, status: 'active' },
   };
 };
