@@ -9,6 +9,10 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@easy-to-learn/domain": "workspace:*",
+    "katex": "0.18.7"
+  },
   "devDependencies": {
     "@types/react": "19.3.0",
     "react": "catalog:",

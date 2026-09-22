@@ -1,0 +1,39 @@
+.tutor-spike {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background-color: #f8f5ef;
+  background-image: radial-gradient(rgba(67, 57, 46, 0.11) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.tutor-spike__question {
+  position: absolute;
+  top: 190px;
+  left: min(560px, calc(100vw - 250px));
+  display: grid;
+  gap: 8px;
+  padding: 20px 24px;
+  border: 2px solid #807466;
+  border-radius: 18px;
+  background: #fffdf9;
+  transform: rotate(-1deg);
+}
+.tutor-spike__question span {
+  color: #8a8177;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.tutor-spike__question strong {
+  font-family: Georgia, serif;
+  font-size: 28px;
+}
+.tutor-spike__restore {
+  margin: 32px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  background: #2c261f;
+  cursor: pointer;
+}
