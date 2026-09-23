@@ -201,7 +201,10 @@ export default function CanvasPage() {
   const requestInputs = useRef(
     new Map<
       string,
-      Omit<TutorRequest, 'requestId' | 'mode' | 'parentTutorBoardId' | 'targetStepId'>
+      Omit<
+        TutorRequest,
+        'requestId' | 'mode' | 'parentTutorBoardId' | 'targetStepId' | 'parentContext'
+      >
     >(),
   );
   const requestAbort = useRef<AbortController | null>(null);
@@ -740,6 +743,11 @@ export default function CanvasPage() {
       setPreparationError('原题上下文已失效，请重新选择题目。');
       return;
     }
+    const targetStep = parent.result.steps.find(({ id }) => id === targetStepId);
+    if (!targetStep) {
+      setPreparationError('目标步骤已失效，请重新打开辅导板。');
+      return;
+    }
     setLoadingAction('solve');
     try {
       const requestId = crypto.randomUUID();
@@ -779,6 +787,7 @@ export default function CanvasPage() {
         mode: 'explain_step',
         parentTutorBoardId: parentId,
         targetStepId,
+        parentContext: { title: parent.result.title, step: targetStep },
       });
       const result = await new TutorApiClient(async () => session?.access_token ?? null).execute(
         request,
@@ -934,9 +943,10 @@ export default function CanvasPage() {
       {prepared || preparationError || migrationMessage ? (
         <div className={styles.notice} role="status">
           {migrationMessage ??
+            preparationError ??
             (prepared
               ? `已准备 ${prepared.elementCount} 个元素的${prepared.action === 'solve' ? '解题' : '提示'}输入${prepared.textLength > 0 ? ` · ${prepared.textLength} 个文字` : ''}${prepared.hasImage ? ' · 1 张选区图片' : ''}`
-              : preparationError)}
+              : '')}
         </div>
       ) : null}
 

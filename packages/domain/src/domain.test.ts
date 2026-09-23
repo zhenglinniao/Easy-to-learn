@@ -263,6 +263,10 @@ describe('AI API 契约', () => {
         text: '为什么要移项？',
         parentTutorBoardId: 'tutor-1',
         targetStepId: 'step-1',
+        parentContext: {
+          title: '一元一次方程',
+          step: solveResult.steps[0],
+        },
       }).success,
     ).toBe(true);
   });

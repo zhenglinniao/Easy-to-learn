@@ -8,7 +8,7 @@ import {
   nonNegativeIntegerSchema,
   tutorImageMimeTypeSchema,
 } from './common';
-import { tutorResultSchema } from './tutor';
+import { tutorResultSchema, tutorStepSchema } from './tutor';
 
 export const API_ERROR_DEFINITIONS = {
   INVALID_INPUT: { httpStatus: 400, retryable: false },
@@ -88,6 +88,11 @@ const tutorImageSchema = z
     message: '图片必须包含 base64 或 uploadPath',
   });
 
+const tutorParentContextSchema = z.strictObject({
+  title: z.string().min(1).max(120),
+  step: tutorStepSchema,
+});
+
 export const tutorRequestSchema = z
   .strictObject({
     requestId: nonEmptyStringSchema,
@@ -104,31 +109,39 @@ export const tutorRequestSchema = z
     }),
     parentTutorBoardId: nonEmptyStringSchema.optional(),
     targetStepId: nonEmptyStringSchema.optional(),
+    parentContext: tutorParentContextSchema.optional(),
   })
-  .superRefine(({ text, image, mode, parentTutorBoardId, targetStepId }, context) => {
-    if (text === undefined && image === undefined) {
-      context.addIssue({ code: 'custom', path: ['text'], message: '文字和图片至少提供一项' });
-    }
+  .superRefine(
+    ({ text, image, mode, parentTutorBoardId, targetStepId, parentContext }, context) => {
+      if (text === undefined && image === undefined) {
+        context.addIssue({ code: 'custom', path: ['text'], message: '文字和图片至少提供一项' });
+      }
 
-    const hasExplainContext = parentTutorBoardId !== undefined && targetStepId !== undefined;
-    if (mode === 'explain_step' && !hasExplainContext) {
-      context.addIssue({
-        code: 'custom',
-        path: ['parentTutorBoardId'],
-        message: 'Explain step 必须提供父辅导板和目标步骤',
-      });
-    }
-    if (
-      mode !== 'explain_step' &&
-      (parentTutorBoardId !== undefined || targetStepId !== undefined)
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['parentTutorBoardId'],
-        message: '只有 Explain step 可以携带父辅导板和目标步骤',
-      });
-    }
-  });
+      const hasExplainContext =
+        parentTutorBoardId !== undefined &&
+        targetStepId !== undefined &&
+        parentContext !== undefined;
+      if (mode === 'explain_step' && !hasExplainContext) {
+        context.addIssue({
+          code: 'custom',
+          path: ['parentTutorBoardId'],
+          message: 'Explain step 必须提供父辅导板和目标步骤',
+        });
+      }
+      if (
+        mode !== 'explain_step' &&
+        (parentTutorBoardId !== undefined ||
+          targetStepId !== undefined ||
+          parentContext !== undefined)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['parentTutorBoardId'],
+          message: '只有 Explain step 可以携带父辅导板和目标步骤',
+        });
+      }
+    },
+  );
 
 export const tutorResponseSchema = createDataResponseSchema(
   z.strictObject({

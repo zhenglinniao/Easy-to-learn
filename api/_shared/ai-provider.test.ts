@@ -53,6 +53,7 @@ describe('AI Provider 配置', () => {
         apiKey: 'primary-secret',
         model: 'vision-model',
         responseFormat: 'json_object',
+        wireApi: 'chat_completions',
         timeoutMs: 12_500,
       },
       {
@@ -63,6 +64,29 @@ describe('AI Provider 配置', () => {
         timeoutMs: 12_000,
       },
     ]);
+  });
+
+  it('校验 Responses API 与推理强度配置', () => {
+    expect(
+      loadAiProviderConfigs({
+        AI_PROVIDERS: 'deepseek',
+        AI_PROVIDER_DEEPSEEK_TYPE: 'openai-compatible',
+        AI_PROVIDER_DEEPSEEK_BASE_URL: 'https://api.deepseek.com',
+        AI_PROVIDER_DEEPSEEK_MODEL: 'deepseek-flash',
+        AI_PROVIDER_DEEPSEEK_WIRE_API: 'responses',
+        AI_PROVIDER_DEEPSEEK_RESPONSE_FORMAT: 'json_schema',
+        AI_PROVIDER_DEEPSEEK_REASONING_EFFORT: 'none',
+      }),
+    ).toMatchObject([{ wireApi: 'responses', reasoningEffort: 'none' }]);
+    expect(() =>
+      loadAiProviderConfigs({
+        AI_PROVIDERS: 'bad',
+        AI_PROVIDER_BAD_TYPE: 'openai-compatible',
+        AI_PROVIDER_BAD_BASE_URL: 'https://api.example.com',
+        AI_PROVIDER_BAD_MODEL: 'model',
+        AI_PROVIDER_BAD_WIRE_API: 'legacy',
+      }),
+    ).toThrow(/WIRE_API/);
   });
 
   it('兼容原 GEMINI_API_KEY 配置，并拒绝不完整或不安全的配置', () => {
@@ -156,6 +180,54 @@ describe('AI Provider 执行', () => {
     expect(body.messages[1].content).toContainEqual({
       type: 'image_url',
       image_url: { url: 'data:image/png;base64,YQ==' },
+    });
+  });
+
+  it('通过 Responses API 发送 JSON Schema、图像与关闭推理参数', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output: [
+            {
+              type: 'message',
+              content: [
+                { type: 'output_text', text: JSON.stringify({ ...modelResult, metadata: 'fake' }) },
+              ],
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const model = createTutorModelFromEnvironment(
+      vi.fn(),
+      {
+        AI_PROVIDERS: 'deepseek',
+        AI_PROVIDER_DEEPSEEK_TYPE: 'openai-compatible',
+        AI_PROVIDER_DEEPSEEK_BASE_URL: 'https://api.deepseek.example',
+        AI_PROVIDER_DEEPSEEK_API_KEY: 'server-only-secret',
+        AI_PROVIDER_DEEPSEEK_MODEL: 'deepseek-flash',
+        AI_PROVIDER_DEEPSEEK_WIRE_API: 'responses',
+        AI_PROVIDER_DEEPSEEK_RESPONSE_FORMAT: 'json_schema',
+        AI_PROVIDER_DEEPSEEK_REASONING_EFFORT: 'none',
+        AI_PROMPT_VERSION: 'v1',
+      },
+      fetchMock,
+    );
+
+    await model.generate({ ...request, image: { mimeType: 'image/png', base64: 'YQ==' } });
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(url).toBe('https://api.deepseek.example/responses');
+    expect(body).toMatchObject({
+      model: 'deepseek-flash',
+      reasoning: { effort: 'none' },
+      text: { format: { type: 'json_schema', name: 'tutor_result_v1' } },
+    });
+    expect(body.input[0].content).toContainEqual({
+      type: 'input_image',
+      image_url: 'data:image/png;base64,YQ==',
+      detail: 'original',
     });
   });
 });

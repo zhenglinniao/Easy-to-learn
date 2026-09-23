@@ -24,6 +24,17 @@ export interface BoardAuthorizer {
 export class ProviderTimeoutError extends Error {}
 export class ProviderUnavailableError extends Error {}
 
+const correctionFromIssues = (issues: Array<{ path: PropertyKey[]; message: string }>): string => {
+  const details = issues
+    .slice(0, 8)
+    .map(({ path, message }) => `${path.length ? path.join('.') : '<root>'}: ${message}`)
+    .join('；');
+  return [
+    '上一次输出未通过 Tutor DSL。只返回符合 JSON Schema 的 JSON，不要添加未定义字段。',
+    `需要修正：${details}`,
+  ].join('\n');
+};
+
 export class TutorService {
   constructor(
     private readonly state: AiStateStore,
@@ -66,7 +77,7 @@ export class TutorService {
       if (!validated.success) {
         candidate = await this.model.generate(
           request,
-          '上一次输出未通过 Tutor DSL，请只返回符合 JSON Schema 的 JSON。',
+          correctionFromIssues(validated.error.issues),
         );
         validated = tutorResultSchema.safeParse(candidate);
       }

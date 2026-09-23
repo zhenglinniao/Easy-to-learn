@@ -59,9 +59,14 @@ export const buildTutorPrompt = (
     getPromptDefinition(promptVersion).modeInstructions;
   return [
     modeInstruction[request.mode],
+    '输出契约：只返回一个 JSON 对象；顶层必须包含 schemaVersion、mode、title、steps；不得输出 rawHtml、boardHtml、finalAnswer 或未定义字段。每个 step 必须包含 id、title、blocks，blocks 只能使用 Tutor DSL 已支持的类型。',
     request.text ? `题目文字：${request.text}` : '',
     request.parentTutorBoardId ? `父辅导板：${request.parentTutorBoardId}` : '',
     request.targetStepId ? `目标步骤：${request.targetStepId}` : '',
+    request.parentContext ? `父辅导板标题：${request.parentContext.title}` : '',
+    request.parentContext
+      ? `目标步骤已验证内容：${JSON.stringify(request.parentContext.step)}`
+      : '',
     correction ?? '',
   ]
     .filter(Boolean)
