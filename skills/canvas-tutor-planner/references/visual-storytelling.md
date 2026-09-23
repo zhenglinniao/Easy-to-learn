@@ -27,10 +27,34 @@ Choose the smallest grammar that matches the idea:
 - coordinate plane: functions, measured change, trends, and plotted relationships;
 - geometry: spatial reasoning, shape properties, and construction;
 - comic strip: Q-style conceptual actions, analogies, attention cues, and memorable transitions led by 小易;
+- part map: exploded parts, stacked layers, ingredient composition, materials, belongings, or labels around one subject;
 - callout: the “aha”, warning, common misconception, practical checkpoint, or punchline;
 - short paragraphs: context and transitions that cannot be encoded more clearly elsewhere.
 
 For articles, turn structure into a claim → evidence → implication story. For food, show ingredients → transformations → finished result. For produce, choose nutrient roles, growth stages, or field-to-table flow according to the selected goal. When there is no explicit question, recognizable fruit, vegetables, and agricultural produce route to `produce + nutrition`; prepared dishes route to `food_dish + recipe`; do not collapse either into a generic object explanation. For objects, show parts → interactions → output. These are patterns, not mandatory templates, except for the no-question category-routing rule.
+
+## Illustrated decomposition patterns
+
+Choose the pattern from the subject's structure rather than from surface style:
+
+- `part-map/exploded`: separable components arranged away from the whole; use for devices, tools, assemblies, garments, belongings, and recipes whose identity comes from combined parts;
+- `part-map/layers`: vertically or conceptually stacked strata; use for drinks, burgers, soil, atmosphere, software layers, and nested systems;
+- `part-map/callout`: one subject with numbered or labeled facts around it; use for anatomy, materials, visible features, interface regions, and character/object sheets;
+- `flow`: time, causality, transformation, procedure, or data movement;
+- `comic-strip`: a learner-facing analogy, misconception correction, observation, or memory cue;
+- exact mathematical diagrams: quantities, scale, geometry, coordinates, graphs, or proof relations that must not be approximated by decorative illustration.
+
+Every part-map item needs both a short label and a concrete role or function. Do not list visually indistinguishable trivia. End with one takeaway that reconstructs how the parts create the whole.
+
+## Detailed learning steps
+
+For exercises, code, or explicit learning questions, a step should make four things recoverable without hidden reasoning: the evidence used, the visible operation or comparison, the reason the operation is valid, and the resulting state. Express these through the diagram plus concise learner-facing blocks. Use `math` for equations and `code` for exact syntax; never place precise syntax into a generated illustration.
+
+Do not impose a fixed number of steps. A one-relation question may be one complete illustrated card. A longer problem needs one card per real cognitive transition, followed by verification or a compact synthesis.
+
+## Originality boundary
+
+Reference images may establish general qualities such as cream paper, loose ink, arrows, numbered tabs, exploded layers, callout labels, a recurring guide, or a bottom-line summary. They do not authorize copying a creator's mascot, handle, logo, brand palette, exact wording, distinctive layout, or recognizable composition. Easy to learn keeps its own 小易 character and controlled semantic colors.
 
 ## Hand-drawn voice
 

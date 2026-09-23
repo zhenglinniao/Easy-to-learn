@@ -57,7 +57,7 @@ describe.skipIf(!runIntegration)('真实 AI Provider 黄金集', () => {
   };
 
   it('为简单习题返回结论前置、可渲染的 Tutor DSL', async () => {
-    const result = tutorResultSchema.parse(await execute(request('解方程：2x + 3 = 11')));
+    const result = tutorResultSchema.parse(await execute(request('解方程：2x + 3 = 11'), true));
     expect(result.contentProfile).toMatchObject({
       contentKind: 'exercise',
       learningGoal: 'solve',
@@ -68,6 +68,9 @@ describe.skipIf(!runIntegration)('真实 AI Provider 黄金集', () => {
     });
     expect(
       result.steps.every((step) => step.blocks.some((block) => block.type === 'diagram')),
+    ).toBe(true);
+    expect(
+      result.steps.every((step) => step.blocks.some((block) => block.type !== 'diagram')),
     ).toBe(true);
     expect(result.steps.some((step) => step.blocks.some((block) => block.type === 'math'))).toBe(
       true,
@@ -83,13 +86,49 @@ describe.skipIf(!runIntegration)('真实 AI Provider 黄金集', () => {
 
   it('为没有显式问题的蔬果选择营养拆解路线', async () => {
     const result = tutorResultSchema.parse(
-      await execute(request('画布上是一颗番茄，没有附加问题。')),
+      await execute(request('画布上是一颗番茄，没有附加问题。'), true),
     );
     expect(result.contentProfile).toMatchObject({
       contentKind: 'produce',
       learningGoal: 'nutrition',
       goalSource: 'inferred',
     });
+  }, 35_000);
+
+  it('按爆炸拆解图解释日常物体的组成和作用', async () => {
+    const result = tutorResultSchema.parse(
+      await execute(
+        request('请用手绘爆炸拆解图解释一支按压式香水瓶由哪些主要部件组成，以及各部件的作用。'),
+        true,
+      ),
+    );
+    expect(result.contentProfile).toMatchObject({
+      contentKind: 'object',
+      goalSource: 'explicit',
+    });
+    expect(['explain', 'mechanism']).toContain(result.contentProfile?.learningGoal);
+    expect(
+      result.steps.some((step) =>
+        step.blocks.some((block) => block.type === 'diagram' && block.diagram.type === 'part-map'),
+      ),
+    ).toBe(true);
+  }, 35_000);
+
+  it('用准确代码和图解解释编程概念', async () => {
+    const result = tutorResultSchema.parse(
+      await execute(
+        request(
+          '解释 Java 的 Class 对象是什么，并用一个准确的最小 Java 代码示例配合结构图讲清楚。',
+        ),
+        true,
+      ),
+    );
+    expect(result.steps.some((step) => step.blocks.some((block) => block.type === 'code'))).toBe(
+      true,
+    );
+    expect(
+      result.steps.every((step) => step.blocks.some((block) => block.type === 'diagram')),
+    ).toBe(true);
   }, 35_000);
 
   it('接受真实 PNG 图文输入并返回可渲染结构', async () => {

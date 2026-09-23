@@ -233,6 +233,36 @@ describe('TutorBoard', () => {
               ],
             },
           },
+          {
+            type: 'diagram',
+            diagram: {
+              type: 'part-map',
+              layout: 'layers',
+              subject: { label: '汉堡', motif: 'food', color: 'amber' },
+              parts: [
+                {
+                  id: 'bun',
+                  label: '面包层',
+                  detail: '托住其他食材',
+                  role: 'layer',
+                  color: 'amber',
+                },
+                {
+                  id: 'filling',
+                  label: '馅料层',
+                  detail: '提供主要风味和口感',
+                  role: 'ingredient',
+                  color: 'green',
+                },
+              ],
+              takeaway: '层层组合，才形成完整的汉堡。',
+            },
+          },
+          {
+            type: 'code',
+            language: 'java',
+            code: 'Class<User> type = User.class;',
+          },
         ]}
       />,
     );
@@ -242,6 +272,9 @@ describe('TutorBoard', () => {
     expect(screen.getByText('先找已知量')).toBeInTheDocument();
     expect(screen.getByText('等式两边同步')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: '小易手绘讲解图' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '汉堡结构拆解图' })).toBeInTheDocument();
+    expect(screen.getByText('馅料层')).toBeInTheDocument();
+    expect(screen.getByText('Class<User> type = User.class;')).toBeInTheDocument();
     expect(container.querySelectorAll('g[aria-hidden="true"] line').length).toBeGreaterThan(0);
     expect(container.querySelector('path[d*=" L "]')).not.toBeNull();
   });

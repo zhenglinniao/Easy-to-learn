@@ -153,6 +153,31 @@
   border-radius: 12px;
   background: #f7f2eb;
 }
+.codeBlock {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(52, 44, 36, 0.1);
+  border-radius: 12px 15px 11px 14px;
+  color: #315d8d;
+  background: #f5f7f8;
+  font:
+    600 11px/1.55 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  white-space: pre;
+}
+.codeBlock::before {
+  display: block;
+  margin-bottom: 6px;
+  color: #8a8177;
+  content: '</> ' attr(data-language);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 .callout {
   padding: 10px 12px;
   border-left: 3px solid #527fc0;
@@ -387,6 +412,108 @@
   color: #8b8177;
   font-weight: 800;
 }
+.partMap {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(52, 44, 36, 0.09);
+  border-radius: 16px 12px 17px 13px;
+  background: #faf7f2;
+}
+.partSubject {
+  --part-color: #7654b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 2px solid var(--part-color);
+  border-radius: 12px 16px 11px 15px;
+  color: var(--part-color);
+  background: color-mix(in srgb, var(--part-color) 7%, #fff);
+}
+.partSubject span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 2px dashed currentColor;
+  border-radius: 50%;
+  font-weight: 800;
+}
+.partItems {
+  display: grid;
+  gap: 7px;
+}
+.partMap[data-layout='callout'] .partItems {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.partMap[data-layout='layers'] .partItems {
+  padding-inline: 10px;
+}
+.partMap[data-layout='layers'] .partItem:nth-child(odd) {
+  transform: translateX(-5px);
+}
+.partMap[data-layout='layers'] .partItem:nth-child(even) {
+  transform: translateX(5px);
+}
+.partItem {
+  --part-color: #6f675e;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1.5px solid color-mix(in srgb, var(--part-color) 68%, transparent);
+  border-radius: 10px 13px 9px 12px;
+  background: color-mix(in srgb, var(--part-color) 6%, #fff);
+}
+.partMap[data-layout='exploded'] .partItem:not(:last-child)::after {
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  height: 8px;
+  border-left: 2px dashed color-mix(in srgb, var(--part-color) 58%, transparent);
+  content: '';
+}
+.partIndex {
+  display: grid;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1.5px solid var(--part-color);
+  border-radius: 50%;
+  color: var(--part-color);
+  font-size: 11px;
+  font-weight: 800;
+}
+.partItem strong,
+.partItem small {
+  display: block;
+}
+.partItem strong {
+  color: var(--part-color);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.partItem small {
+  margin-top: 1px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.partTakeaway {
+  display: flex;
+  gap: 6px;
+  padding: 7px 9px;
+  border: 1px dashed rgba(182, 107, 22, 0.55);
+  border-radius: 10px;
+  color: #79501e;
+  background: #fff7de;
+  font-size: 11px;
+  line-height: 1.45;
+}
 .footer {
   display: flex;
   align-items: center;
@@ -549,6 +676,18 @@
 :global(html[data-theme='dark']) .comicMascot b {
   border-color: #f4eee6;
 }
+:global(html[data-theme='dark']) .partMap {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #24221f;
+}
+:global(html[data-theme='dark']) .partSubject,
+:global(html[data-theme='dark']) .partItem {
+  background: color-mix(in srgb, var(--part-color) 13%, #292622);
+}
+:global(html[data-theme='dark']) .partTakeaway {
+  color: #f4d59f;
+  background: #382f20;
+}
 :global(html[data-theme='dark']) .header,
 :global(html[data-theme='dark']) .footer,
 :global(html[data-theme='dark']) .feedback {
@@ -566,9 +705,14 @@
   background: #302d29;
 }
 :global(html[data-theme='dark']) .math,
+:global(html[data-theme='dark']) .codeBlock,
 :global(html[data-theme='dark']) .diagram,
 :global(html[data-theme='dark']) .flow {
   background: #24221f;
+}
+:global(html[data-theme='dark']) .codeBlock {
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #a9cbf2;
 }
 :global(html[data-theme='dark']) .callout {
   border-color: #6da2ea;

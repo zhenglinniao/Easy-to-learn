@@ -30,6 +30,45 @@ const initialBoard: PersistedTutorBoardV2 = {
           {
             type: 'diagram',
             diagram: {
+              type: 'part-map',
+              layout: 'callout',
+              subject: { label: '2x + 3 = 11', motif: 'concept', color: 'purple' },
+              parts: [
+                {
+                  id: 'unknown',
+                  label: '2x',
+                  detail: '要留下来的未知数项',
+                  role: 'core',
+                  color: 'purple',
+                },
+                {
+                  id: 'constant',
+                  label: '+3',
+                  detail: '先从两边一起消掉',
+                  role: 'component',
+                  color: 'amber',
+                },
+                {
+                  id: 'equals',
+                  label: '等号',
+                  detail: '两边必须保持平衡',
+                  role: 'shell',
+                  color: 'blue',
+                },
+                {
+                  id: 'result',
+                  label: '11',
+                  detail: '右边也同步减 3',
+                  role: 'output',
+                  color: 'green',
+                },
+              ],
+              takeaway: '先看清每一块扮演什么角色，再决定怎么移动它。',
+            },
+          },
+          {
+            type: 'diagram',
+            diagram: {
               type: 'comic-strip',
               layout: 'single',
               panels: [
@@ -93,7 +132,7 @@ const initialBoard: PersistedTutorBoardV2 = {
     },
     metadata: {
       model: 'preview-fixture',
-      promptVersion: 'v4',
+      promptVersion: 'v5',
       generatedAt: '2026-09-22T00:00:00.000Z',
     },
   },
