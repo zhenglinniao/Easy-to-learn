@@ -1,4 +1,4 @@
 interface:
   display_name: 'Canvas Tutor Planner'
-  short_description: '将画布选区拆解为安全、清晰且可验证的教学步骤方案'
-  default_prompt: 'Use $canvas-tutor-planner to plan a clear Tutor DSL lesson for this canvas selection.'
+  short_description: '把任意画布内容路由为风趣、手绘感且可验证的教学拆解'
+  default_prompt: 'Use $canvas-tutor-planner to classify this canvas selection and turn it into a clear visual Tutor DSL lesson.'

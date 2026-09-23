@@ -1,6 +1,6 @@
 # Easy to learn
 
-Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无限画布中书写、绘图或粘贴题图，圈选内容后就地获取分步解答、递进提示或步骤解释。
+Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无限画布中书写、涂鸦、绘图或粘贴图片，圈选习题、文章、食物、物体、流程图等内容后，就地获取手绘感的分步解答、内容拆解、递进提示或步骤解释。
 
 当前仓库已完成可运行的本地 MVP 代码、单元测试和 Vercel 部署配置。由于仓库尚未配置真实 Supabase、Upstash Redis、AI 模型供应商、OAuth、Sentry、Vercel 项目和域名，云登录、云同步与真实 AI 请求不能视为已经上线或完成供应商 E2E 验证。
 
@@ -10,6 +10,8 @@ Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无�
 - 登录用户可创建、重命名、打开和删除多个私有画板。
 - 文字、手写、图形和图片混合选区可调用 Solve、Hint 与 Explain step。
 - AI 输出使用受控 Tutor DSL、KaTeX 与受限图表渲染，不注入模型 HTML。
+- AI 会优先遵循明确问题；没有问题时按画布内容推断一个主要学习目标，例如文章结构、菜谱变化、营养构成、种植过程或物体机制，并在结果中标记推断来源和置信度。
+- 讲解采用准确、轻松而不过度卖萌的手绘叙事方向；严肃、高风险或识别不确定的内容会主动降低幽默并明确边界。
 - AI Provider 可按顺序配置 Gemini 或 OpenAI-compatible 模型，并在超时、网络错误或供应商故障时自动回退。
 - 画布教学规则集中在项目级 `canvas-tutor-planner` Skill，并由同一版本化注册表生成线上 Prompt。
 - Solve 会根据题型选择答案位置：简单题先给结论再解释，推理题完成必要推理后在最后一步给结论。
@@ -90,7 +92,7 @@ Copy-Item .env.example .env.local
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY`                  | JWT 校验与用户级访问                             |
 | `SUPABASE_SERVICE_ROLE_KEY`                           | 临时 AI 图片、账户删除和保留任务；禁止传到浏览器 |
 | `AI_PROVIDERS`                                        | Provider 标识的有序列表，如 `primary,backup`     |
-| `AI_PROMPT_VERSION`                                   | 已在 Tutor Skill 注册的提示词版本，默认 `v2`     |
+| `AI_PROMPT_VERSION`                                   | 已在 Tutor Skill 注册的提示词版本，默认 `v3`     |
 | `AI_PROVIDER_<ID>_TYPE`                               | `gemini` 或 `openai-compatible`                  |
 | `AI_PROVIDER_<ID>_MODEL`                              | 该 Provider 使用的模型名                         |
 | `AI_PROVIDER_<ID>_API_KEY`                            | 该 Provider 的服务端密钥；本地服务可以留空       |

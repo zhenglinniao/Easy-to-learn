@@ -144,6 +144,65 @@ describe('Tutor DSL', () => {
     ).toBe(false);
   });
 
+  it('校验 Prompt v3 的通用内容路由与求解答案策略', () => {
+    const recipeResult = {
+      ...solveResult,
+      title: '番茄炒蛋是怎么变好吃的',
+      contentProfile: {
+        contentKind: 'food_dish',
+        learningGoal: 'recipe',
+        goalSource: 'inferred',
+        confidence: 'high',
+      },
+      metadata: { ...solveResult.metadata, promptVersion: 'v3' },
+    };
+    expect(tutorResultSchema.safeParse(recipeResult).success).toBe(true);
+    expect(
+      tutorResultSchema.safeParse({ ...recipeResult, contentProfile: undefined }).success,
+    ).toBe(false);
+    expect(
+      tutorResultSchema.safeParse({
+        ...recipeResult,
+        answerPresentation: {
+          problemType: 'simple',
+          conclusionPosition: 'first_step',
+        },
+      }).success,
+    ).toBe(false);
+
+    const exerciseResult = {
+      ...recipeResult,
+      contentProfile: {
+        contentKind: 'exercise',
+        learningGoal: 'solve',
+        goalSource: 'explicit',
+        confidence: 'high',
+      },
+      answerPresentation: {
+        problemType: 'reasoning',
+        conclusionPosition: 'final_step',
+      },
+    };
+    expect(tutorResultSchema.safeParse(exerciseResult).success).toBe(true);
+    expect(
+      tutorResultSchema.safeParse({ ...exerciseResult, answerPresentation: undefined }).success,
+    ).toBe(false);
+    expect(
+      tutorResultSchema.safeParse({
+        ...exerciseResult,
+        mode: 'hint',
+        hintLevel: 3,
+        answerPresentation: undefined,
+        steps: [1, 2, 3].map((hintLevel) => ({
+          id: `v3-hint-${hintLevel}`,
+          title: `提示 ${hintLevel}`,
+          hintLevel,
+          blocks: [{ type: 'paragraph', text: `第 ${hintLevel} 级提示` }],
+        })),
+      }).success,
+    ).toBe(true);
+  });
+
   it('拒绝超过 100 KiB 的 Tutor JSON', () => {
     expect(
       tutorResultSchema.safeParse({
