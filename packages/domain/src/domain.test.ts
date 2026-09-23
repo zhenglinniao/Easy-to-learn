@@ -203,6 +203,63 @@ describe('Tutor DSL', () => {
     ).toBe(true);
   });
 
+  it('校验 Prompt v4 的视觉优先步骤和安全 Q 版漫画图解', () => {
+    const visualResult = {
+      ...solveResult,
+      contentProfile: {
+        contentKind: 'exercise' as const,
+        learningGoal: 'solve' as const,
+        goalSource: 'explicit' as const,
+        confidence: 'high' as const,
+      },
+      answerPresentation: {
+        problemType: 'simple' as const,
+        conclusionPosition: 'first_step' as const,
+      },
+      steps: [
+        {
+          id: 'visual-step',
+          title: '等式像天平',
+          blocks: [
+            { type: 'math' as const, latex: '2x+3=11', display: true },
+            {
+              type: 'diagram' as const,
+              diagram: {
+                type: 'comic-strip' as const,
+                layout: 'single' as const,
+                panels: [
+                  {
+                    id: 'balance-panel',
+                    motif: 'balance' as const,
+                    pose: 'point' as const,
+                    label: '两边一起减 3',
+                    caption: '小易提醒：天平两边做同一件事，等号才不会歪。',
+                    color: 'blue' as const,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+      metadata: { ...solveResult.metadata, promptVersion: 'v4' },
+    };
+
+    expect(tutorResultSchema.safeParse(visualResult).success).toBe(true);
+    expect(
+      tutorResultSchema.safeParse({
+        ...visualResult,
+        steps: [
+          {
+            id: 'text-only',
+            title: '只有文字',
+            blocks: [{ type: 'paragraph', text: '这是缺少理解图的生硬文字。' }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
   it('拒绝超过 100 KiB 的 Tutor JSON', () => {
     expect(
       tutorResultSchema.safeParse({

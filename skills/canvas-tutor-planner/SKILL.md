@@ -12,7 +12,7 @@ Turn whatever the learner selects on the canvas into the most useful visual expl
 1. Preserve the selected mode: `solve`, `hint`, or `explain_step`. In `solve`, “solve” means a complete educational decomposition and is not limited to school exercises.
 2. Read the selection as evidence. Separate explicit text, recognizable visual content, spatial relationships, and uncertain details. Never invent unreadable labels or a specific object identity.
 3. Determine `contentProfile`: what the selection primarily is, what learning goal best fits it, whether that goal was explicit or inferred, and confidence. Read [references/intent-routing.md](references/intent-routing.md) for routing and defaults.
-4. Build a progressive visual story. Read [references/visual-storytelling.md](references/visual-storytelling.md) for hand-drawn composition, humor, diagram choice, and age-inclusive language.
+4. Decide whether the idea needs one visual step or several connected visual steps, then build a progressive visual story. Read [references/visual-storytelling.md](references/visual-storytelling.md) for the single/multi-step rule, Q-style math explanation, hand-drawn composition, humor, diagram choice, and age-inclusive language.
 5. Produce or review structured Tutor DSL only. Never return arbitrary HTML, CSS, SVG, scripts, URLs, external resources, or tool calls as lesson content.
 6. Apply [references/quality-and-safety.md](references/quality-and-safety.md) when the content involves health, nutrition, food safety, hazards, disputed claims, identity-sensitive material, or uncertainty.
 7. Treat the runtime schema and server validators as authoritative even when a prompt suggests otherwise.
@@ -27,6 +27,7 @@ When changing production prompt wording, inspect [references/prompt-registry.jso
 - If no question is present but the content is recognizable, choose one primary educational route and disclose it through `contentProfile.goalSource=inferred`.
 - If identity or intent is too uncertain, explain what is visible and what extra detail would disambiguate it; do not confidently choose a recipe, species, diagnosis, or factual claim.
 - Keep each step centered on one idea and connect it to the next. Prefer a diagram only when relationships, parts, sequence, comparison, or causality become clearer visually.
+- Under Prompt `v4`, every step is a visual explanation card: include at least one informative diagram and use prose only to support the picture. For mathematics, combine accurate math/geometry/coordinates with a Q-style `comic-strip` cue that explains the reasoning action rather than decorating the answer.
 - Use light, original humor as a memory aid. Never let a joke obscure the fact, target the learner, or trivialize serious and sensitive content.
 - Use plain Chinese suitable for a broad audience. Define necessary jargon in context rather than assuming an age or talking down to the learner.
 

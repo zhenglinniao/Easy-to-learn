@@ -4,7 +4,7 @@ Use this reference when planning or reviewing a canvas tutoring result against t
 
 ## Input boundary
 
-- The user chooses `solve`, `hint`, or `explain_step`; the model does not replace that choice. Under Prompt `v3`, `solve` means a complete educational decomposition rather than only solving exercises.
+- The user chooses `solve`, `hint`, or `explain_step`; the model does not replace that choice. Under Prompt `v3/v4`, `solve` means a complete educational decomposition rather than only solving exercises.
 - A request contains selected text and/or a validated PNG/JPEG representation of supported Excalidraw elements.
 - `explain_step` includes the parent tutor-board ID, target step ID, parent title, and the validated target-step Tutor DSL. Other modes do not carry that context. The model must stay consistent with this supplied step instead of guessing from IDs.
 - Missing or unreadable source information must remain explicit; do not fabricate labels or problem conditions.
@@ -15,7 +15,7 @@ Use this reference when planning or reviewing a canvas tutoring result against t
 - `hint`: return exactly three progressive hints without the final numerical answer or complete proof.
 - `explain_step`: explain only the specified step while remaining consistent with its parent tutor board.
 
-The Solve answer-placement rule was confirmed on 2026-09-23 in Prompt `v2`. Prompt `v3` retains it for `learningGoal=solve` and adds the user-approved general-content routing, hand-drawn visual-storytelling direction, light-humor boundary, and uncertainty handling. Any additional global teaching-policy constraint requires user confirmation before it enters the production prompt registry.
+The Solve answer-placement rule was confirmed on 2026-09-23 in Prompt `v2`. Prompt `v3` retains it for `learningGoal=solve` and adds general-content routing. Prompt `v4` adds the user-confirmed visual-first contract: decide single versus multiple steps from conceptual dependencies, require an informative diagram in every step, and combine exact mathematics with Q-style comic cues. Any additional global teaching-policy constraint requires user confirmation before it enters the production prompt registry.
 
 ## Output boundary
 
@@ -26,10 +26,11 @@ Tutor Result V1 contains a title and one or more steps. Each step has a stable I
 - ordered or unordered list;
 - callout with an approved tone;
 - a constrained coordinate-plane, geometry, or flow diagram.
+- a constrained Q-style comic strip with safe motifs, poses, labels, and captions.
 
-Prompt `v3` results contain `contentProfile.contentKind`, `learningGoal`, `goalSource`, and `confidence`. The server requires this profile for every mode and rejects it on older prompt versions.
+Prompt `v3/v4` results contain `contentProfile.contentKind`, `learningGoal`, `goalSource`, and `confidence`. Prompt `v4` additionally requires every step to contain at least one diagram.
 
-Prompt `v2` Solve results contain `answerPresentation.problemType` and `answerPresentation.conclusionPosition`. Prompt `v3` requires the same pair only for full `solve` results whose `learningGoal` is `solve`; non-solution routes, Hint, and Explain step cannot carry it.
+Prompt `v2` Solve results contain `answerPresentation.problemType` and `answerPresentation.conclusionPosition`. Prompt `v3/v4` requires the same pair only for full `solve` results whose `learningGoal` is `solve`; non-solution routes, Hint, and Explain step cannot carry it.
 
 The hand-drawn look, stroke animation, mascot, navigation, and reduced-motion behavior remain frontend responsibilities. Model output expresses semantic visual relationships only through the safe blocks below.
 

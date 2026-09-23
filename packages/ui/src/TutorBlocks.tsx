@@ -262,9 +262,63 @@ function FlowDiagram({ diagram }: { diagram: Extract<DiagramV1, { type: 'flow' }
   );
 }
 
+const motifMarks: Record<
+  Extract<DiagramV1, { type: 'comic-strip' }>['panels'][number]['motif'],
+  string
+> = {
+  idea: '✦',
+  balance: '=',
+  magnifier: '⌕',
+  puzzle: '◇',
+  numbers: '123',
+  shapes: '△○',
+  book: '▤',
+  sprout: '♧',
+  food: '◉',
+  gear: '⚙',
+  chart: '↗',
+};
+
+function ComicStrip({ diagram }: { diagram: Extract<DiagramV1, { type: 'comic-strip' }> }) {
+  return (
+    <div
+      className={styles.comicStrip}
+      data-layout={diagram.layout}
+      role="img"
+      aria-label="小易手绘讲解图"
+    >
+      {diagram.panels.map((panel, index) => (
+        <div
+          key={panel.id}
+          className={styles.comicPanel}
+          style={{ '--comic-color': colors[panel.color] } as React.CSSProperties}
+        >
+          <div className={styles.comicScene} aria-hidden="true">
+            <span className={styles.comicMascot} data-pose={panel.pose}>
+              <i />
+              <i />
+              <b />
+              <u />
+            </span>
+            <span className={styles.comicMotif}>{motifMarks[panel.motif]}</span>
+          </div>
+          <strong>{panel.label}</strong>
+          <p>{panel.caption}</p>
+          {index < diagram.panels.length - 1 ? (
+            <span className={styles.comicArrow} aria-hidden="true">
+              →
+            </span>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SafeDiagram({ diagram }: { diagram: DiagramV1 }) {
   if (diagram.type === 'coordinate-plane') return <CoordinateDiagram diagram={diagram} />;
   if (diagram.type === 'geometry') return <GeometryDiagram diagram={diagram} />;
+  if (diagram.type === 'comic-strip') return <ComicStrip diagram={diagram} />;
   return <FlowDiagram diagram={diagram} />;
 }
 
