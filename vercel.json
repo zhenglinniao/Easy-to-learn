@@ -9,7 +9,12 @@
     "api/ai/tutor.ts": { "maxDuration": 60 },
     "api/jobs/retention.ts": { "maxDuration": 60 }
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "rewrites": [
+    {
+      "source": "/((?!api/|assets/|node_modules/|@vite/|@fs/|@react-refresh$|src/|theme-init\\.js$|favicon\\.svg$).*)",
+      "destination": "/index.html"
+    }
+  ],
   "crons": [{ "path": "/api/jobs/retention", "schedule": "0 * * * *" }],
   "headers": [
     {
