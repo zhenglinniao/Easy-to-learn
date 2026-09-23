@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TutorBoard } from './TutorBoard';
+import { TutorBlocks } from './TutorBlocks';
 
 const board: PersistedTutorBoardV2 = {
   id: 'tutor-1',
@@ -128,5 +129,92 @@ describe('TutorBoard', () => {
       />,
     );
     expect(screen.getByRole('status')).toHaveTextContent('已收到反馈，谢谢你。');
+  });
+
+  it('展示模型识别出的内容类型与学习目标', () => {
+    render(
+      <TutorBoard
+        board={{
+          ...board,
+          result: {
+            ...board.result,
+            contentProfile: {
+              contentKind: 'produce',
+              learningGoal: 'nutrition',
+              goalSource: 'inferred',
+              confidence: 'high',
+            },
+            metadata: { ...board.result.metadata, promptVersion: 'v3' },
+          },
+        }}
+        onChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('识别为：蔬果 · 营养拆解 · 自动选择')).toBeInTheDocument();
+  });
+
+  it('忠实渲染几何标签、角的两条射线、坐标网格和流程边', () => {
+    const { container } = render(
+      <TutorBlocks
+        blocks={[
+          {
+            type: 'diagram',
+            diagram: {
+              type: 'geometry',
+              viewport: { xMin: -2, xMax: 4, yMin: -2, yMax: 4 },
+              primitives: [
+                { kind: 'point', id: 'A', at: [0, 0], label: 'A', color: 'blue' },
+                {
+                  kind: 'angle',
+                  vertex: [0, 0],
+                  from: [2, 0],
+                  to: [0, 2],
+                  label: '90°',
+                  color: 'amber',
+                },
+              ],
+            },
+          },
+          {
+            type: 'diagram',
+            diagram: {
+              type: 'coordinate-plane',
+              xRange: [-2, 2],
+              yRange: [-2, 2],
+              showGrid: true,
+              showAxes: true,
+              points: [],
+              segments: [{ from: [-1, -1], to: [1, 1], label: 'y=x', color: 'green' }],
+            },
+          },
+          {
+            type: 'diagram',
+            diagram: {
+              type: 'flow',
+              direction: 'LR',
+              nodes: [
+                { id: 'start', label: '观察', shape: 'rounded', color: 'blue' },
+                { id: 'end', label: '结论', shape: 'diamond', color: 'green' },
+              ],
+              edges: [
+                {
+                  id: 'edge',
+                  from: 'start',
+                  to: 'end',
+                  label: '因此',
+                  style: 'dashed',
+                },
+              ],
+            },
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText('90°')).toBeInTheDocument();
+    expect(screen.getByText('y=x')).toBeInTheDocument();
+    expect(screen.getByText('因此')).toBeInTheDocument();
+    expect(container.querySelectorAll('g[aria-hidden="true"] line').length).toBeGreaterThan(0);
+    expect(container.querySelector('path[d*=" L "]')).not.toBeNull();
   });
 });

@@ -22,6 +22,32 @@ const feedbackCategories: ReadonlyArray<{ value: AiFeedbackCategory; label: stri
   { value: 'other', label: '其他问题' },
 ];
 
+const contentKindLabels = {
+  exercise: '习题',
+  question: '问题',
+  article: '文章',
+  food_dish: '菜品',
+  produce: '蔬果',
+  object: '物品',
+  process: '过程',
+  diagram: '图示',
+  mixed: '混合内容',
+  unknown: '待探索内容',
+} as const;
+
+const learningGoalLabels = {
+  solve: '求解',
+  explain: '解释',
+  summarize: '总结',
+  recipe: '菜谱拆解',
+  nutrition: '营养拆解',
+  production: '生产过程',
+  growth: '生长过程',
+  mechanism: '原理拆解',
+  compare: '对比',
+  explore: '探索',
+} as const;
+
 export function TutorBoard({
   board,
   screenPosition,
@@ -96,9 +122,14 @@ export function TutorBoard({
         onPointerCancel={onPointerUp}
       >
         <div>
-          <span className={styles.eyebrow}>AI TUTOR</span>
+          <span className={styles.eyebrow}>AI TUTOR · 小易</span>
           <h2>{board.title}</h2>
         </div>
+        <span className={styles.mascot} aria-hidden="true">
+          <i />
+          <i />
+          <b />
+        </span>
         <button
           type="button"
           className={styles.iconButton}
@@ -115,6 +146,13 @@ export function TutorBoard({
             ? '原题已更改'
             : '原题已删除'}
       </div>
+      {board.result.contentProfile ? (
+        <p className={styles.routeLabel}>
+          识别为：{contentKindLabels[board.result.contentProfile.contentKind]} ·{' '}
+          {learningGoalLabels[board.result.contentProfile.learningGoal]} ·{' '}
+          {board.result.contentProfile.goalSource === 'explicit' ? '按你的问题' : '自动选择'}
+        </p>
+      ) : null}
       <section className={styles.content} aria-live="polite">
         <p className={styles.stepLabel}>步骤 {board.stepIndex + 1}</p>
         <h3>{step.title}</h3>
