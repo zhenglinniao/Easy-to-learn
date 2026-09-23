@@ -11,11 +11,11 @@ Use this reference when planning or reviewing a canvas tutoring result against t
 
 ## Current confirmed mode semantics
 
-- `solve`: explain the problem step by step and do not skip key steps.
+- `solve`: explain the problem step by step and do not skip key steps. Classify the problem as `simple` or `reasoning`; simple problems place the conclusion in the first step, while reasoning problems place it only in the final step.
 - `hint`: return exactly three progressive hints without the final numerical answer or complete proof.
 - `explain_step`: explain only the specified step while remaining consistent with its parent tutor board.
 
-These are the currently approved semantics. Any additional teaching-policy constraint requires user confirmation before it enters the production prompt registry.
+The Solve answer-placement rule was confirmed on 2026-09-23 and is active in Prompt `v2`. These are the currently approved semantics. Any additional teaching-policy constraint requires user confirmation before it enters the production prompt registry.
 
 ## Output boundary
 
@@ -26,6 +26,8 @@ Tutor Result V1 contains a title and one or more steps. Each step has a stable I
 - ordered or unordered list;
 - callout with an approved tone;
 - a constrained coordinate-plane, geometry, or flow diagram.
+
+Prompt `v2` Solve results also contain `answerPresentation.problemType` and `answerPresentation.conclusionPosition`. The server rejects missing or inconsistent pairs. Hint and Explain step results cannot carry this field.
 
 The model does not output HTML, arbitrary SVG, CSS, executable animation, URLs, external resources, or UI controls. React components own rendering and navigation. Server code overwrites model, prompt version, and generation time metadata.
 
