@@ -218,6 +218,11 @@ export const tutorStepSchema = z.strictObject({
   hintLevel: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
 });
 
+const answerPresentationSchema = z.strictObject({
+  problemType: z.enum(['simple', 'reasoning']),
+  conclusionPosition: z.enum(['first_step', 'final_step']),
+});
+
 export const tutorResultSchema = z
   .strictObject({
     schemaVersion: z.literal(TUTOR_SCHEMA_VERSION),
@@ -225,6 +230,7 @@ export const tutorResultSchema = z
     title: titleSchema,
     steps: z.array(tutorStepSchema).min(1).max(12),
     hintLevel: z.literal(3).optional(),
+    answerPresentation: answerPresentationSchema.optional(),
     metadata: z.strictObject({
       model: nonEmptyStringSchema,
       promptVersion: nonEmptyStringSchema,
@@ -232,7 +238,7 @@ export const tutorResultSchema = z
     }),
   })
   .superRefine((result, context) => {
-    const { mode, steps, hintLevel } = result;
+    const { mode, steps, hintLevel, answerPresentation, metadata } = result;
     const byteLength = serializedUtf8ByteLength(result);
     if (byteLength === null || byteLength > MAX_TUTOR_RESULT_BYTES) {
       context.addIssue({ code: 'custom', message: 'Tutor 响应 JSON 超过 100 KiB' });
@@ -240,6 +246,33 @@ export const tutorResultSchema = z
 
     if (new Set(steps.map(({ id }) => id)).size !== steps.length) {
       context.addIssue({ code: 'custom', path: ['steps'], message: '步骤 ID 必须唯一' });
+    }
+
+    if (mode === 'solve' && metadata.promptVersion === 'v2') {
+      if (!answerPresentation) {
+        context.addIssue({
+          code: 'custom',
+          path: ['answerPresentation'],
+          message: 'Prompt v2 的 Solve 结果必须声明答案呈现策略',
+        });
+      } else if (
+        (answerPresentation.problemType === 'simple' &&
+          answerPresentation.conclusionPosition !== 'first_step') ||
+        (answerPresentation.problemType === 'reasoning' &&
+          answerPresentation.conclusionPosition !== 'final_step')
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['answerPresentation'],
+          message: '答案位置必须与题型一致',
+        });
+      }
+    } else if (answerPresentation !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['answerPresentation'],
+        message: '只有 Prompt v2 的 Solve 结果可以声明答案呈现策略',
+      });
     }
 
     if (mode === 'hint') {

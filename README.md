@@ -12,6 +12,7 @@ Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无�
 - AI 输出使用受控 Tutor DSL、KaTeX 与受限图表渲染，不注入模型 HTML。
 - AI Provider 可按顺序配置 Gemini 或 OpenAI-compatible 模型，并在超时、网络错误或供应商故障时自动回退。
 - 画布教学规则集中在项目级 `canvas-tutor-planner` Skill，并由同一版本化注册表生成线上 Prompt。
+- Solve 会根据题型选择答案位置：简单题先给结论再解释，推理题完成必要推理后在最后一步给结论。
 - 辅导板支持“有帮助”或预定义问题分类反馈，不采集自由文本与原题内容。
 - 本地事务完成后再同步云端；资产先上传，快照使用 revision 乐观锁。
 - 多标签页竞争单写入者，冲突时保留本地副本，不静默覆盖云端。
@@ -89,7 +90,7 @@ Copy-Item .env.example .env.local
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY`                  | JWT 校验与用户级访问                             |
 | `SUPABASE_SERVICE_ROLE_KEY`                           | 临时 AI 图片、账户删除和保留任务；禁止传到浏览器 |
 | `AI_PROVIDERS`                                        | Provider 标识的有序列表，如 `primary,backup`     |
-| `AI_PROMPT_VERSION`                                   | 已在 Tutor Skill 注册的提示词版本，默认 `v1`     |
+| `AI_PROMPT_VERSION`                                   | 已在 Tutor Skill 注册的提示词版本，默认 `v2`     |
 | `AI_PROVIDER_<ID>_TYPE`                               | `gemini` 或 `openai-compatible`                  |
 | `AI_PROVIDER_<ID>_MODEL`                              | 该 Provider 使用的模型名                         |
 | `AI_PROVIDER_<ID>_API_KEY`                            | 该 Provider 的服务端密钥；本地服务可以留空       |

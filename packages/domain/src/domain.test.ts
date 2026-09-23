@@ -110,6 +110,40 @@ describe('Tutor DSL', () => {
     ).toBe(false);
   });
 
+  it('校验 Prompt v2 的题型与答案位置策略', () => {
+    const v2Result = {
+      ...solveResult,
+      answerPresentation: {
+        problemType: 'simple',
+        conclusionPosition: 'first_step',
+      },
+      metadata: { ...solveResult.metadata, promptVersion: 'v2' },
+    };
+    expect(tutorResultSchema.safeParse(v2Result).success).toBe(true);
+    expect(
+      tutorResultSchema.safeParse({
+        ...v2Result,
+        answerPresentation: {
+          problemType: 'reasoning',
+          conclusionPosition: 'first_step',
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      tutorResultSchema.safeParse({ ...v2Result, answerPresentation: undefined }).success,
+    ).toBe(false);
+    expect(
+      tutorResultSchema.safeParse({
+        ...v2Result,
+        mode: 'explain_step',
+        answerPresentation: {
+          problemType: 'reasoning',
+          conclusionPosition: 'final_step',
+        },
+      }).success,
+    ).toBe(false);
+  });
+
   it('拒绝超过 100 KiB 的 Tutor JSON', () => {
     expect(
       tutorResultSchema.safeParse({
