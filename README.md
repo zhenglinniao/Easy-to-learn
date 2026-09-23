@@ -92,7 +92,7 @@ Copy-Item .env.example .env.local
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY`                  | JWT 校验与用户级访问                             |
 | `SUPABASE_SERVICE_ROLE_KEY`                           | 临时 AI 图片、账户删除和保留任务；禁止传到浏览器 |
 | `AI_PROVIDERS`                                        | Provider 标识的有序列表，如 `primary,backup`     |
-| `AI_PROMPT_VERSION`                                   | 已在 Tutor Skill 注册的提示词版本，默认 `v4`     |
+| `AI_PROMPT_VERSION`                                   | 已在 Tutor Skill 注册的提示词版本，默认 `v5`     |
 | `AI_PROVIDER_<ID>_TYPE`                               | `gemini` 或 `openai-compatible`                  |
 | `AI_PROVIDER_<ID>_MODEL`                              | 该 Provider 使用的模型名                         |
 | `AI_PROVIDER_<ID>_API_KEY`                            | 该 Provider 的服务端密钥；本地服务可以留空       |

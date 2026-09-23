@@ -214,11 +214,50 @@ export const comicStripSchema = z.strictObject({
     .max(4),
 });
 
+export const partMapSchema = z
+  .strictObject({
+    type: z.literal('part-map'),
+    layout: z.enum(['exploded', 'layers', 'callout']),
+    subject: z.strictObject({
+      label: diagramLabelSchema,
+      motif: z.enum(['object', 'food', 'plant', 'body', 'device', 'concept']),
+      color: diagramColorSchema,
+    }),
+    parts: z
+      .array(
+        z.strictObject({
+          id: diagramIdSchema,
+          label: diagramLabelSchema,
+          detail: z.string().min(1).max(140),
+          role: z.enum([
+            'shell',
+            'core',
+            'layer',
+            'component',
+            'ingredient',
+            'material',
+            'input',
+            'output',
+          ]),
+          color: diagramColorSchema,
+        }),
+      )
+      .min(2)
+      .max(10),
+    takeaway: z.string().min(1).max(180),
+  })
+  .superRefine(({ parts }, context) => {
+    if (new Set(parts.map(({ id }) => id)).size !== parts.length) {
+      context.addIssue({ code: 'custom', path: ['parts'], message: '结构拆解图部件 ID 必须唯一' });
+    }
+  });
+
 export const diagramSchema = z.discriminatedUnion('type', [
   coordinatePlaneSchema,
   geometryDiagramSchema,
   flowDiagramSchema,
   comicStripSchema,
+  partMapSchema,
 ]);
 
 export const tutorBlockSchema = z.discriminatedUnion('type', [
@@ -227,6 +266,11 @@ export const tutorBlockSchema = z.discriminatedUnion('type', [
     type: z.literal('math'),
     latex: z.string().min(1).max(2_000),
     display: z.boolean(),
+  }),
+  z.strictObject({
+    type: z.literal('code'),
+    language: z.enum(['text', 'javascript', 'typescript', 'java', 'python', 'sql', 'c', 'cpp']),
+    code: z.string().min(1).max(4_000),
   }),
   z.strictObject({
     type: z.literal('list'),
@@ -328,12 +372,12 @@ export const tutorResultSchema = z
           message: '答案位置必须与题型一致',
         });
       }
-    } else if (metadata.promptVersion === 'v3' || metadata.promptVersion === 'v4') {
+    } else if (['v3', 'v4', 'v5'].includes(metadata.promptVersion)) {
       if (!contentProfile) {
         context.addIssue({
           code: 'custom',
           path: ['contentProfile'],
-          message: 'Prompt v3/v4 结果必须声明内容与学习目标路由',
+          message: 'Prompt v3/v4/v5 结果必须声明内容与学习目标路由',
         });
       }
 
@@ -342,7 +386,7 @@ export const tutorResultSchema = z
           context.addIssue({
             code: 'custom',
             path: ['answerPresentation'],
-            message: 'Prompt v3/v4 的求解型拆解必须声明答案呈现策略',
+            message: 'Prompt v3/v4/v5 的求解型拆解必须声明答案呈现策略',
           });
         } else if (
           (answerPresentation.problemType === 'simple' &&
@@ -353,7 +397,7 @@ export const tutorResultSchema = z
           context.addIssue({
             code: 'custom',
             path: ['answerPresentation'],
-            message: '答案位置必须与题型一致',
+            message: '答案位置不匹配：simple 必须使用 first_step，reasoning 必须使用 final_step',
           });
         }
       } else if (answerPresentation !== undefined) {
@@ -371,22 +415,58 @@ export const tutorResultSchema = z
       });
     }
 
-    if (!['v3', 'v4'].includes(metadata.promptVersion) && contentProfile !== undefined) {
+    if (!['v3', 'v4', 'v5'].includes(metadata.promptVersion) && contentProfile !== undefined) {
       context.addIssue({
         code: 'custom',
         path: ['contentProfile'],
-        message: '只有 Prompt v3/v4 结果可以声明内容与学习目标路由',
+        message: '只有 Prompt v3/v4/v5 结果可以声明内容与学习目标路由',
       });
     }
 
     if (
-      metadata.promptVersion === 'v4' &&
+      ['v4', 'v5'].includes(metadata.promptVersion) &&
       steps.some((step) => step.blocks.every((block) => block.type !== 'diagram'))
     ) {
       context.addIssue({
         code: 'custom',
         path: ['steps'],
-        message: 'Prompt v4 的每一步都必须包含至少一个有信息量的图解',
+        message: 'Prompt v4/v5 的每一步都必须包含至少一个有信息量的图解',
+      });
+    }
+
+    if (
+      metadata.promptVersion === 'v5' &&
+      steps.some((step) => step.blocks.every((block) => block.type === 'diagram'))
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['steps'],
+        message: 'Prompt v5 的每一步都必须用简短文字、公式或提示框解释图解',
+      });
+    }
+
+    const hasMath = steps.some((step) => step.blocks.some((block) => block.type === 'math'));
+    const hasComic = steps.some((step) =>
+      step.blocks.some((block) => block.type === 'diagram' && block.diagram.type === 'comic-strip'),
+    );
+    if (metadata.promptVersion === 'v5' && hasMath && !hasComic) {
+      context.addIssue({
+        code: 'custom',
+        path: ['steps'],
+        message: 'Prompt v5 的数学图文讲解必须至少包含一个 Q 版 comic-strip 推理提示',
+      });
+    }
+
+    if (
+      metadata.promptVersion === 'v5' &&
+      contentProfile?.goalSource === 'inferred' &&
+      ((contentProfile.contentKind === 'produce' && contentProfile.learningGoal !== 'nutrition') ||
+        (contentProfile.contentKind === 'food_dish' && contentProfile.learningGoal !== 'recipe'))
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['contentProfile', 'learningGoal'],
+        message: '无明确问题时 produce 必须使用 nutrition，food_dish 必须使用 recipe',
       });
     }
 

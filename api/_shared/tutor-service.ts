@@ -35,6 +35,53 @@ const correctionFromIssues = (issues: Array<{ path: PropertyKey[]; message: stri
   ].join('\n');
 };
 
+const normalizeKnownModelDrift = (candidate: unknown): unknown => {
+  if (candidate === null || typeof candidate !== 'object' || Array.isArray(candidate)) {
+    return candidate;
+  }
+
+  const rawResult = candidate as Record<string, unknown>;
+  const result = Object.fromEntries(
+    Object.entries(rawResult).filter(
+      ([key]) => key !== '$schema' && !(key === 'hintLevel' && rawResult.mode !== 'hint'),
+    ),
+  );
+  if (!Array.isArray(result.steps)) return result;
+
+  return {
+    ...result,
+    steps: result.steps.map((step) => {
+      if (step === null || typeof step !== 'object' || Array.isArray(step)) return step;
+      const stepRecord = step as Record<string, unknown>;
+      if (!Array.isArray(stepRecord.blocks)) return step;
+      return {
+        ...stepRecord,
+        blocks: stepRecord.blocks.map((block) => {
+          if (block === null || typeof block !== 'object' || Array.isArray(block)) return block;
+          const blockRecord = block as Record<string, unknown>;
+          const diagram = blockRecord.diagram;
+          if (
+            blockRecord.type !== 'diagram' ||
+            typeof blockRecord.takeaway !== 'string' ||
+            diagram === null ||
+            typeof diagram !== 'object' ||
+            Array.isArray(diagram) ||
+            (diagram as Record<string, unknown>).type !== 'part-map' ||
+            typeof (diagram as Record<string, unknown>).takeaway === 'string'
+          ) {
+            return block;
+          }
+          const { takeaway, ...safeBlock } = blockRecord;
+          return {
+            ...safeBlock,
+            diagram: { ...(diagram as Record<string, unknown>), takeaway },
+          };
+        }),
+      };
+    }),
+  };
+};
+
 export class TutorService {
   constructor(
     private readonly state: AiStateStore,
@@ -73,13 +120,13 @@ export class TutorService {
     }
     try {
       let candidate = await this.model.generate(request);
-      let validated = tutorResultSchema.safeParse(candidate);
+      let validated = tutorResultSchema.safeParse(normalizeKnownModelDrift(candidate));
       if (!validated.success) {
         candidate = await this.model.generate(
           request,
           correctionFromIssues(validated.error.issues),
         );
-        validated = tutorResultSchema.safeParse(candidate);
+        validated = tutorResultSchema.safeParse(normalizeKnownModelDrift(candidate));
       }
       if (!validated.success) {
         throw new ApiFault('INVALID_MODEL_OUTPUT', 'AI 返回内容无法安全展示');

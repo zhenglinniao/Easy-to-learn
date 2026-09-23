@@ -40,7 +40,7 @@ const request = (mode: TutorRequest['mode']): TutorRequest => ({
 
 describe('Tutor Skill prompt registry', () => {
   it('以项目 Skill 注册表作为生产 Prompt 的唯一来源', () => {
-    const defaultPrompt = tutorPromptRegistry.versions.v4;
+    const defaultPrompt = tutorPromptRegistry.versions.v5;
     expect(DEFAULT_TUTOR_PROMPT_VERSION).toBe(tutorPromptRegistry.defaultVersion);
     expect(TUTOR_SYSTEM_INSTRUCTION).toBe(defaultPrompt.systemInstruction);
 
@@ -66,6 +66,7 @@ describe('Tutor Skill prompt registry', () => {
     expect(resolveTutorPromptVersion('v2')).toBe('v2');
     expect(resolveTutorPromptVersion('v3')).toBe('v3');
     expect(resolveTutorPromptVersion('v4')).toBe('v4');
+    expect(resolveTutorPromptVersion('v5')).toBe('v5');
     expect(() => resolveTutorPromptVersion('v999')).toThrow(/未知 Tutor Prompt 版本/);
   });
 });

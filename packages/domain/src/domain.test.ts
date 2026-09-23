@@ -260,6 +260,117 @@ describe('Tutor DSL', () => {
     ).toBe(false);
   });
 
+  it('校验 Prompt v5 的图文步骤、代码和结构拆解图', () => {
+    const illustratedResult = {
+      ...solveResult,
+      title: 'Java Class 是什么',
+      contentProfile: {
+        contentKind: 'question' as const,
+        learningGoal: 'explain' as const,
+        goalSource: 'explicit' as const,
+        confidence: 'high' as const,
+      },
+      steps: [
+        {
+          id: 'class-map',
+          title: '先看 Class 装了什么',
+          blocks: [
+            {
+              type: 'diagram' as const,
+              diagram: {
+                type: 'part-map' as const,
+                layout: 'callout' as const,
+                subject: {
+                  label: 'Class<User>',
+                  motif: 'concept' as const,
+                  color: 'purple' as const,
+                },
+                parts: [
+                  {
+                    id: 'name',
+                    label: '类名',
+                    detail: '告诉 JVM 这是谁',
+                    role: 'component' as const,
+                    color: 'blue' as const,
+                  },
+                  {
+                    id: 'method',
+                    label: '方法',
+                    detail: '描述它能做什么',
+                    role: 'component' as const,
+                    color: 'green' as const,
+                  },
+                ],
+                takeaway: 'Class 对象就像类在 JVM 里的信息档案。',
+              },
+            },
+            {
+              type: 'code' as const,
+              language: 'java' as const,
+              code: 'Class<User> type = User.class;',
+            },
+            {
+              type: 'callout' as const,
+              tone: 'info' as const,
+              text: '代码负责精确，插画负责解释结构。',
+            },
+          ],
+        },
+      ],
+      metadata: { ...solveResult.metadata, promptVersion: 'v5' },
+    };
+
+    expect(tutorResultSchema.safeParse(illustratedResult).success).toBe(true);
+    expect(
+      tutorResultSchema.safeParse({
+        ...illustratedResult,
+        steps: [
+          {
+            ...illustratedResult.steps[0],
+            blocks: [illustratedResult.steps[0]!.blocks[0]!],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      tutorResultSchema.safeParse({
+        ...illustratedResult,
+        steps: [
+          {
+            ...illustratedResult.steps[0],
+            blocks: [illustratedResult.steps[0]!.blocks[1]!],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      tutorResultSchema.safeParse({
+        ...illustratedResult,
+        steps: [
+          {
+            ...illustratedResult.steps[0],
+            blocks: [
+              illustratedResult.steps[0]!.blocks[0]!,
+              { type: 'math', latex: 'x=4', display: true },
+              { type: 'callout', tone: 'info', text: '缺少 Q 版推理提示。' },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      tutorResultSchema.safeParse({
+        ...illustratedResult,
+        contentProfile: {
+          contentKind: 'produce',
+          learningGoal: 'explain',
+          goalSource: 'inferred',
+          confidence: 'high',
+        },
+      }).success,
+    ).toBe(false);
+  });
+
   it('拒绝超过 100 KiB 的 Tutor JSON', () => {
     expect(
       tutorResultSchema.safeParse({

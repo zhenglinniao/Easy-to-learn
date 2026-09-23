@@ -109,6 +109,56 @@ describe('TutorService', () => {
     });
   });
 
+  it('修复 part-map takeaway 被模型放到图块外层的已知结构漂移', async () => {
+    const model = {
+      generate: vi.fn().mockResolvedValue({
+        ...result,
+        $schema: 'https://example.invalid/tutor.schema.json',
+        hintLevel: 1,
+        title: '香水瓶拆解',
+        steps: [
+          {
+            id: 'step-1',
+            title: '看清结构',
+            blocks: [
+              { type: 'paragraph', text: '先从外到内观察。' },
+              {
+                type: 'diagram',
+                diagram: {
+                  type: 'part-map',
+                  layout: 'exploded',
+                  subject: { label: '香水瓶', motif: 'device', color: 'amber' },
+                  parts: [
+                    { id: 'cap', label: '瓶盖', detail: '保护喷头', role: 'shell', color: 'blue' },
+                    { id: 'body', label: '瓶身', detail: '容纳香水', role: 'core', color: 'amber' },
+                  ],
+                },
+                takeaway: '每个部件各司其职。',
+              },
+            ],
+          },
+        ],
+      }),
+    };
+    const service = new TutorService(
+      new MemoryAiStateStore(),
+      model,
+      boards,
+      () => new Date('2026-09-22T00:00:00.000Z'),
+    );
+
+    const response = await service.execute(actor, request);
+
+    const diagramBlock = response.data.result.steps[0]?.blocks[1];
+    expect(diagramBlock).toMatchObject({
+      type: 'diagram',
+      diagram: { type: 'part-map', takeaway: '每个部件各司其职。' },
+    });
+    expect(response.data.result).not.toHaveProperty('$schema');
+    expect(response.data.result).not.toHaveProperty('hintLevel');
+    expect(model.generate).toHaveBeenCalledTimes(1);
+  });
+
   it('执行五分钟间隔与上海自然日三次配额', async () => {
     const state = new MemoryAiStateStore();
     const model: TutorModel = { generate: vi.fn().mockResolvedValue(result) };

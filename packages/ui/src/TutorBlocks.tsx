@@ -315,10 +315,72 @@ function ComicStrip({ diagram }: { diagram: Extract<DiagramV1, { type: 'comic-st
   );
 }
 
+const subjectMarks: Record<Extract<DiagramV1, { type: 'part-map' }>['subject']['motif'], string> = {
+  object: '◇',
+  food: '◉',
+  plant: '♧',
+  body: '☺',
+  device: '▣',
+  concept: '✦',
+};
+
+const partMarks: Record<Extract<DiagramV1, { type: 'part-map' }>['parts'][number]['role'], string> =
+  {
+    shell: '○',
+    core: '●',
+    layer: '≡',
+    component: '◇',
+    ingredient: '＋',
+    material: '▧',
+    input: '→',
+    output: '✓',
+  };
+
+function PartMap({ diagram }: { diagram: Extract<DiagramV1, { type: 'part-map' }> }) {
+  return (
+    <div
+      className={styles.partMap}
+      data-layout={diagram.layout}
+      role="img"
+      aria-label={`${diagram.subject.label}结构拆解图`}
+    >
+      <div
+        className={styles.partSubject}
+        style={{ '--part-color': colors[diagram.subject.color] } as React.CSSProperties}
+      >
+        <span aria-hidden="true">{subjectMarks[diagram.subject.motif]}</span>
+        <strong>{diagram.subject.label}</strong>
+      </div>
+      <div className={styles.partItems}>
+        {diagram.parts.map((part, index) => (
+          <div
+            key={part.id}
+            className={styles.partItem}
+            style={{ '--part-color': colors[part.color] } as React.CSSProperties}
+          >
+            <span className={styles.partIndex} aria-hidden="true">
+              {diagram.layout === 'callout' ? index + 1 : partMarks[part.role]}
+            </span>
+            <span>
+              <strong>{part.label}</strong>
+              <small>{part.detail}</small>
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className={styles.partTakeaway}>
+        <span aria-hidden="true">★</span>
+        {diagram.takeaway}
+      </p>
+    </div>
+  );
+}
+
 function SafeDiagram({ diagram }: { diagram: DiagramV1 }) {
   if (diagram.type === 'coordinate-plane') return <CoordinateDiagram diagram={diagram} />;
   if (diagram.type === 'geometry') return <GeometryDiagram diagram={diagram} />;
   if (diagram.type === 'comic-strip') return <ComicStrip diagram={diagram} />;
+  if (diagram.type === 'part-map') return <PartMap diagram={diagram} />;
   return <FlowDiagram diagram={diagram} />;
 }
 
@@ -339,6 +401,13 @@ export function TutorBlocks({ blocks }: { blocks: readonly TutorBlock[] }) {
           });
           return (
             <div key={index} className={styles.math} dangerouslySetInnerHTML={{ __html: html }} />
+          );
+        }
+        if (block.type === 'code') {
+          return (
+            <pre key={index} className={styles.codeBlock} data-language={block.language}>
+              <code>{block.code}</code>
+            </pre>
           );
         }
         if (block.type === 'list') {
