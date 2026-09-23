@@ -7,10 +7,15 @@
   border-radius: 22px;
   color: #29241f;
   background: rgba(255, 253, 249, 0.98);
+  background-image:
+    linear-gradient(rgba(83, 123, 168, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(83, 123, 168, 0.045) 1px, transparent 1px);
+  background-size: 22px 22px;
   box-shadow:
     0 22px 56px rgba(48, 39, 29, 0.18),
     0 3px 10px rgba(48, 39, 29, 0.08);
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  animation: boardArrive 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .header {
   display: flex;
@@ -30,6 +35,49 @@
   margin: 3px 0 0;
   font-size: 17px;
   line-height: 1.25;
+}
+.mascot {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 29px;
+  border: 2px solid #b55039;
+  border-radius: 11px 13px 10px 12px;
+  background: #fff8e9;
+  transform: rotate(-2deg);
+}
+.mascot::before {
+  position: absolute;
+  top: -9px;
+  left: 15px;
+  width: 2px;
+  height: 8px;
+  background: #b55039;
+  content: '';
+}
+.mascot i {
+  position: absolute;
+  top: 9px;
+  width: 3px;
+  height: 4px;
+  border-radius: 50%;
+  background: #4d463f;
+}
+.mascot i:first-child {
+  left: 9px;
+}
+.mascot i:nth-child(2) {
+  right: 9px;
+}
+.mascot b {
+  position: absolute;
+  top: 16px;
+  left: 12px;
+  width: 9px;
+  height: 4px;
+  border-bottom: 2px solid #4d463f;
+  border-radius: 50%;
 }
 .eyebrow,
 .stepLabel {
@@ -65,6 +113,12 @@
   color: #397659;
   font-size: 11px;
   font-weight: 700;
+}
+.routeLabel {
+  margin: 7px 18px 0;
+  color: #766e65;
+  font-size: 11px;
+  line-height: 1.4;
 }
 .sourceStatus[data-status='stale'] {
   color: #a1631c;
@@ -120,31 +174,84 @@
   border-radius: 14px;
   background: #faf7f2;
 }
+.diagramGrid line {
+  stroke: rgba(111, 103, 94, 0.16);
+  stroke-width: 1;
+}
+.diagramAxis {
+  stroke: #8f867d;
+  stroke-width: 1.25;
+}
+.diagramLabel {
+  paint-order: stroke;
+  stroke: #faf7f2;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.sketchStroke {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transform: translateY(2px);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: revealSketch 420ms cubic-bezier(0.23, 1, 0.32, 1) 60ms forwards;
+}
 .diagram text {
   fill: currentColor;
   font-size: 11px;
 }
 .flow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: grid;
+  gap: 10px;
   overflow-x: auto;
   padding: 12px;
   border-radius: 14px;
   background: #faf7f2;
 }
-.flowNode {
+.flowNodes {
   display: flex;
-  flex: 0 0 auto;
   align-items: center;
   gap: 8px;
+}
+.flow[data-direction='TB'] .flowNodes {
+  flex-direction: column;
+  align-items: stretch;
+}
+.flowNode {
+  flex: 0 0 auto;
   padding: 8px 10px;
   border: 2px solid;
   border-radius: 10px;
   background: #fff;
 }
-.flowNode b {
-  font-size: 17px;
+.flowNode[data-shape='rounded'] {
+  border-radius: 999px;
+}
+.flowNode[data-shape='diamond'] {
+  border-radius: 3px 12px 3px 12px;
+}
+.flowEdges {
+  display: grid;
+  gap: 5px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(52, 44, 36, 0.14);
+}
+.flowEdge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.flowEdge[data-style='dashed'] b {
+  opacity: 0.55;
+}
+.flowEdge em {
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #efe8de;
+  font-size: 10px;
+  font-style: normal;
 }
 .footer {
   display: flex;
@@ -233,6 +340,14 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .board,
+  .sketchStroke {
+    transform: none;
+    animation: fadeOnly 160ms ease-out both;
+  }
+  .sketchStroke {
+    opacity: 1;
+  }
   .iconButton,
   .actions button,
   .feedback button {
@@ -246,11 +361,41 @@
     transform: none;
   }
 }
+@keyframes boardArrive {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+}
+@keyframes revealSketch {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fadeOnly {
+  from {
+    opacity: 0;
+  }
+}
 :global(html[data-theme='dark']) .board {
   border-color: rgba(255, 255, 255, 0.11);
   color: #f4eee6;
   background: rgba(40, 37, 33, 0.98);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 22px 22px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+}
+:global(html[data-theme='dark']) .mascot {
+  background: #302d29;
+}
+:global(html[data-theme='dark']) .diagramLabel {
+  stroke: #24221f;
+}
+:global(html[data-theme='dark']) .flowEdge em {
+  background: #38342f;
 }
 :global(html[data-theme='dark']) .header,
 :global(html[data-theme='dark']) .footer,
@@ -272,4 +417,19 @@
 :global(html[data-theme='dark']) .diagram,
 :global(html[data-theme='dark']) .flow {
   background: #24221f;
+}
+:global(html[data-theme='dark']) .callout {
+  border-color: #6da2ea;
+  color: #dceaff;
+  background: #1d2a3c;
+}
+:global(html[data-theme='dark']) .callout[data-tone='warning'] {
+  border-color: #dda85e;
+  color: #ffe6bf;
+  background: #382b1b;
+}
+:global(html[data-theme='dark']) .callout[data-tone='success'] {
+  border-color: #67b68c;
+  color: #d4f5e2;
+  background: #1b3227;
 }
