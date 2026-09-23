@@ -6,8 +6,8 @@ import {
   attachTrustedMetadata,
   buildTutorPrompt,
   DEFAULT_TUTOR_PROMPT_VERSION,
+  getTutorSystemInstruction,
   parseModelJson,
-  TUTOR_SYSTEM_INSTRUCTION,
   type TutorImageResolver,
 } from './model-prompt';
 import { ProviderTimeoutError, ProviderUnavailableError, type TutorModel } from './tutor-service';
@@ -32,7 +32,7 @@ export class GeminiTutorModel implements TutorModel {
     try {
       const parts: Array<
         { text: string } | { inlineData: { mimeType: 'image/png' | 'image/jpeg'; data: string } }
-      > = [{ text: buildTutorPrompt(request, correction) }];
+      > = [{ text: buildTutorPrompt(request, correction, this.promptVersion) }];
       if (request.image?.base64) {
         parts.push({
           inlineData: { mimeType: request.image.mimeType, data: request.image.base64 },
@@ -58,7 +58,7 @@ export class GeminiTutorModel implements TutorModel {
           temperature: 0.6,
           responseMimeType: 'application/json',
           responseJsonSchema: domainJsonSchemas.tutorResultV1,
-          systemInstruction: TUTOR_SYSTEM_INSTRUCTION,
+          systemInstruction: getTutorSystemInstruction(this.promptVersion),
         },
       });
       return attachTrustedMetadata(

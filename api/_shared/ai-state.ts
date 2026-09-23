@@ -42,9 +42,11 @@ export class MemoryAiStateStore implements AiStateStore {
     { expiresAt: number; data: TutorResponse['data'] }
   >();
 
+  constructor(private readonly clock: () => number = () => Date.now()) {}
+
   async getCached(actorKey: string, requestId: string): Promise<TutorResponse['data'] | null> {
     const entry = this.cacheEntries.get(`${actorKey}:${requestId}`);
-    if (!entry || entry.expiresAt <= Date.now()) return null;
+    if (!entry || entry.expiresAt <= this.clock()) return null;
     return entry.data;
   }
 

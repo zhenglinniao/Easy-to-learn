@@ -135,7 +135,7 @@ describe('AI Provider 执行', () => {
         AI_PROVIDER_DEEPSEEK_API_KEY: 'server-only-secret',
         AI_PROVIDER_DEEPSEEK_MODEL: 'deepseek-chat',
         AI_PROVIDER_DEEPSEEK_RESPONSE_FORMAT: 'json_object',
-        AI_PROMPT_VERSION: 'v2',
+        AI_PROMPT_VERSION: 'v1',
       },
       fetchMock,
     );
@@ -143,7 +143,7 @@ describe('AI Provider 执行', () => {
     await expect(
       model.generate({ ...request, image: { mimeType: 'image/png', base64: 'YQ==' } }),
     ).resolves.toMatchObject({
-      metadata: { model: 'deepseek/deepseek-chat', promptVersion: 'v2' },
+      metadata: { model: 'deepseek/deepseek-chat', promptVersion: 'v1' },
     });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('https://api.deepseek.example/v1/chat/completions');

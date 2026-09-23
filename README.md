@@ -11,6 +11,7 @@ Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无�
 - 文字、手写、图形和图片混合选区可调用 Solve、Hint 与 Explain step。
 - AI 输出使用受控 Tutor DSL、KaTeX 与受限图表渲染，不注入模型 HTML。
 - AI Provider 可按顺序配置 Gemini 或 OpenAI-compatible 模型，并在超时、网络错误或供应商故障时自动回退。
+- 画布教学规则集中在项目级 `canvas-tutor-planner` Skill，并由同一版本化注册表生成线上 Prompt。
 - 辅导板支持“有帮助”或预定义问题分类反馈，不采集自由文本与原题内容。
 - 本地事务完成后再同步云端；资产先上传，快照使用 revision 乐观锁。
 - 多标签页竞争单写入者，冲突时保留本地副本，不静默覆盖云端。
@@ -41,6 +42,7 @@ packages/domain/           领域模型与 Zod 协议
 packages/canvas-adapter/   Excalidraw 选区、坐标和导出适配
 packages/persistence/      IndexedDB、outbox、同步和导出
 packages/ui/               径向菜单、辅导板与安全 DSL 渲染
+skills/canvas-tutor-planner/ 画布问题拆解 Skill、运行契约与 Prompt 注册表
 supabase/migrations/       数据库、RLS、RPC、Storage policy
 supabase/tests/            pgTAP 权限与契约测试
 docs/                      需求、方案、进度和测试报告
@@ -87,7 +89,7 @@ Copy-Item .env.example .env.local
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY`                  | JWT 校验与用户级访问                             |
 | `SUPABASE_SERVICE_ROLE_KEY`                           | 临时 AI 图片、账户删除和保留任务；禁止传到浏览器 |
 | `AI_PROVIDERS`                                        | Provider 标识的有序列表，如 `primary,backup`     |
-| `AI_PROMPT_VERSION`                                   | 服务端提示词版本，默认 `v1`                      |
+| `AI_PROMPT_VERSION`                                   | 已在 Tutor Skill 注册的提示词版本，默认 `v1`     |
 | `AI_PROVIDER_<ID>_TYPE`                               | `gemini` 或 `openai-compatible`                  |
 | `AI_PROVIDER_<ID>_MODEL`                              | 该 Provider 使用的模型名                         |
 | `AI_PROVIDER_<ID>_API_KEY`                            | 该 Provider 的服务端密钥；本地服务可以留空       |
@@ -102,6 +104,8 @@ Copy-Item .env.example .env.local
 | `APP_ORIGINS`                                         | 逗号分隔的完整允许 origin                        |
 
 Provider 按 `AI_PROVIDERS` 的声明顺序尝试。仅当当前 Provider 超时、网络失败或返回供应商错误时才切换；模型成功返回但 DSL 非法时，仍由现有的一次纠错流程处理。`GEMINI_API_KEY`、`AI_MODEL` 和 `AI_TIMEOUT_MS` 仅用于兼容旧部署；声明 `AI_PROVIDERS` 后不再读取它们。
+
+生产 Prompt 的唯一来源是 `skills/canvas-tutor-planner/references/prompt-registry.json`。`AI_PROMPT_VERSION` 必须指向其中真实存在的版本；未知版本会让健康检查返回 AI `degraded`，Tutor API 返回依赖未配置，避免审计元数据与实际 Prompt 内容不一致。
 
 Provider 链最多配置 3 个节点，累计超时预算不得超过 25 秒；未单独设置超时时，预算会在节点间平均分配。Tutor Function 时限为 60 秒，用于容纳一次正常调用和至多一次既有格式纠错，不应依靠平台时限代替 Provider 超时。
 

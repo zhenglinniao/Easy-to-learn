@@ -4,8 +4,8 @@ import {
   attachTrustedMetadata,
   buildTutorPrompt,
   DEFAULT_TUTOR_PROMPT_VERSION,
+  getTutorSystemInstruction,
   parseModelJson,
-  TUTOR_SYSTEM_INSTRUCTION,
   type TutorImageResolver,
 } from './model-prompt';
 import { ProviderTimeoutError, ProviderUnavailableError, type TutorModel } from './tutor-service';
@@ -49,7 +49,12 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
     try {
       const content: Array<
         { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
-      > = [{ type: 'text', text: buildTutorPrompt(request, correction) }];
+      > = [
+        {
+          type: 'text',
+          text: buildTutorPrompt(request, correction, this.promptVersion),
+        },
+      ];
       if (request.image) {
         let data = request.image.base64;
         if (!data && request.image.uploadPath) {
@@ -91,7 +96,7 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
           model: this.model,
           temperature: 0.6,
           messages: [
-            { role: 'system', content: TUTOR_SYSTEM_INSTRUCTION },
+            { role: 'system', content: getTutorSystemInstruction(this.promptVersion) },
             { role: 'user', content },
           ],
           ...(responseFormat ? { response_format: responseFormat } : {}),
