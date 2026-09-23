@@ -6,7 +6,7 @@ Use this reference when planning or reviewing a canvas tutoring result against t
 
 - The user chooses `solve`, `hint`, or `explain_step`; the model does not replace that choice. Under Prompt `v3`, `solve` means a complete educational decomposition rather than only solving exercises.
 - A request contains selected text and/or a validated PNG/JPEG representation of supported Excalidraw elements.
-- `explain_step` includes both the parent tutor-board ID and target step ID. Other modes do not carry that context.
+- `explain_step` includes the parent tutor-board ID, target step ID, parent title, and the validated target-step Tutor DSL. Other modes do not carry that context. The model must stay consistent with this supplied step instead of guessing from IDs.
 - Missing or unreadable source information must remain explicit; do not fabricate labels or problem conditions.
 
 ## Current confirmed mode semantics
@@ -38,7 +38,8 @@ The model does not output HTML, arbitrary SVG, CSS, executable animation, URLs, 
 ## Validation and failure behavior
 
 - The domain Zod schema is the source of truth for shape, size, enum, diagram, and Hint invariants.
-- The service performs at most one format-correction attempt after invalid Tutor DSL.
+- The service performs at most one format-correction attempt after invalid Tutor DSL and supplies only bounded Zod issue paths/messages, never the original private content.
+- OpenAI-compatible providers can use Chat Completions or Responses API. DeepSeek `deepseek-flash` uses Responses API with `json_schema` and non-thinking mode; transport settings never change teaching semantics.
 - A valid but pedagogically weak response is an evaluation failure, not a reason to bypass the schema.
 - Provider failure may use the configured fallback chain; invalid lesson content does not silently switch providers.
 

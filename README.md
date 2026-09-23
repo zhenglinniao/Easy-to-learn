@@ -98,6 +98,8 @@ Copy-Item .env.example .env.local
 | `AI_PROVIDER_<ID>_API_KEY`                            | 该 Provider 的服务端密钥；本地服务可以留空       |
 | `AI_PROVIDER_<ID>_BASE_URL`                           | OpenAI-compatible API 的 `/v1` 基础地址          |
 | `AI_PROVIDER_<ID>_RESPONSE_FORMAT`                    | `json_schema`、`json_object` 或 `prompt`         |
+| `AI_PROVIDER_<ID>_WIRE_API`                           | `chat_completions`（默认）或 `responses`         |
+| `AI_PROVIDER_<ID>_REASONING_EFFORT`                   | 可选：`none`、`low`、`high` 或 `max`             |
 | `AI_PROVIDER_<ID>_TIMEOUT_MS`                         | 单个 Provider 超时，范围 1000–25000 毫秒         |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 配额、限流、票据和幂等缓存                       |
 | `ANON_SESSION_KEYS`                                   | `v2:至少32字符密钥,v1:旧密钥`，第一项用于签发    |
@@ -112,7 +114,7 @@ Provider 按 `AI_PROVIDERS` 的声明顺序尝试。仅当当前 Provider 超时
 
 Provider 链最多配置 3 个节点，累计超时预算不得超过 25 秒；未单独设置超时时，预算会在节点间平均分配。Tutor Function 时限为 60 秒，用于容纳一次正常调用和至多一次既有格式纠错，不应依靠平台时限代替 Provider 超时。
 
-OpenAI、DeepSeek、通义千问、Moonshot、OpenRouter、Groq 与本地服务共用 `openai-compatible` 适配器。不同供应商对结构化输出的支持不同：优先使用 `json_schema`，不支持时改为 `json_object`，仍不支持时使用 `prompt`。所选模型必须支持图片输入，才能处理题图。
+OpenAI、DeepSeek、通义千问、Moonshot、OpenRouter、Groq 与本地服务共用 `openai-compatible` 适配器。不同供应商对结构化输出的支持不同：优先使用 `json_schema`，不支持时改为 `json_object`，仍不支持时使用 `prompt`。DeepSeek 的 `deepseek-flash` 应配置 `WIRE_API=responses`、`RESPONSE_FORMAT=json_schema`、`REASONING_EFFORT=none`，以获得图文输入、严格结构和适合交互场景的延迟。所选模型必须支持图片输入，才能处理题图。
 
 建议用密码管理器生成独立随机密钥；不要复用 Supabase、Redis 或 AI Provider 凭据。
 
@@ -259,8 +261,8 @@ pnpm db:stop
 - [需求评审与决策记录](docs/01-需求评审与决策记录.md)
 - [系统方案设计](docs/02-方案设计.md)
 - [单元测试报告](docs/04-单元测试报告.md)
-- [开发节点记录](docs/progress/03-10-官网登录与桌面体验.md)
+- [最新开发节点记录](docs/progress/03-23-生产AI与辅导板验收.md)
 
 ## 当前发布边界
 
-本地代码完成不等于生产发布完成。缺少真实供应商凭据时，以下事项仍是外部阻塞：OAuth、云端 RLS/Storage E2E、各启用 AI Provider 的黄金题集与回退演练、Redis 配额、Sentry 告警、Vercel Preview 安全头、备份恢复和灰度观察。所有这些必须用对应环境的证据单独验收。
+本地代码完成不等于生产发布完成。DeepSeek `deepseek-flash` 的文字、PNG 图文、结构化输出和一次纠错已经过真实 API 验收；仍需外部资源的事项包括：OAuth、云端 RLS/Storage E2E、其他启用 Provider 的黄金题集与 Provider 间回退演练、Redis 配额、Sentry 告警、Vercel Preview 安全头、域名、备份恢复和灰度观察。所有这些必须用对应环境的证据单独验收。
