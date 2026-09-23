@@ -57,6 +57,8 @@ export const createTutorModelFromEnvironment = (
       config.apiKey,
       config.timeoutMs,
       config.responseFormat,
+      config.wireApi,
+      config.reasoningEffort,
       resolveImage,
       promptVersion,
       fetchImpl,

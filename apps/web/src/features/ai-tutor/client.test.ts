@@ -3,6 +3,60 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TutorApiClient } from './client';
 
 describe('TutorApiClient', () => {
+  it('默认 fetch 不会因方法 this 绑定触发 Illegal invocation', async () => {
+    const request = {
+      requestId: 'request-native-fetch',
+      schemaVersion: 1 as const,
+      boardId: 'local_board-1',
+      mode: 'solve' as const,
+      text: '2 + 2',
+      locale: 'zh-CN' as const,
+      source: {
+        elementIds: ['element-1'],
+        selectionBounds: { x: 0, y: 0, width: 40, height: 20 },
+        contentHash: 'native-fetch',
+      },
+    };
+    const response = {
+      data: {
+        requestId: request.requestId,
+        result: {
+          schemaVersion: 1,
+          mode: 'solve',
+          title: '加法',
+          steps: [
+            {
+              id: 'step-1',
+              title: '相加',
+              blocks: [{ type: 'paragraph', text: '答案是 4。' }],
+            },
+          ],
+          metadata: {
+            model: 'test',
+            promptVersion: 'v1',
+            generatedAt: '2026-09-23T00:00:00.000Z',
+          },
+        },
+        quota: {
+          dailyLimit: 3,
+          remaining: 2,
+          nextAllowedAt: '2026-09-23T00:05:00.000Z',
+        },
+      },
+    };
+    const nativeLikeFetch = vi.fn(function (this: typeof globalThis, input: RequestInfo | URL) {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      const url = String(input);
+      if (url.endsWith('/api/anonymous/session')) return Promise.resolve(new Response('{}'));
+      return Promise.resolve(new Response(JSON.stringify(response)));
+    }) as unknown as typeof fetch;
+    vi.stubGlobal('fetch', nativeLikeFetch);
+
+    await expect(new TutorApiClient(async () => null).execute(request)).resolves.toMatchObject({
+      requestId: request.requestId,
+    });
+    vi.unstubAllGlobals();
+  });
   afterEach(() => vi.unstubAllGlobals());
 
   it('为游客获取会话并通过一次性票据上传大图', async () => {

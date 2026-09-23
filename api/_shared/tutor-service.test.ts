@@ -95,6 +95,7 @@ describe('TutorService', () => {
       data: { result: { schemaVersion: 1 } },
     });
     expect(generate).toHaveBeenNthCalledWith(2, request, expect.stringContaining('Tutor DSL'));
+    expect(generate).toHaveBeenNthCalledWith(2, request, expect.stringContaining('schemaVersion'));
 
     const invalid = new TutorService(
       new MemoryAiStateStore(),

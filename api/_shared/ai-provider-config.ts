@@ -1,4 +1,8 @@
-import type { OpenAiResponseFormat } from './openai-compatible-model';
+import type {
+  ModelReasoningEffort,
+  OpenAiResponseFormat,
+  OpenAiWireApi,
+} from './openai-compatible-model';
 
 type Environment = Record<string, string | undefined>;
 
@@ -22,6 +26,8 @@ export interface OpenAiCompatibleProviderConfig extends CommonProviderConfig {
   baseUrl: string;
   apiKey?: string;
   responseFormat: OpenAiResponseFormat;
+  wireApi: OpenAiWireApi;
+  reasoningEffort?: ModelReasoningEffort;
 }
 
 export type AiProviderConfig = GeminiProviderConfig | OpenAiCompatibleProviderConfig;
@@ -93,6 +99,20 @@ const parseProvider = (
         `${prefix}_RESPONSE_FORMAT 必须是 json_schema、json_object 或 prompt`,
       );
     }
+    const wireApi = (environment[`${prefix}_WIRE_API`]?.trim() ??
+      'chat_completions') as OpenAiWireApi;
+    if (!['chat_completions', 'responses'].includes(wireApi)) {
+      throw new AiProviderConfigurationError(
+        `${prefix}_WIRE_API 必须是 chat_completions 或 responses`,
+      );
+    }
+    const reasoningEffort = environment[`${prefix}_REASONING_EFFORT`]?.trim() as
+      ModelReasoningEffort | undefined;
+    if (reasoningEffort && !['none', 'low', 'high', 'max'].includes(reasoningEffort)) {
+      throw new AiProviderConfigurationError(
+        `${prefix}_REASONING_EFFORT 必须是 none、low、high 或 max`,
+      );
+    }
     const apiKey = environment[`${prefix}_API_KEY`]?.trim();
     return {
       id,
@@ -101,6 +121,8 @@ const parseProvider = (
       timeoutMs,
       baseUrl,
       responseFormat,
+      wireApi,
+      ...(reasoningEffort ? { reasoningEffort } : {}),
       ...(apiKey ? { apiKey } : {}),
     };
   }

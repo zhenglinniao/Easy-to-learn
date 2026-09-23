@@ -22,7 +22,20 @@ const request = (mode: TutorRequest['mode']): TutorRequest => ({
     selectionBounds: { x: 0, y: 0, width: 100, height: 40 },
     contentHash: 'prompt-registry-test',
   },
-  ...(mode === 'explain_step' ? { parentTutorBoardId: 'parent-1', targetStepId: 'step-1' } : {}),
+  ...(mode === 'explain_step'
+    ? {
+        parentTutorBoardId: 'parent-1',
+        targetStepId: 'step-1',
+        parentContext: {
+          title: '一元一次方程',
+          step: {
+            id: 'step-1',
+            title: '移项',
+            blocks: [{ type: 'paragraph' as const, text: '先把常数项移到右边。' }],
+          },
+        },
+      }
+    : {}),
 });
 
 describe('Tutor Skill prompt registry', () => {
@@ -42,6 +55,8 @@ describe('Tutor Skill prompt registry', () => {
     const prompt = buildTutorPrompt(request('explain_step'));
     expect(prompt).toContain('父辅导板：parent-1');
     expect(prompt).toContain('目标步骤：step-1');
+    expect(prompt).toContain('目标步骤已验证内容');
+    expect(prompt).toContain('先把常数项移到右边');
     expect(buildTutorPrompt(request('solve'))).not.toContain('父辅导板');
   });
 

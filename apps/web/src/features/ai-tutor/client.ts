@@ -23,7 +23,7 @@ const digest = async (blob: Blob): Promise<string> => {
 export class TutorApiClient {
   constructor(
     private readonly getAccessToken: () => Promise<string | null>,
-    private readonly fetcher: typeof fetch = fetch,
+    private readonly fetcher: typeof fetch = (input, init) => globalThis.fetch(input, init),
   ) {}
 
   async execute(request: TutorRequest, signal?: AbortSignal): Promise<TutorResponse['data']> {

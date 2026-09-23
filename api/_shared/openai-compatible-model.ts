@@ -11,9 +11,18 @@ import {
 import { ProviderTimeoutError, ProviderUnavailableError, type TutorModel } from './tutor-service';
 
 export type OpenAiResponseFormat = 'json_schema' | 'json_object' | 'prompt';
+export type OpenAiWireApi = 'chat_completions' | 'responses';
+export type ModelReasoningEffort = 'none' | 'low' | 'high' | 'max';
 
 interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string | Array<{ type?: string; text?: string }> } }>;
+}
+
+interface ResponsesApiResponse {
+  output?: Array<{
+    type?: string;
+    content?: Array<{ type?: string; text?: string }>;
+  }>;
 }
 
 type FetchLike = typeof fetch;
@@ -30,6 +39,16 @@ const responseText = (payload: ChatCompletionResponse): string | undefined => {
   return undefined;
 };
 
+const responsesOutputText = (payload: ResponsesApiResponse): string | undefined => {
+  const text = payload.output
+    ?.filter((item) => item.type === 'message')
+    .flatMap((item) => item.content ?? [])
+    .filter((part) => part.type === 'output_text' && typeof part.text === 'string')
+    .map((part) => part.text)
+    .join('');
+  return text || undefined;
+};
+
 export class OpenAiCompatibleTutorModel implements TutorModel {
   constructor(
     private readonly providerId: string,
@@ -38,6 +57,8 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
     private readonly apiKey?: string,
     private readonly timeoutMs = 30_000,
     private readonly responseFormat: OpenAiResponseFormat = 'json_schema',
+    private readonly wireApi: OpenAiWireApi = 'chat_completions',
+    private readonly reasoningEffort?: ModelReasoningEffort,
     private readonly resolveImage?: TutorImageResolver,
     private readonly promptVersion = DEFAULT_TUTOR_PROMPT_VERSION,
     private readonly fetchImpl: FetchLike = fetch,
@@ -47,7 +68,7 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const content: Array<
+      const chatContent: Array<
         { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
       > = [
         {
@@ -66,7 +87,7 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
           );
         }
         if (data) {
-          content.push({
+          chatContent.push({
             type: 'image_url',
             image_url: { url: `data:${request.image.mimeType};base64,${data}` },
           });
@@ -86,21 +107,60 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
           : this.responseFormat === 'json_object'
             ? { type: 'json_object' }
             : undefined;
-      const response = await this.fetchImpl(`${this.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+      const baseUrl = this.baseUrl.replace(/\/$/, '');
+      const requestBody =
+        this.wireApi === 'responses'
+          ? {
+              model: this.model,
+              temperature: 0.6,
+              instructions: getTutorSystemInstruction(this.promptVersion),
+              input: [
+                {
+                  role: 'user',
+                  content: chatContent.map((part) =>
+                    part.type === 'text'
+                      ? { type: 'input_text', text: part.text }
+                      : {
+                          type: 'input_image',
+                          image_url: part.image_url.url,
+                          detail: 'original',
+                        },
+                  ),
+                },
+              ],
+              ...(this.responseFormat === 'json_schema'
+                ? {
+                    text: {
+                      format: {
+                        type: 'json_schema',
+                        name: 'tutor_result_v1',
+                        schema: domainJsonSchemas.tutorResultV1,
+                      },
+                    },
+                  }
+                : this.responseFormat === 'json_object'
+                  ? { text: { format: { type: 'json_object' } } }
+                  : {}),
+              ...(this.reasoningEffort ? { reasoning: { effort: this.reasoningEffort } } : {}),
+            }
+          : {
+              model: this.model,
+              temperature: 0.6,
+              messages: [
+                { role: 'system', content: getTutorSystemInstruction(this.promptVersion) },
+                { role: 'user', content: chatContent },
+              ],
+              ...(responseFormat ? { response_format: responseFormat } : {}),
+              ...(this.reasoningEffort ? { reasoning_effort: this.reasoningEffort } : {}),
+            };
+      const endpoint = this.wireApi === 'responses' ? '/responses' : '/chat/completions';
+      const response = await this.fetchImpl(`${baseUrl}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
         },
-        body: JSON.stringify({
-          model: this.model,
-          temperature: 0.6,
-          messages: [
-            { role: 'system', content: getTutorSystemInstruction(this.promptVersion) },
-            { role: 'user', content },
-          ],
-          ...(responseFormat ? { response_format: responseFormat } : {}),
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
       if (!response.ok) {
@@ -108,9 +168,13 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
           `${this.providerId} request failed with status ${response.status}`,
         );
       }
-      const payload = (await response.json()) as ChatCompletionResponse;
+      const payload = (await response.json()) as ChatCompletionResponse | ResponsesApiResponse;
+      const text =
+        this.wireApi === 'responses'
+          ? responsesOutputText(payload as ResponsesApiResponse)
+          : responseText(payload as ChatCompletionResponse);
       return attachTrustedMetadata(
-        parseModelJson(responseText(payload)),
+        parseModelJson(text),
         `${this.providerId}/${this.model}`,
         this.promptVersion,
       );
