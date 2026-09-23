@@ -11,3 +11,5 @@ supabase/.temp/
 supabase/.branches/
 .DS_Store
 Thumbs.db
+
+.vercel
