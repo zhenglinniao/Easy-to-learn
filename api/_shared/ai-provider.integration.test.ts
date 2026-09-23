@@ -66,6 +66,19 @@ describe.skipIf(!runIntegration)('真实 AI Provider 黄金集', () => {
       problemType: 'simple',
       conclusionPosition: 'first_step',
     });
+    expect(
+      result.steps.every((step) => step.blocks.some((block) => block.type === 'diagram')),
+    ).toBe(true);
+    expect(result.steps.some((step) => step.blocks.some((block) => block.type === 'math'))).toBe(
+      true,
+    );
+    expect(
+      result.steps.some((step) =>
+        step.blocks.some(
+          (block) => block.type === 'diagram' && block.diagram.type === 'comic-strip',
+        ),
+      ),
+    ).toBe(true);
   }, 35_000);
 
   it('为没有显式问题的蔬果选择营养拆解路线', async () => {

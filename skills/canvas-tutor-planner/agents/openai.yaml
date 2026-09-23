@@ -1,4 +1,4 @@
 interface:
   display_name: 'Canvas Tutor Planner'
-  short_description: '把任意画布内容路由为风趣、手绘感且可验证的教学拆解'
-  default_prompt: 'Use $canvas-tutor-planner to classify this canvas selection and turn it into a clear visual Tutor DSL lesson.'
+  short_description: '把任意画布内容变成可爱、手绘、可验证的理解图'
+  default_prompt: 'Use $canvas-tutor-planner to turn this canvas selection into a visual-first Tutor DSL lesson, choosing one or multiple steps from the idea structure.'

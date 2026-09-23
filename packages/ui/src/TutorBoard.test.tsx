@@ -208,12 +208,40 @@ describe('TutorBoard', () => {
               ],
             },
           },
+          {
+            type: 'diagram',
+            diagram: {
+              type: 'comic-strip',
+              layout: 'sequence',
+              panels: [
+                {
+                  id: 'look',
+                  motif: 'magnifier',
+                  pose: 'observe',
+                  label: '先找已知量',
+                  caption: '小易拿起放大镜，圈出题目给出的数字。',
+                  color: 'purple',
+                },
+                {
+                  id: 'balance',
+                  motif: 'balance',
+                  pose: 'point',
+                  label: '等式两边同步',
+                  caption: '两边做同样的运算，等号才站得稳。',
+                  color: 'blue',
+                },
+              ],
+            },
+          },
         ]}
       />,
     );
     expect(screen.getByText('90°')).toBeInTheDocument();
     expect(screen.getByText('y=x')).toBeInTheDocument();
     expect(screen.getByText('因此')).toBeInTheDocument();
+    expect(screen.getByText('先找已知量')).toBeInTheDocument();
+    expect(screen.getByText('等式两边同步')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '小易手绘讲解图' })).toBeInTheDocument();
     expect(container.querySelectorAll('g[aria-hidden="true"] line').length).toBeGreaterThan(0);
     expect(container.querySelector('path[d*=" L "]')).not.toBeNull();
   });

@@ -184,10 +184,41 @@ export const flowDiagramSchema = z
     });
   });
 
+export const comicStripSchema = z.strictObject({
+  type: z.literal('comic-strip'),
+  layout: z.enum(['single', 'sequence']),
+  panels: z
+    .array(
+      z.strictObject({
+        id: diagramIdSchema,
+        motif: z.enum([
+          'idea',
+          'balance',
+          'magnifier',
+          'puzzle',
+          'numbers',
+          'shapes',
+          'book',
+          'sprout',
+          'food',
+          'gear',
+          'chart',
+        ]),
+        pose: z.enum(['point', 'think', 'cheer', 'observe']),
+        label: diagramLabelSchema,
+        caption: z.string().min(1).max(160),
+        color: diagramColorSchema,
+      }),
+    )
+    .min(1)
+    .max(4),
+});
+
 export const diagramSchema = z.discriminatedUnion('type', [
   coordinatePlaneSchema,
   geometryDiagramSchema,
   flowDiagramSchema,
+  comicStripSchema,
 ]);
 
 export const tutorBlockSchema = z.discriminatedUnion('type', [
@@ -297,12 +328,12 @@ export const tutorResultSchema = z
           message: '答案位置必须与题型一致',
         });
       }
-    } else if (metadata.promptVersion === 'v3') {
+    } else if (metadata.promptVersion === 'v3' || metadata.promptVersion === 'v4') {
       if (!contentProfile) {
         context.addIssue({
           code: 'custom',
           path: ['contentProfile'],
-          message: 'Prompt v3 结果必须声明内容与学习目标路由',
+          message: 'Prompt v3/v4 结果必须声明内容与学习目标路由',
         });
       }
 
@@ -311,7 +342,7 @@ export const tutorResultSchema = z
           context.addIssue({
             code: 'custom',
             path: ['answerPresentation'],
-            message: 'Prompt v3 的求解型拆解必须声明答案呈现策略',
+            message: 'Prompt v3/v4 的求解型拆解必须声明答案呈现策略',
           });
         } else if (
           (answerPresentation.problemType === 'simple' &&
@@ -340,11 +371,22 @@ export const tutorResultSchema = z
       });
     }
 
-    if (metadata.promptVersion !== 'v3' && contentProfile !== undefined) {
+    if (!['v3', 'v4'].includes(metadata.promptVersion) && contentProfile !== undefined) {
       context.addIssue({
         code: 'custom',
         path: ['contentProfile'],
-        message: '只有 Prompt v3 结果可以声明内容与学习目标路由',
+        message: '只有 Prompt v3/v4 结果可以声明内容与学习目标路由',
+      });
+    }
+
+    if (
+      metadata.promptVersion === 'v4' &&
+      steps.some((step) => step.blocks.every((block) => block.type !== 'diagram'))
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['steps'],
+        message: 'Prompt v4 的每一步都必须包含至少一个有信息量的图解',
       });
     }
 
