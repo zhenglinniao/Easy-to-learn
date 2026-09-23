@@ -5,6 +5,7 @@ import { AiProviderConfigurationError } from './ai-provider-config';
 import { createTutorModelFromEnvironment } from './ai-provider';
 import { ApiFault } from './fault';
 import { cookieValue, header, type HttpRequest } from './http';
+import { TutorPromptConfigurationError } from './model-prompt';
 import { RedisAiStateStore } from './redis-ai-state';
 import { verifyAnonymousSession, type SessionKey } from './session';
 import {
@@ -110,7 +111,10 @@ export const createTutorService = (actor: TutorActor, accessToken?: string): Tut
   try {
     model = createTutorModelFromEnvironment((...args) => tickets.resolve(actor, ...args));
   } catch (error) {
-    if (error instanceof AiProviderConfigurationError) {
+    if (
+      error instanceof AiProviderConfigurationError ||
+      error instanceof TutorPromptConfigurationError
+    ) {
       throw new ApiFault('DEPENDENCY_UNAVAILABLE', 'AI 服务配置尚未完成');
     }
     throw error;

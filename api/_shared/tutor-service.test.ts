@@ -64,7 +64,12 @@ describe('TutorService', () => {
   it('相同 requestId 返回同一结果且不重复调用模型或扣配额', async () => {
     const model: TutorModel = { generate: vi.fn().mockResolvedValue(result) };
     const now = new Date('2026-09-22T00:00:00.000Z');
-    const service = new TutorService(new MemoryAiStateStore(), model, boards, () => now);
+    const service = new TutorService(
+      new MemoryAiStateStore(() => now.getTime()),
+      model,
+      boards,
+      () => now,
+    );
 
     const first = await service.execute(actor, request);
     const second = await service.execute(actor, request);

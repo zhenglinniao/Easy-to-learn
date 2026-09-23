@@ -2,7 +2,7 @@ import type { TutorRequest } from '@easy-to-learn/domain';
 
 import { AiProviderConfigurationError, loadAiProviderConfigs } from './ai-provider-config';
 import { GeminiTutorModel } from './gemini-model';
-import { DEFAULT_TUTOR_PROMPT_VERSION, type TutorImageResolver } from './model-prompt';
+import { resolveTutorPromptVersion, type TutorImageResolver } from './model-prompt';
 import { OpenAiCompatibleTutorModel } from './openai-compatible-model';
 import { ProviderTimeoutError, ProviderUnavailableError, type TutorModel } from './tutor-service';
 
@@ -38,7 +38,7 @@ export const createTutorModelFromEnvironment = (
   environment: Environment = process.env,
   fetchImpl: typeof fetch = fetch,
 ): TutorModel => {
-  const promptVersion = environment.AI_PROMPT_VERSION?.trim() || DEFAULT_TUTOR_PROMPT_VERSION;
+  const promptVersion = resolveTutorPromptVersion(environment.AI_PROMPT_VERSION);
   const models = loadAiProviderConfigs(environment).map((config): TutorModel => {
     if (config.type === 'gemini') {
       return new GeminiTutorModel(
