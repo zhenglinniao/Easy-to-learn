@@ -78,12 +78,13 @@ Copy-Item .env.example .env.local
 
 浏览器仅允许以下公开变量：
 
-| 变量                     | 用途                                        |
-| ------------------------ | ------------------------------------------- |
-| `VITE_SUPABASE_URL`      | Supabase 项目 URL                           |
-| `VITE_SUPABASE_ANON_KEY` | 浏览器 anon key，不是 service role          |
-| `VITE_APP_ENV`           | `local`、`preview` 或 `production`          |
-| `VITE_SENTRY_DSN`        | 可选的公开 Sentry DSN；未配置时监控保持禁用 |
+| 变量                                                    | 用途                                         |
+| ------------------------------------------------------- | -------------------------------------------- |
+| `VITE_SUPABASE_URL`                                     | Supabase 项目 URL                            |
+| `VITE_SUPABASE_ANON_KEY`                                | 浏览器 anon key，不是 service role           |
+| `VITE_AUTH_GOOGLE_ENABLED` / `VITE_AUTH_GITHUB_ENABLED` | 对应 OAuth 已在 Supabase 配置后才设为 `true` |
+| `VITE_APP_ENV`                                          | `local`、`preview` 或 `production`           |
+| `VITE_SENTRY_DSN`                                       | 可选的公开 Sentry DSN；未配置时监控保持禁用  |
 
 服务端变量：
 

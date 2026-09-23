@@ -3,10 +3,18 @@ import { createContext, useContext } from 'react';
 
 export interface AuthContextValue {
   loading: boolean;
+  initializationError: string | null;
   user: User | null;
   session: Session | null;
   signIn(email: string, password: string): Promise<void>;
-  signUp(email: string, password: string): Promise<void>;
+  signUp(
+    email: string,
+    password: string,
+    redirect?: string,
+  ): Promise<{ requiresEmailConfirmation: boolean }>;
+  requestPasswordReset(email: string): Promise<void>;
+  resendSignUpConfirmation(email: string, redirect?: string): Promise<void>;
+  updatePassword(password: string): Promise<void>;
   signInWithOAuth(provider: 'google' | 'github', redirect?: string): Promise<void>;
   signOut(): Promise<void>;
 }

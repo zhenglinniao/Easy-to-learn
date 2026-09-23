@@ -988,18 +988,30 @@
   background: #fff;
   box-shadow: 0 2px 8px rgba(40, 35, 29, 0.08);
 }
-.authCard form {
+.authCard form,
+.passwordCard form,
+.authCard fieldset,
+.passwordCard fieldset {
   display: grid;
   gap: 14px;
 }
-.authCard label {
+.authCard fieldset,
+.passwordCard fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.authCard label,
+.passwordCard label {
   display: grid;
   gap: 6px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
 }
-.authCard input {
+.authCard input,
+.passwordCard input {
   width: 100%;
   padding: 12px;
   border: 1px solid var(--line);
@@ -1007,6 +1019,106 @@
   color: var(--ink);
   background: rgba(255, 255, 255, 0.65);
   font: inherit;
+}
+.authCard input:focus-visible,
+.passwordCard input:focus-visible {
+  border-color: var(--accent);
+  outline: 3px solid rgba(238, 108, 77, 0.16);
+}
+.authCard fieldset:disabled,
+.passwordCard fieldset:disabled {
+  opacity: 0.72;
+}
+.authHeading {
+  margin-bottom: 20px;
+}
+.authHeading h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 26px;
+}
+.authHeading p:last-child {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.fieldHint {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.authCard .consentRow {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  align-items: start;
+  gap: 9px;
+  font-weight: 520;
+  line-height: 1.6;
+}
+.authCard .consentRow input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+.consentRow a {
+  color: var(--ink);
+  text-underline-offset: 2px;
+}
+.textButton {
+  display: inline-flex;
+  margin-top: 12px;
+  padding: 2px 0;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.textButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.authFeedback:empty {
+  display: none;
+}
+.successMessage {
+  padding: 10px 12px;
+  border-radius: 11px;
+  color: #346044;
+  background: #eaf7ed;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.passwordCard {
+  width: min(430px, calc(100vw - 32px));
+  padding: 30px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+.passwordCard h1 {
+  font-size: 38px;
+}
+.passwordCard > p:not(.eyebrow) {
+  margin-bottom: 22px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .divider {
   display: flex;
@@ -1221,6 +1333,9 @@
   .secondaryButton:hover,
   .oauth button:hover:not(:disabled) {
     border-color: rgba(238, 108, 77, 0.4);
+  }
+  .textButton:hover:not(:disabled) {
+    color: var(--ink);
   }
 }
 @media (max-width: 850px) {

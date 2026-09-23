@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  completeOAuthCallback,
+  completeAuthCallback,
   getOptionalSupabaseClient,
   parseSafeRedirect,
 } from '../features/auth';
@@ -10,19 +10,26 @@ import styles from './pages.module.css';
 export default function AuthCallbackPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const invalidCallback = !getOptionalSupabaseClient() || !params.get('code');
+  const started = useRef(false);
+  const code = params.get('code');
+  const providerError = params.get('error');
+  const invalidCallback = !getOptionalSupabaseClient() || !code || Boolean(providerError);
   const [error, setError] = useState<string | null>(
     invalidCallback ? '认证回调无效或本地服务尚未配置。' : null,
   );
   useEffect(() => {
+    if (started.current) return;
+    started.current = true;
     const client = getOptionalSupabaseClient();
-    const code = params.get('code');
-    const target = parseSafeRedirect(params.get('redirect'));
-    if (!client || !code) return;
-    void completeOAuthCallback(client, code)
+    const target =
+      params.get('flow') === 'recovery'
+        ? '/reset-password'
+        : parseSafeRedirect(params.get('redirect'));
+    if (!client || !code || providerError) return;
+    void completeAuthCallback(client, code)
       .then(() => navigate(target, { replace: true }))
       .catch(() => setError('登录链接已过期或已使用，请重新登录。'));
-  }, [navigate, params]);
+  }, [code, navigate, params, providerError]);
   return (
     <main className={styles.centerPage}>
       <p className={styles.eyebrow}>安全登录</p>
@@ -31,7 +38,7 @@ export default function AuthCallbackPage() {
         <>
           <p>{error}</p>
           <Link className={styles.primaryButton} to="/login">
-            返回登录
+            重新登录
           </Link>
         </>
       )}

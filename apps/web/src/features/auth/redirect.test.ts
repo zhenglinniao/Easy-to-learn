@@ -8,6 +8,7 @@ describe('parseSafeRedirect', () => {
       '/canvas/local_abc-123?from=login',
     );
     expect(parseSafeRedirect('/boards')).toBe('/boards');
+    expect(parseSafeRedirect('/reset-password')).toBe('/reset-password');
   });
   it('拒绝外部、协议相对、反斜线与未知路由', () => {
     expect(parseSafeRedirect('https://evil.example')).toBe('/boards');
