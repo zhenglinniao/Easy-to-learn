@@ -223,6 +223,35 @@ const answerPresentationSchema = z.strictObject({
   conclusionPosition: z.enum(['first_step', 'final_step']),
 });
 
+const contentProfileSchema = z.strictObject({
+  contentKind: z.enum([
+    'exercise',
+    'question',
+    'article',
+    'food_dish',
+    'produce',
+    'object',
+    'process',
+    'diagram',
+    'mixed',
+    'unknown',
+  ]),
+  learningGoal: z.enum([
+    'solve',
+    'explain',
+    'summarize',
+    'recipe',
+    'nutrition',
+    'production',
+    'growth',
+    'mechanism',
+    'compare',
+    'explore',
+  ]),
+  goalSource: z.enum(['explicit', 'inferred']),
+  confidence: z.enum(['high', 'medium', 'low']),
+});
+
 export const tutorResultSchema = z
   .strictObject({
     schemaVersion: z.literal(TUTOR_SCHEMA_VERSION),
@@ -231,6 +260,7 @@ export const tutorResultSchema = z
     steps: z.array(tutorStepSchema).min(1).max(12),
     hintLevel: z.literal(3).optional(),
     answerPresentation: answerPresentationSchema.optional(),
+    contentProfile: contentProfileSchema.optional(),
     metadata: z.strictObject({
       model: nonEmptyStringSchema,
       promptVersion: nonEmptyStringSchema,
@@ -238,7 +268,7 @@ export const tutorResultSchema = z
     }),
   })
   .superRefine((result, context) => {
-    const { mode, steps, hintLevel, answerPresentation, metadata } = result;
+    const { mode, steps, hintLevel, answerPresentation, contentProfile, metadata } = result;
     const byteLength = serializedUtf8ByteLength(result);
     if (byteLength === null || byteLength > MAX_TUTOR_RESULT_BYTES) {
       context.addIssue({ code: 'custom', message: 'Tutor 响应 JSON 超过 100 KiB' });
@@ -267,11 +297,54 @@ export const tutorResultSchema = z
           message: '答案位置必须与题型一致',
         });
       }
+    } else if (metadata.promptVersion === 'v3') {
+      if (!contentProfile) {
+        context.addIssue({
+          code: 'custom',
+          path: ['contentProfile'],
+          message: 'Prompt v3 结果必须声明内容与学习目标路由',
+        });
+      }
+
+      if (mode === 'solve' && contentProfile?.learningGoal === 'solve') {
+        if (!answerPresentation) {
+          context.addIssue({
+            code: 'custom',
+            path: ['answerPresentation'],
+            message: 'Prompt v3 的求解型拆解必须声明答案呈现策略',
+          });
+        } else if (
+          (answerPresentation.problemType === 'simple' &&
+            answerPresentation.conclusionPosition !== 'first_step') ||
+          (answerPresentation.problemType === 'reasoning' &&
+            answerPresentation.conclusionPosition !== 'final_step')
+        ) {
+          context.addIssue({
+            code: 'custom',
+            path: ['answerPresentation'],
+            message: '答案位置必须与题型一致',
+          });
+        }
+      } else if (answerPresentation !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          path: ['answerPresentation'],
+          message: '只有完整求解型拆解可以声明答案呈现策略',
+        });
+      }
     } else if (answerPresentation !== undefined) {
       context.addIssue({
         code: 'custom',
         path: ['answerPresentation'],
-        message: '只有 Prompt v2 的 Solve 结果可以声明答案呈现策略',
+        message: '当前 Prompt 版本不允许声明答案呈现策略',
+      });
+    }
+
+    if (metadata.promptVersion !== 'v3' && contentProfile !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['contentProfile'],
+        message: '只有 Prompt v3 结果可以声明内容与学习目标路由',
       });
     }
 

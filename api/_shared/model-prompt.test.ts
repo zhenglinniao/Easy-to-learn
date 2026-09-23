@@ -27,13 +27,14 @@ const request = (mode: TutorRequest['mode']): TutorRequest => ({
 
 describe('Tutor Skill prompt registry', () => {
   it('以项目 Skill 注册表作为生产 Prompt 的唯一来源', () => {
-    const defaultPrompt = tutorPromptRegistry.versions.v2;
+    const defaultPrompt = tutorPromptRegistry.versions.v3;
     expect(DEFAULT_TUTOR_PROMPT_VERSION).toBe(tutorPromptRegistry.defaultVersion);
     expect(TUTOR_SYSTEM_INSTRUCTION).toBe(defaultPrompt.systemInstruction);
 
     for (const mode of ['solve', 'hint', 'explain_step'] as const) {
       expect(buildTutorPrompt(request(mode))).toContain(defaultPrompt.modeInstructions[mode]);
     }
+    expect(buildTutorPrompt(request('solve'))).toContain('contentProfile');
     expect(buildTutorPrompt(request('solve'))).toContain('answerPresentation');
   });
 
@@ -47,6 +48,7 @@ describe('Tutor Skill prompt registry', () => {
   it('拒绝元数据与真实内容不一致的未知 Prompt 版本', () => {
     expect(resolveTutorPromptVersion('v1')).toBe('v1');
     expect(resolveTutorPromptVersion('v2')).toBe('v2');
+    expect(resolveTutorPromptVersion('v3')).toBe('v3');
     expect(() => resolveTutorPromptVersion('v999')).toThrow(/未知 Tutor Prompt 版本/);
   });
 });
