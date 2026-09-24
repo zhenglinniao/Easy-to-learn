@@ -106,10 +106,13 @@ class SupabaseBoardAuthorizer implements BoardAuthorizer {
 }
 
 export const createTutorService = (actor: TutorActor, accessToken?: string): TutorService => {
-  const tickets = createUploadTicketService();
   let model: TutorModel;
   try {
-    model = createTutorModelFromEnvironment((...args) => tickets.resolve(actor, ...args));
+    // 文字题和小型内嵌图片不依赖对象存储。仅在模型实际需要读取上传图片时，
+    // 再创建需要 Supabase service role 的票据服务，避免无关配置阻断匿名文字辅导。
+    model = createTutorModelFromEnvironment((...args) =>
+      createUploadTicketService().resolve(actor, ...args),
+    );
   } catch (error) {
     if (
       error instanceof AiProviderConfigurationError ||
