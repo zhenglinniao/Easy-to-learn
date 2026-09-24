@@ -35,6 +35,12 @@ const correctionFromIssues = (issues: Array<{ path: PropertyKey[]; message: stri
   ].join('\n');
 };
 
+const safeIssueSummary = (issues: Array<{ path: PropertyKey[]; message: string }>) =>
+  issues.slice(0, 8).map(({ path, message }) => ({
+    path: path.map(String).join('.'),
+    message,
+  }));
+
 const normalizeKnownModelDrift = (candidate: unknown): unknown => {
   if (candidate === null || typeof candidate !== 'object' || Array.isArray(candidate)) {
     return candidate;
@@ -121,6 +127,7 @@ export class TutorService {
     try {
       let candidate = await this.model.generate(request);
       let validated = tutorResultSchema.safeParse(normalizeKnownModelDrift(candidate));
+      const initialIssues = validated.success ? [] : safeIssueSummary(validated.error.issues);
       if (!validated.success) {
         candidate = await this.model.generate(
           request,
@@ -129,6 +136,17 @@ export class TutorService {
         validated = tutorResultSchema.safeParse(normalizeKnownModelDrift(candidate));
       }
       if (!validated.success) {
+        // 只记录契约字段路径和规则，不记录题目、图片或模型原文。
+        console.warn(
+          JSON.stringify({
+            timestamp: this.now().toISOString(),
+            level: 'warning',
+            event: 'ai_model_output_invalid',
+            requestId: request.requestId,
+            initialIssues,
+            correctionIssues: safeIssueSummary(validated.error.issues),
+          }),
+        );
         throw new ApiFault('INVALID_MODEL_OUTPUT', 'AI 返回内容无法安全展示');
       }
       const data: TutorResponse['data'] = {
