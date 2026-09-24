@@ -59,7 +59,8 @@ export class GeminiTutorModel implements TutorModel {
         contents: [{ role: 'user', parts }],
         config: {
           abortSignal: controller.signal,
-          temperature: 0.6,
+          // 首次生成保留少量表达空间；格式纠错必须稳定服从结构约束。
+          temperature: correction ? 0 : 0.4,
           responseMimeType: 'application/json',
           responseJsonSchema: domainJsonSchemas.tutorResultV1,
           systemInstruction: getTutorSystemInstruction(this.promptVersion),

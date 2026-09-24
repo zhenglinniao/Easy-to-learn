@@ -116,7 +116,8 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
         this.wireApi === 'responses'
           ? {
               model: this.model,
-              temperature: 0.6,
+              // 首次生成保留少量表达空间；格式纠错必须稳定服从结构约束。
+              temperature: correction ? 0 : 0.4,
               instructions: getTutorSystemInstruction(this.promptVersion),
               input: [
                 {
@@ -149,7 +150,7 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
             }
           : {
               model: this.model,
-              temperature: 0.6,
+              temperature: correction ? 0 : 0.4,
               messages: [
                 { role: 'system', content: getTutorSystemInstruction(this.promptVersion) },
                 { role: 'user', content: chatContent },
