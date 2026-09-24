@@ -80,7 +80,14 @@ export const parseModelJson = (text: string | undefined): unknown => {
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/, '');
   try {
-    return JSON.parse(cleaned);
+    const parsed: unknown = JSON.parse(cleaned);
+    // 部分 OpenAI-compatible Responses 实现会把结构化 JSON 再编码为字符串。
+    // 只额外解码一层，既兼容该差异，也避免无限递归或接受任意多层包装。
+    if (typeof parsed === 'string') {
+      const nested = parsed.trim();
+      if (nested.startsWith('{') && nested.endsWith('}')) return JSON.parse(nested);
+    }
+    return parsed;
   } catch {
     return text;
   }

@@ -6,6 +6,7 @@ import tutorPromptRegistry from '../../skills/canvas-tutor-planner/references/pr
 import {
   buildTutorPrompt,
   DEFAULT_TUTOR_PROMPT_VERSION,
+  parseModelJson,
   resolveTutorPromptVersion,
   TUTOR_SYSTEM_INSTRUCTION,
 } from './model-prompt.js';
@@ -68,5 +69,12 @@ describe('Tutor Skill prompt registry', () => {
     expect(resolveTutorPromptVersion('v4')).toBe('v4');
     expect(resolveTutorPromptVersion('v5')).toBe('v5');
     expect(() => resolveTutorPromptVersion('v999')).toThrow(/未知 Tutor Prompt 版本/);
+  });
+
+  it('兼容 Responses API 将结构化 JSON 再编码为字符串', () => {
+    expect(parseModelJson(JSON.stringify(JSON.stringify({ schemaVersion: 1 })))).toEqual({
+      schemaVersion: 1,
+    });
+    expect(parseModelJson(JSON.stringify('普通文本'))).toBe('普通文本');
   });
 });
