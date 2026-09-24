@@ -60,5 +60,6 @@ describe('AuthCallbackPage', () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole('heading', { name: '未能完成登录' })).toBeInTheDocument();
+    expect(screen.getByText('认证请求已取消、失效或不完整，请重新登录。')).toBeInTheDocument();
   });
 });
