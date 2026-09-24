@@ -1,17 +1,17 @@
-import { ApiFault } from '../_shared/fault';
+import { ApiFault } from '../_shared/fault.js';
 import {
   cookieValue,
   requireAllowedOrigin,
   sendError,
   type HttpRequest,
   type HttpResponse,
-} from '../_shared/http';
-import { createAiStateStore, sessionKeysFromEnvironment } from '../_shared/runtime';
+} from '../_shared/http.js';
+import { createAiStateStore, sessionKeysFromEnvironment } from '../_shared/runtime.js';
 import {
   issueAnonymousSession,
   serializeAnonymousCookie,
   verifyAnonymousSession,
-} from '../_shared/session';
+} from '../_shared/session.js';
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
   try {

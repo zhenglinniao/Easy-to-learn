@@ -1,4 +1,4 @@
-import type { ApiFault } from './fault';
+import type { ApiFault } from './fault.js';
 
 interface ApiErrorLog {
   timestamp: string;

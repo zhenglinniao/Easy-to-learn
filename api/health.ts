@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
-import { isAiProviderEnvironmentConfigured } from './_shared/ai-provider-config';
-import { ApiFault } from './_shared/fault';
-import { sendError, type HttpRequest, type HttpResponse } from './_shared/http';
-import { isTutorPromptVersionConfigured } from './_shared/model-prompt';
-import { API_CONTRACT_VERSION } from './_shared/version';
+import { isAiProviderEnvironmentConfigured } from './_shared/ai-provider-config.js';
+import { ApiFault } from './_shared/fault.js';
+import { sendError, type HttpRequest, type HttpResponse } from './_shared/http.js';
+import { isTutorPromptVersionConfigured } from './_shared/model-prompt.js';
+import { API_CONTRACT_VERSION } from './_shared/version.js';
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
   const requestId = randomUUID();

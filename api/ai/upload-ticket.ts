@@ -6,15 +6,15 @@ import {
 } from '@easy-to-learn/domain';
 import { z } from 'zod';
 
-import { ApiFault } from '../_shared/fault';
+import { ApiFault } from '../_shared/fault.js';
 import {
   header,
   requireAllowedOrigin,
   sendError,
   type HttpRequest,
   type HttpResponse,
-} from '../_shared/http';
-import { createUploadTicketService, resolveActor } from '../_shared/runtime';
+} from '../_shared/http.js';
+import { createUploadTicketService, resolveActor } from '../_shared/runtime.js';
 
 const inputSchema = z
   .strictObject({

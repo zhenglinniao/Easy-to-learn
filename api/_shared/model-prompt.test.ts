@@ -1,14 +1,14 @@
 import type { TutorRequest } from '@easy-to-learn/domain';
 import { describe, expect, it } from 'vitest';
 
-import tutorPromptRegistry from '../../skills/canvas-tutor-planner/references/prompt-registry.json';
+import tutorPromptRegistry from '../../skills/canvas-tutor-planner/references/prompt-registry.json' with { type: 'json' };
 
 import {
   buildTutorPrompt,
   DEFAULT_TUTOR_PROMPT_VERSION,
   resolveTutorPromptVersion,
   TUTOR_SYSTEM_INSTRUCTION,
-} from './model-prompt';
+} from './model-prompt.js';
 
 const request = (mode: TutorRequest['mode']): TutorRequest => ({
   requestId: `request-${mode}`,

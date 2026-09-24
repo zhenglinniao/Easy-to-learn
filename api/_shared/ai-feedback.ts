@@ -7,9 +7,9 @@ import {
   type TutorResponse,
 } from '@easy-to-learn/domain';
 
-import type { AiStateStore } from './ai-state';
-import { ApiFault } from './fault';
-import type { TutorActor } from './tutor-service';
+import type { AiStateStore } from './ai-state.js';
+import { ApiFault } from './fault.js';
+import type { TutorActor } from './tutor-service.js';
 
 export interface AiFeedbackRecord extends AiFeedbackInput {
   actorHash: string;

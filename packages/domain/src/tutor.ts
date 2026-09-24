@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
-import { MAX_TUTOR_RESULT_BYTES, TUTOR_SCHEMA_VERSION } from './constants';
+import { MAX_TUTOR_RESULT_BYTES, TUTOR_SCHEMA_VERSION } from './constants.js';
 import {
   finiteNumberSchema,
   isoDateTimeSchema,
   nonEmptyStringSchema,
   serializedUtf8ByteLength,
-} from './common';
+} from './common.js';
 
 const titleSchema = z.string().min(1).max(120);
 const bodyTextSchema = z.string().min(1).max(2_000);

@@ -1,8 +1,8 @@
 import { type TutorRequest } from '@easy-to-learn/domain';
 
-import tutorPromptRegistry from '../../skills/canvas-tutor-planner/references/prompt-registry.json';
+import tutorPromptRegistry from '../../skills/canvas-tutor-planner/references/prompt-registry.json' with { type: 'json' };
 
-import { ProviderUnavailableError } from './tutor-service';
+import { ProviderUnavailableError } from './tutor-service.js';
 
 type TutorPromptDefinition =
   (typeof tutorPromptRegistry.versions)[keyof typeof tutorPromptRegistry.versions];

@@ -4,7 +4,7 @@ import {
   AccountDeletionService,
   type AccountDeletionStore,
   type DeletionRecord,
-} from './account-deletion';
+} from './account-deletion.js';
 
 const now = new Date('2026-09-22T04:00:00.000Z');
 const createStore = (initial: DeletionRecord | null = null) => {

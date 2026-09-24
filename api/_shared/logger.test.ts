@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { ApiFault } from './fault';
-import { createApiErrorLog } from './logger';
+import { ApiFault } from './fault.js';
+import { createApiErrorLog } from './logger.js';
 
 describe('服务端结构化日志', () => {
   it('只记录白名单诊断字段，不记录错误消息或请求内容', () => {

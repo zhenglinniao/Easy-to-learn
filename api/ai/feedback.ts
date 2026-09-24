@@ -1,14 +1,14 @@
 import { aiFeedbackInputSchema } from '@easy-to-learn/domain';
 
-import { ApiFault } from '../_shared/fault';
+import { ApiFault } from '../_shared/fault.js';
 import {
   header,
   requireAllowedOrigin,
   sendError,
   type HttpRequest,
   type HttpResponse,
-} from '../_shared/http';
-import { createAiFeedbackService, resolveActor } from '../_shared/runtime';
+} from '../_shared/http.js';
+import { createAiFeedbackService, resolveActor } from '../_shared/runtime.js';
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
   const parsed = aiFeedbackInputSchema.safeParse(request.body);

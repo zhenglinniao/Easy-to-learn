@@ -3,8 +3,8 @@ import { createHash, createHmac } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import type { Redis } from '@upstash/redis';
 
-import { ApiFault } from './fault';
-import type { TutorActor } from './tutor-service';
+import { ApiFault } from './fault.js';
+import type { TutorActor } from './tutor-service.js';
 
 const TICKET_TTL_SECONDS = 10 * 60;
 

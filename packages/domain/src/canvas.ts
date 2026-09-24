@@ -7,7 +7,7 @@ import {
   MAX_IMAGE_EDGE,
   MAX_IMAGE_PIXELS,
   PERSISTED_CANVAS_SCHEMA_VERSION,
-} from './constants';
+} from './constants.js';
 import {
   boundsSchema,
   finiteNumberSchema,
@@ -18,8 +18,8 @@ import {
   sha256Schema,
   serializedUtf8ByteLength,
   supportedImageMimeTypeSchema,
-} from './common';
-import { tutorResultSchema } from './tutor';
+} from './common.js';
+import { tutorResultSchema } from './tutor.js';
 
 export const excalidrawElementTypeSchema = z.enum([
   'rectangle',

@@ -1,15 +1,15 @@
 import type { TutorRequest, TutorResultV1 } from '@easy-to-learn/domain';
 import { describe, expect, it, vi } from 'vitest';
 
-import { MemoryAiStateStore } from './ai-state';
-import { ApiFault } from './fault';
-import { issueAnonymousSession, verifyAnonymousSession } from './session';
+import { MemoryAiStateStore } from './ai-state.js';
+import { ApiFault } from './fault.js';
+import { issueAnonymousSession, verifyAnonymousSession } from './session.js';
 import {
   ProviderTimeoutError,
   TutorService,
   type BoardAuthorizer,
   type TutorModel,
-} from './tutor-service';
+} from './tutor-service.js';
 
 const request: TutorRequest = {
   requestId: 'request-1',

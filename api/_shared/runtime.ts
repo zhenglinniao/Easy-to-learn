@@ -1,26 +1,26 @@
 import { createClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
 
-import { AiProviderConfigurationError } from './ai-provider-config';
-import { createTutorModelFromEnvironment } from './ai-provider';
-import { ApiFault } from './fault';
-import { cookieValue, header, type HttpRequest } from './http';
-import { TutorPromptConfigurationError } from './model-prompt';
-import { RedisAiStateStore } from './redis-ai-state';
-import { verifyAnonymousSession, type SessionKey } from './session';
+import { AiProviderConfigurationError } from './ai-provider-config.js';
+import { createTutorModelFromEnvironment } from './ai-provider.js';
+import { ApiFault } from './fault.js';
+import { cookieValue, header, type HttpRequest } from './http.js';
+import { TutorPromptConfigurationError } from './model-prompt.js';
+import { RedisAiStateStore } from './redis-ai-state.js';
+import { verifyAnonymousSession, type SessionKey } from './session.js';
 import {
   TutorService,
   type BoardAuthorizer,
   type TutorActor,
   type TutorModel,
-} from './tutor-service';
-import { UploadTicketService } from './upload-ticket';
+} from './tutor-service.js';
+import { UploadTicketService } from './upload-ticket.js';
 import {
   AccountDeletionService,
   SupabaseAccountDeletionStore,
   type AuthenticatedAccount,
-} from './account-deletion';
-import { AiFeedbackService, SupabaseAiFeedbackStore } from './ai-feedback';
+} from './account-deletion.js';
+import { AiFeedbackService, SupabaseAiFeedbackStore } from './ai-feedback.js';
 
 const required = (name: string): string => {
   const value = process.env[name];

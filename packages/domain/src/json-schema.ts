@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-import { tutorRequestSchema } from './api';
-import { persistedCanvasSchema } from './canvas';
-import { tutorResultSchema } from './tutor';
+import { tutorRequestSchema } from './api.js';
+import { persistedCanvasSchema } from './canvas.js';
+import { tutorResultSchema } from './tutor.js';
 
 const jsonSchemaOptions = {
   target: 'draft-2020-12',

@@ -2,7 +2,7 @@ import { createHmac } from 'node:crypto';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-import { ApiFault } from './fault';
+import { ApiFault } from './fault.js';
 
 const COOLING_PERIOD_MS = 7 * 24 * 60 * 60 * 1_000;
 const RECENT_AUTH_MS = 10 * 60 * 1_000;
