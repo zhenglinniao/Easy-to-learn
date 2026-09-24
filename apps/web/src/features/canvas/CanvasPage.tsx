@@ -1,4 +1,4 @@
-import { Excalidraw } from '@excalidraw/excalidraw';
+import { Excalidraw, FONT_FAMILY } from '@excalidraw/excalidraw';
 import type {
   AppState,
   ExcalidrawImperativeAPI,
@@ -886,6 +886,8 @@ export default function CanvasPage() {
             onChange={handleChange}
             initialData={{
               appState: {
+                // Excalifont 负责拉丁字符，中文会自动回退到配套的 Xiaolai 手写字形。
+                currentItemFontFamily: FONT_FAMILY.Excalifont,
                 viewBackgroundColor: '#fbfaf7',
               },
             }}
