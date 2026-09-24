@@ -15,7 +15,7 @@ export default function AuthCallbackPage() {
   const providerError = params.get('error');
   const invalidCallback = !getOptionalSupabaseClient() || !code || Boolean(providerError);
   const [error, setError] = useState<string | null>(
-    invalidCallback ? '认证回调无效或本地服务尚未配置。' : null,
+    invalidCallback ? '认证请求已取消、失效或不完整，请重新登录。' : null,
   );
   useEffect(() => {
     if (started.current) return;
