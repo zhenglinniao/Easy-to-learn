@@ -4,7 +4,7 @@ Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无�
 
 在线演示：[https://easy-to-learn-steel.vercel.app](https://easy-to-learn-steel.vercel.app)
 
-当前仓库已完成可运行的本地 MVP 代码、单元测试和 Vercel 部署。线上演示尚未配置 Supabase、Upstash Redis、AI 模型供应商、OAuth、Sentry 和自定义域名，因此官网与浏览器本地画板可以使用，云登录、云同步和真实 AI 请求仍保持安全降级，不能视为完整生产上线。
+当前仓库已完成可运行的本地 MVP 代码、单元测试和 Vercel 部署。线上演示已配置 Supabase 公共连接、Upstash Redis 和 DeepSeek，游客文字拆解已经过真实端到端验收；Supabase service role、OAuth、Sentry 和自定义域名尚未配置，因此大图临时上传、账户删除和相关管理任务仍不能视为完整生产上线。
 
 ## 功能
 
@@ -212,7 +212,9 @@ pnpm check
 
 - 生产别名：[https://easy-to-learn-steel.vercel.app](https://easy-to-learn-steel.vercel.app)
 - 已验收路由：`/`、`/canvas`、`/api/health` 均返回 HTTP 200。
-- 当前健康状态：应用版本正常，`supabase`、`redis` 和 `ai` 为 `degraded`，与尚未录入生产环境变量的状态一致。
+- 当前健康状态：应用版本正常，`supabase`、`redis` 和 `ai` 均为 `ok`。
+- 已完成游客文字题端到端验收：建立匿名会话、调用 DeepSeek、解析 Tutor DSL 和扣减每日配额均成功。
+- 尚未配置 `SUPABASE_SERVICE_ROLE_KEY`，因此超过内联上限的题图上传、账户删除及相关管理任务保持不可用；补齐凭据后仍需单独验收。
 
 当前项目位于 Vercel Hobby 计划。仓库要求的保留任务每小时执行一次，而 Hobby Cron 仅允许每日调度，因此本次线上演示没有注册该 Cron；仓库中的小时级生产配置仍被保留。正式上线前必须升级到支持小时级 Cron 的计划，或接入可携带 `CRON_SECRET` 的外部小时级调度器，不应擅自把数据保留要求降为每日执行。
 
