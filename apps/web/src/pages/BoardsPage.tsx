@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { AccountService } from '../features/account';
 import { getOptionalSupabaseClient, useAuth } from '../features/auth';
-import { RemoteBoardRepository, type BoardSummary } from '../features/boards';
+import { RemoteBoardRepository, toBoardMessage, type BoardSummary } from '../features/boards';
 import { SiteHeader } from './SiteHeader';
 import styles from './pages.module.css';
 
@@ -19,25 +19,44 @@ export default function BoardsPage() {
   const [renameBoard, setRenameBoard] = useState<BoardSummary | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [pendingDeletion, setPendingDeletion] = useState<string | null>(null);
+  const [initializing, setInitializing] = useState(true);
   useEffect(() => {
     if (!user || !repository || !account) return;
-    void Promise.all([repository.list(), account.pendingDeletion()])
-      .then(([items, pending]) => {
-        setBoards(items);
-        setPendingDeletion(pending?.executeAfter ?? null);
+    let active = true;
+    void repository
+      .list()
+      .then((items) => {
+        if (active) setBoards(items);
       })
-      .catch(() => setError('暂时无法加载云端画板。'));
+      .catch((cause: unknown) => {
+        if (active) setError(toBoardMessage(cause, '暂时无法加载云端画板。'));
+      })
+      .finally(() => {
+        if (active) setInitializing(false);
+      });
+    void account
+      .pendingDeletion()
+      .then((pending) => {
+        if (active) setPendingDeletion(pending?.executeAfter ?? null);
+      })
+      .catch(() => {
+        // 账户删除状态不应阻断核心画板列表。
+      });
+    return () => {
+      active = false;
+    };
   }, [account, repository, user]);
   if (loading) return <p className="route-loading">正在恢复登录状态…</p>;
   if (!user) return <Navigate to="/login?redirect=/boards" replace />;
   const create = async () => {
-    if (!repository) return;
+    if (!repository || busy) return;
     setBusy(true);
+    setError(null);
     try {
       const board = await repository.create();
       navigate(`/canvas/${board.boardId}`);
-    } catch {
-      setError('无法创建画板，请稍后重试。');
+    } catch (cause) {
+      setError(toBoardMessage(cause, '无法创建画板，请稍后重试。'));
     } finally {
       setBusy(false);
     }
@@ -87,7 +106,7 @@ export default function BoardsPage() {
           disabled={busy}
           onClick={() => void create()}
         >
-          新建画板
+          {busy ? '正在创建…' : '新建画板'}
         </button>
       </section>
       {error && (
@@ -96,12 +115,21 @@ export default function BoardsPage() {
         </p>
       )}
       <section className={styles.boardGrid} aria-label="画板列表">
-        {boards.length === 0 ? (
+        {initializing ? (
+          <div className={styles.emptyState} role="status">
+            <strong>正在整理你的画板…</strong>
+          </div>
+        ) : boards.length === 0 ? (
           <div className={styles.emptyState}>
             <strong>第一块画板，等你落笔。</strong>
             <p>创建画板，或先以游客身份试用无限画布。</p>
-            <button className={styles.primaryButton} type="button" onClick={() => void create()}>
-              创建第一块画板
+            <button
+              className={styles.primaryButton}
+              type="button"
+              disabled={busy}
+              onClick={() => void create()}
+            >
+              {busy ? '正在创建…' : '创建第一块画板'}
             </button>
           </div>
         ) : (
