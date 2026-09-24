@@ -175,6 +175,7 @@ describe('AI Provider 执行', () => {
     const body = JSON.parse(String(init.body));
     expect(body).toMatchObject({
       model: 'deepseek-chat',
+      temperature: 0.4,
       response_format: { type: 'json_object' },
     });
     expect(body.messages[1].content).toContainEqual({
@@ -215,12 +216,16 @@ describe('AI Provider 执行', () => {
       fetchMock,
     );
 
-    await model.generate({ ...request, image: { mimeType: 'image/png', base64: 'YQ==' } });
+    await model.generate(
+      { ...request, image: { mimeType: 'image/png', base64: 'YQ==' } },
+      '补齐每一步缺失的图解',
+    );
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     const body = JSON.parse(String(init.body));
     expect(url).toBe('https://api.deepseek.example/responses');
     expect(body).toMatchObject({
       model: 'deepseek-flash',
+      temperature: 0,
       reasoning: { effort: 'none' },
       text: { format: { type: 'json_schema', name: 'tutor_result_v1' } },
     });
