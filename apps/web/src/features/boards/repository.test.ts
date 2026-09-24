@@ -38,6 +38,25 @@ const storedBoard: StoredBoard = {
 };
 
 describe('RemoteBoardRepository', () => {
+  it('通过受控 RPC 创建画板并校验返回快照', async () => {
+    const single = vi.fn().mockResolvedValue({ data: { snapshot }, error: null });
+    const rpc = vi.fn().mockReturnValue({ single });
+    const client = { rpc } as unknown as SupabaseClient;
+
+    await expect(new RemoteBoardRepository(client).create()).resolves.toEqual(snapshot);
+    expect(rpc).toHaveBeenCalledWith('create_board', { p_title: '未命名画板' });
+  });
+
+  it('创建 RPC 失败时保留服务端错误供页面安全映射', async () => {
+    const rpcError = { code: 'P0001', message: 'STORAGE_QUOTA_EXCEEDED' };
+    const single = vi.fn().mockResolvedValue({ data: null, error: rpcError });
+    const client = {
+      rpc: vi.fn().mockReturnValue({ single }),
+    } as unknown as SupabaseClient;
+
+    await expect(new RemoteBoardRepository(client).create()).rejects.toBe(rpcError);
+  });
+
   it('限制分页大小并映射画板摘要', async () => {
     const range = vi.fn().mockResolvedValue({
       data: [
