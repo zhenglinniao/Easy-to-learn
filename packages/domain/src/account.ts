@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { isoDateTimeSchema, nonEmptyStringSchema } from './common';
+import { isoDateTimeSchema, nonEmptyStringSchema } from './common.js';
 
 export const accountDeletionStatusSchema = z.enum([
   'pending',

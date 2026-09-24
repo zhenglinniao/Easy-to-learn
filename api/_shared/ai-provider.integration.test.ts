@@ -2,9 +2,9 @@ import { tutorResultSchema, type TutorRequest } from '@easy-to-learn/domain';
 import { loadEnv } from 'vite';
 import { describe, expect, it } from 'vitest';
 
-import { createTutorModelFromEnvironment } from './ai-provider';
-import { MemoryAiStateStore } from './ai-state';
-import { TutorService } from './tutor-service';
+import { createTutorModelFromEnvironment } from './ai-provider.js';
+import { MemoryAiStateStore } from './ai-state.js';
+import { TutorService } from './tutor-service.js';
 
 const runIntegration = process.env.RUN_AI_INTEGRATION === '1';
 const environment = loadEnv('development', process.cwd(), '');

@@ -5,9 +5,9 @@ import {
   AiProviderConfigurationError,
   isAiProviderEnvironmentConfigured,
   loadAiProviderConfigs,
-} from './ai-provider-config';
-import { FallbackTutorModel, createTutorModelFromEnvironment } from './ai-provider';
-import { ProviderTimeoutError, type TutorModel } from './tutor-service';
+} from './ai-provider-config.js';
+import { FallbackTutorModel, createTutorModelFromEnvironment } from './ai-provider.js';
+import { ProviderTimeoutError, type TutorModel } from './tutor-service.js';
 
 const request: TutorRequest = {
   requestId: 'request-provider-1',

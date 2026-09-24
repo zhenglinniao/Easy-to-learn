@@ -1,10 +1,14 @@
 import type { TutorRequest } from '@easy-to-learn/domain';
 
-import { AiProviderConfigurationError, loadAiProviderConfigs } from './ai-provider-config';
-import { GeminiTutorModel } from './gemini-model';
-import { resolveTutorPromptVersion, type TutorImageResolver } from './model-prompt';
-import { OpenAiCompatibleTutorModel } from './openai-compatible-model';
-import { ProviderTimeoutError, ProviderUnavailableError, type TutorModel } from './tutor-service';
+import { AiProviderConfigurationError, loadAiProviderConfigs } from './ai-provider-config.js';
+import { GeminiTutorModel } from './gemini-model.js';
+import { resolveTutorPromptVersion, type TutorImageResolver } from './model-prompt.js';
+import { OpenAiCompatibleTutorModel } from './openai-compatible-model.js';
+import {
+  ProviderTimeoutError,
+  ProviderUnavailableError,
+  type TutorModel,
+} from './tutor-service.js';
 
 type Environment = Record<string, string | undefined>;
 

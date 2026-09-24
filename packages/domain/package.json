@@ -2,7 +2,7 @@
   "name": "@easy-to-learn/domain",
   "version": "0.0.0",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },

@@ -1,6 +1,6 @@
 import type { QuotaStatus, TutorResponse } from '@easy-to-learn/domain';
 
-import { ApiFault } from './fault';
+import { ApiFault } from './fault.js';
 
 export const AI_DAILY_LIMIT = 3;
 export const AI_MIN_INTERVAL_MS = 5 * 60 * 1_000;

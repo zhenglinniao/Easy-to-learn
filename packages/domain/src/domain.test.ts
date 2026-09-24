@@ -16,7 +16,7 @@ import {
   tutorRequestSchema,
   tutorResultSchema,
   type TutorResultV1,
-} from './index';
+} from './index.js';
 
 const generatedAt = '2026-09-22T00:00:00.000Z';
 

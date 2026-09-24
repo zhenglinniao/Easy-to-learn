@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import { ApiFault, asApiFault } from './fault';
-import { logApiError } from './logger';
+import { ApiFault, asApiFault } from './fault.js';
+import { logApiError } from './logger.js';
 
 export interface HttpRequest {
   method?: string;

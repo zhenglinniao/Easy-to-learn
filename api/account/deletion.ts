@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
-import { ApiFault } from '../_shared/fault';
+import { ApiFault } from '../_shared/fault.js';
 import {
   requireAllowedOrigin,
   sendError,
   type HttpRequest,
   type HttpResponse,
-} from '../_shared/http';
-import { createAccountDeletionService, resolveAuthenticatedAccount } from '../_shared/runtime';
+} from '../_shared/http.js';
+import { createAccountDeletionService, resolveAuthenticatedAccount } from '../_shared/runtime.js';
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
   const requestId = randomUUID();

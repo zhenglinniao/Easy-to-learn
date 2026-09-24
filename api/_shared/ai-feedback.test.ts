@@ -1,8 +1,8 @@
 import type { TutorResponse } from '@easy-to-learn/domain';
 import { describe, expect, it, vi } from 'vitest';
 
-import { AiFeedbackService, type AiFeedbackRecord, type AiFeedbackStore } from './ai-feedback';
-import { MemoryAiStateStore } from './ai-state';
+import { AiFeedbackService, type AiFeedbackRecord, type AiFeedbackStore } from './ai-feedback.js';
+import { MemoryAiStateStore } from './ai-state.js';
 
 const requestId = '018f47a4-6a1d-7c2e-8f30-123456789abc';
 const actor = { kind: 'anonymous' as const, id: 'anon-1' };

@@ -5,8 +5,8 @@ import {
   type TutorResponse,
 } from '@easy-to-learn/domain';
 
-import type { AiStateStore } from './ai-state';
-import { ApiFault } from './fault';
+import type { AiStateStore } from './ai-state.js';
+import { ApiFault } from './fault.js';
 
 export interface TutorActor {
   kind: 'anonymous' | 'user';

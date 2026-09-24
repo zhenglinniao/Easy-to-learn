@@ -2,7 +2,7 @@ import type {
   ModelReasoningEffort,
   OpenAiResponseFormat,
   OpenAiWireApi,
-} from './openai-compatible-model';
+} from './openai-compatible-model.js';
 
 type Environment = Record<string, string | undefined>;
 

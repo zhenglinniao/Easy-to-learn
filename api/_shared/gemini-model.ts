@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { domainJsonSchemas, type TutorRequest } from '@easy-to-learn/domain';
 
-import { DEFAULT_GEMINI_MODEL } from './ai-provider-config';
+import { DEFAULT_GEMINI_MODEL } from './ai-provider-config.js';
 import {
   attachTrustedMetadata,
   buildTutorPrompt,
@@ -9,8 +9,12 @@ import {
   getTutorSystemInstruction,
   parseModelJson,
   type TutorImageResolver,
-} from './model-prompt';
-import { ProviderTimeoutError, ProviderUnavailableError, type TutorModel } from './tutor-service';
+} from './model-prompt.js';
+import {
+  ProviderTimeoutError,
+  ProviderUnavailableError,
+  type TutorModel,
+} from './tutor-service.js';
 
 export class GeminiTutorModel implements TutorModel {
   private readonly client: GoogleGenAI;

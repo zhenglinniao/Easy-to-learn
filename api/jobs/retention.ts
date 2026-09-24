@@ -2,8 +2,8 @@ import { createHmac, randomUUID } from 'node:crypto';
 
 import { createClient } from '@supabase/supabase-js';
 
-import { ApiFault } from '../_shared/fault';
-import { header, sendError, type HttpRequest, type HttpResponse } from '../_shared/http';
+import { ApiFault } from '../_shared/fault.js';
+import { header, sendError, type HttpRequest, type HttpResponse } from '../_shared/http.js';
 
 const required = (name: string): string => {
   const value = process.env[name];

@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
-import { ApiFault } from './fault';
+import { ApiFault } from './fault.js';
 
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 

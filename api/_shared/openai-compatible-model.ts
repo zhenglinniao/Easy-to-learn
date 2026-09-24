@@ -7,8 +7,12 @@ import {
   getTutorSystemInstruction,
   parseModelJson,
   type TutorImageResolver,
-} from './model-prompt';
-import { ProviderTimeoutError, ProviderUnavailableError, type TutorModel } from './tutor-service';
+} from './model-prompt.js';
+import {
+  ProviderTimeoutError,
+  ProviderUnavailableError,
+  type TutorModel,
+} from './tutor-service.js';
 
 export type OpenAiResponseFormat = 'json_schema' | 'json_object' | 'prompt';
 export type OpenAiWireApi = 'chat_completions' | 'responses';

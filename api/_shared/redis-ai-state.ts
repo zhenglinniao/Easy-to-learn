@@ -9,8 +9,8 @@ import {
   IDEMPOTENCY_TTL_MS,
   type AiStateStore,
   type QuotaGrant,
-} from './ai-state';
-import { ApiFault } from './fault';
+} from './ai-state.js';
+import { ApiFault } from './fault.js';
 
 const RESERVE_SCRIPT = `
 local existing = redis.call('GET', KEYS[3])

@@ -1,14 +1,14 @@
 import { z } from 'zod';
 
-import { MAX_INLINE_IMAGE_BYTES, TUTOR_SCHEMA_VERSION } from './constants';
+import { MAX_INLINE_IMAGE_BYTES, TUTOR_SCHEMA_VERSION } from './constants.js';
 import {
   boundsSchema,
   isoDateTimeSchema,
   nonEmptyStringSchema,
   nonNegativeIntegerSchema,
   tutorImageMimeTypeSchema,
-} from './common';
-import { tutorResultSchema, tutorStepSchema } from './tutor';
+} from './common.js';
+import { tutorResultSchema, tutorStepSchema } from './tutor.js';
 
 export const API_ERROR_DEFINITIONS = {
   INVALID_INPUT: { httpStatus: 400, retryable: false },
