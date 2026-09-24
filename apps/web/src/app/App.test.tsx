@@ -22,6 +22,15 @@ describe('App', () => {
     expect(
       screen.getByRole('heading', { name: '今天没做完，明天从原处继续。' }),
     ).toBeInTheDocument();
+    expect(screen.getByText('KID · zhenglinniao')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /GitHub/ })).toHaveAttribute(
+      'href',
+      'https://github.com/zhenglinniao',
+    );
+    expect(screen.getByRole('link', { name: /个人博客/ })).toHaveAttribute(
+      'href',
+      'https://web.zlnblog.asia/',
+    );
   });
 
   it('保存并即时应用主题偏好', async () => {

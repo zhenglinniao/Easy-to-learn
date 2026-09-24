@@ -88,9 +88,26 @@ export default function LandingPage() {
         </ol>
       </section>
       <footer className={styles.footer}>
-        <strong>Easy to learn</strong>
-        <span>让答案靠近问题，让学习留在画布。</span>
-        <nav aria-label="法律信息">
+        <div className={styles.footerBrand}>
+          <strong>Easy to learn</strong>
+          <span>让答案靠近问题，让学习留在画布。</span>
+        </div>
+        <div className={styles.creator}>
+          <span className={styles.creatorMark} aria-hidden="true">
+            K
+          </span>
+          <div>
+            <small>设计与开发</small>
+            <strong>KID · zhenglinniao</strong>
+          </div>
+        </div>
+        <nav aria-label="创作者与法律信息">
+          <a href="https://github.com/zhenglinniao" target="_blank" rel="noreferrer">
+            GitHub <span aria-hidden="true">↗</span>
+          </a>
+          <a href="https://web.zlnblog.asia/" target="_blank" rel="noreferrer">
+            个人博客 <span aria-hidden="true">↗</span>
+          </a>
           <Link to="/privacy">隐私说明</Link>
           <Link to="/terms">使用条款</Link>
         </nav>

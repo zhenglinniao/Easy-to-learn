@@ -907,21 +907,64 @@
 }
 .footer {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 28px;
   margin-top: 110px;
   padding: 26px 0;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 12px;
 }
+.footerBrand {
+  display: grid;
+  gap: 5px;
+}
+.footerBrand strong,
+.creator strong {
+  color: var(--ink);
+}
+.creator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.creatorMark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: var(--accent);
+  background: var(--paper);
+  font:
+    italic 17px Georgia,
+    serif;
+  box-shadow: 0 7px 18px rgba(39, 35, 29, 0.08);
+}
+.creator div {
+  display: grid;
+  gap: 3px;
+}
+.creator small {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
 .footer nav {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 14px;
 }
 .footer a,
 .legalPage a {
   color: var(--muted);
   text-underline-offset: 3px;
+}
+.footer a {
+  transition: color 140ms ease;
 }
 .legalPage {
   width: min(760px, 100%);
@@ -1337,6 +1380,9 @@
   .textButton:hover:not(:disabled) {
     color: var(--ink);
   }
+  .footer a:hover {
+    color: var(--ink);
+  }
 }
 @media (max-width: 850px) {
   .hero,
@@ -1463,8 +1509,12 @@
     flex-direction: column;
   }
   .footer {
+    align-items: flex-start;
     gap: 12px;
     flex-direction: column;
+  }
+  .footer nav {
+    justify-content: flex-start;
   }
 }
 @media (prefers-reduced-motion: reduce) {
