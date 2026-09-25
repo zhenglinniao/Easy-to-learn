@@ -1,4 +1,4 @@
-import { Excalidraw, FONT_FAMILY } from '@excalidraw/excalidraw';
+import { Excalidraw } from '@excalidraw/excalidraw';
 import type {
   AppState,
   ExcalidrawImperativeAPI,
@@ -41,6 +41,7 @@ import { ThemeToggle, useTheme } from '../theme';
 import '@excalidraw/excalidraw/index.css';
 import styles from './CanvasPage.module.css';
 import { ConflictResolutionDialog } from './ConflictResolutionDialog';
+import { HANDWRITING_FONT_FAMILY, migrateElementsToHandwriting } from './handwriting';
 
 interface OpenMenu {
   x: number;
@@ -269,12 +270,28 @@ export default function CanvasPage() {
           }
         }
         if (stored && active) {
+          const handwriting = migrateElementsToHandwriting(
+            stored.snapshot.excalidraw.elements as unknown as CanvasElements,
+          );
           api.updateScene({
-            elements: stored.snapshot.excalidraw.elements as never,
-            appState: stored.snapshot.excalidraw.appState as never,
+            elements: handwriting.elements as never,
+            appState: {
+              ...stored.snapshot.excalidraw.appState,
+              currentItemFontFamily: HANDWRITING_FONT_FAMILY,
+            } as never,
           });
+          if (handwriting.changed) {
+            await repository.saveDurableChange({
+              ...stored.snapshot,
+              excalidraw: {
+                ...stored.snapshot.excalidraw,
+                elements: handwriting.elements as never,
+              },
+              updatedAt: new Date().toISOString(),
+            });
+          }
           setTutorBoards(stored.snapshot.tutorBoards);
-          setSyncState(stored.dirty ? 'dirty' : 'synced');
+          setSyncState(stored.dirty || handwriting.changed ? 'dirty' : 'synced');
           const assets = await repository.getAssets(boardId);
           const files = await Promise.all(
             assets.map(async (asset) => ({
@@ -597,10 +614,26 @@ export default function CanvasPage() {
       await repositoryRef.current.resolveConflictWithRemote(snapshot, downloads);
       const assets = await repositoryRef.current.getAssets(boardId);
       hydratedBoard.current = null;
+      const handwriting = migrateElementsToHandwriting(
+        snapshot.excalidraw.elements as unknown as CanvasElements,
+      );
       api.updateScene({
-        elements: snapshot.excalidraw.elements as never,
-        appState: snapshot.excalidraw.appState as never,
+        elements: handwriting.elements as never,
+        appState: {
+          ...snapshot.excalidraw.appState,
+          currentItemFontFamily: HANDWRITING_FONT_FAMILY,
+        } as never,
       });
+      if (handwriting.changed) {
+        await repositoryRef.current.saveDurableChange({
+          ...snapshot,
+          excalidraw: {
+            ...snapshot.excalidraw,
+            elements: handwriting.elements as never,
+          },
+          updatedAt: new Date().toISOString(),
+        });
+      }
       api.addFiles(
         (await Promise.all(
           assets.map(async (asset) => ({
@@ -614,7 +647,7 @@ export default function CanvasPage() {
       );
       setTutorBoards(snapshot.tutorBoards);
       hydratedBoard.current = boardId;
-      setSyncState('synced');
+      setSyncState(handwriting.changed ? 'dirty' : 'synced');
     } catch (error) {
       setConflictError(error instanceof Error ? error.message : '暂时无法打开云端版本。');
     } finally {
@@ -887,7 +920,7 @@ export default function CanvasPage() {
             initialData={{
               appState: {
                 // Excalifont 负责拉丁字符，中文会自动回退到配套的 Xiaolai 手写字形。
-                currentItemFontFamily: FONT_FAMILY.Excalifont,
+                currentItemFontFamily: HANDWRITING_FONT_FAMILY,
                 viewBackgroundColor: '#fbfaf7',
               },
             }}
