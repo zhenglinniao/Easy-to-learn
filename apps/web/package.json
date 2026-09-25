@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node ../../scripts/prepare-excalidraw-fonts.mjs",
     "dev": "vite",
+    "prebuild": "node ../../scripts/prepare-excalidraw-fonts.mjs",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit"
   },
