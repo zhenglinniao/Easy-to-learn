@@ -7,9 +7,13 @@ coverage/
 playwright-report/
 test-results/
 .playwright-cli/
+output/playwright/
 supabase/.temp/
 supabase/.branches/
 .DS_Store
 Thumbs.db
 
 .vercel
+
+# 由 scripts/prepare-excalidraw-fonts.mjs 从依赖包生成，不提交二进制字体副本。
+apps/web/public/fonts/

@@ -441,6 +441,21 @@ export default function CanvasPage() {
     appState: AppState,
     files: Parameters<NonNullable<React.ComponentProps<typeof Excalidraw>['onChange']>>[2],
   ) => {
+    const handwriting = migrateElementsToHandwriting(elements);
+    const normalizedElements = handwriting.elements as CanvasElements;
+
+    // 画布输入和 AI 写回内容统一使用手绘字体。即使用户此前选过其他字体，
+    // 或第三方代码插入了普通字体文本，也会在同一轮变更中被规范化。
+    if (
+      api &&
+      (handwriting.changed || appState.currentItemFontFamily !== HANDWRITING_FONT_FAMILY)
+    ) {
+      api.updateScene({
+        ...(handwriting.changed ? { elements: normalizedElements as never } : {}),
+        appState: { currentItemFontFamily: HANDWRITING_FONT_FAMILY } as never,
+      });
+    }
+
     setViewportState(appState);
     const currentMenu = menuRef.current;
     if (
@@ -455,7 +470,10 @@ export default function CanvasPage() {
       sourceTimer.current = setTimeout(() => {
         void Promise.all(
           tutorBoards.map(async (board) =>
-            resolveTutorSource(board, await inspectTutorSource(elements, board.source.elementIds)),
+            resolveTutorSource(
+              board,
+              await inspectTutorSource(normalizedElements, board.source.elementIds),
+            ),
           ),
         ).then((next) => {
           if (JSON.stringify(next) !== JSON.stringify(tutorBoards)) {
@@ -463,7 +481,7 @@ export default function CanvasPage() {
             void persistBoard(
               repositoryRef.current!,
               boardId,
-              elements,
+              normalizedElements,
               appState,
               files,
               next,
@@ -481,7 +499,7 @@ export default function CanvasPage() {
       void persistBoard(
         repositoryRef.current!,
         boardId,
-        elements,
+        normalizedElements,
         appState,
         files,
         tutorBoards,
