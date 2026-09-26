@@ -22,6 +22,9 @@ const MAX_PROVIDER_TIMEOUT_BUDGET_MS = 25_000;
 const dateLabel = (value: string | null): string =>
   value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '从未登录';
 
+const isDeepSeekProvider = (provider: AdminProviderView): boolean =>
+  provider.id === 'deepseek' || provider.baseUrl?.includes('api.deepseek.com') === true;
+
 const providerPresets: Record<'sensenova' | 'deepseek', AdminProviderView> = {
   sensenova: {
     id: 'sensenova',
@@ -149,6 +152,40 @@ export default function AdminPage() {
   const updateModel = (id: string, patch: Partial<AdminProviderView>) => {
     setNotice(null);
     setModels((items) => items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  };
+  const updateWireApi = (
+    provider: AdminProviderView,
+    wireApi: 'chat_completions' | 'responses',
+  ) => {
+    const requiresJsonObject =
+      isDeepSeekProvider(provider) &&
+      wireApi === 'chat_completions' &&
+      provider.responseFormat === 'json_schema';
+    updateModel(provider.id, {
+      wireApi,
+      ...(requiresJsonObject ? { responseFormat: 'json_object' as const } : {}),
+    });
+    if (requiresJsonObject) {
+      setNotice(
+        'DeepSeek 的 Chat Completions 已同时切换为 JSON Object；该组合可以保存并用于接口测试。',
+      );
+    }
+  };
+  const updateResponseFormat = (
+    provider: AdminProviderView,
+    responseFormat: 'json_schema' | 'json_object' | 'prompt',
+  ) => {
+    const requiresResponses =
+      isDeepSeekProvider(provider) &&
+      responseFormat === 'json_schema' &&
+      provider.wireApi === 'chat_completions';
+    updateModel(provider.id, {
+      responseFormat,
+      ...(requiresResponses ? { wireApi: 'responses' as const } : {}),
+    });
+    if (requiresResponses) {
+      setNotice('DeepSeek 的 JSON Schema 已同时切换为 Responses，避免保存不兼容的接口组合。');
+    }
   };
   const moveModel = (index: number, direction: -1 | 1) => {
     setModels((items) => {
@@ -434,26 +471,34 @@ export default function AdminPage() {
                     <label>
                       API 模式
                       <select
+                        aria-label="API 模式"
                         value={provider.wireApi ?? 'chat_completions'}
                         onChange={(event) =>
-                          updateModel(provider.id, {
-                            wireApi: event.target.value as 'chat_completions' | 'responses',
-                          })
+                          updateWireApi(
+                            provider,
+                            event.target.value as 'chat_completions' | 'responses',
+                          )
                         }
                       >
                         <option value="chat_completions">Chat Completions</option>
                         <option value="responses">Responses</option>
                       </select>
+                      {isDeepSeekProvider(provider) && (
+                        <small>
+                          Chat Completions 使用 JSON Object；JSON Schema 使用 Responses。
+                        </small>
+                      )}
                     </label>
                     <label>
                       结构化输出
                       <select
+                        aria-label="结构化输出"
                         value={provider.responseFormat ?? 'prompt'}
                         onChange={(event) =>
-                          updateModel(provider.id, {
-                            responseFormat: event.target.value as
-                              'json_schema' | 'json_object' | 'prompt',
-                          })
+                          updateResponseFormat(
+                            provider,
+                            event.target.value as 'json_schema' | 'json_object' | 'prompt',
+                          )
                         }
                       >
                         <option value="json_schema">JSON Schema</option>
