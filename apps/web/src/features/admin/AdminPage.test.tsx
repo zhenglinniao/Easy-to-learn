@@ -110,9 +110,15 @@ describe('AdminPage', () => {
     );
 
     expect(await screen.findByRole('heading', { name: '管理员后台' })).toBeInTheDocument();
-    expect(await screen.findByDisplayValue('model-a')).toBeInTheDocument();
+    const modelPicker = await screen.findByRole('combobox', { name: 'Model ID' });
+    expect(modelPicker).toHaveValue('model-a');
+    expect(screen.getByRole('option', { name: /DeepSeek V4 Pro/ })).toBeInTheDocument();
     expect(screen.getByText('le****@example.com')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('apiKey');
+
+    fireEvent.change(modelPicker, { target: { value: 'deepseek-v4-pro' } });
+    expect(modelPicker).toHaveValue('deepseek-v4-pro');
+    expect(screen.getByText(/面向更高质量复杂推理/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '暂停' }));
     expect(screen.getByRole('alertdialog')).toHaveTextContent('用户数据不会被删除');
