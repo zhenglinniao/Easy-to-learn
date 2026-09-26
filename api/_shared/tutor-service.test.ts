@@ -131,11 +131,6 @@ describe('TutorService', () => {
         step: result.steps[0]!,
       },
     };
-    const repeated = {
-      ...result,
-      mode: 'explain_step' as const,
-      metadata: { ...result.metadata, promptVersion: 'v1' },
-    };
     const expanded = {
       ...result,
       mode: 'explain_step' as const,
@@ -219,7 +214,19 @@ describe('TutorService', () => {
       ],
       metadata: { ...result.metadata, promptVersion: 'v6' },
     };
-    const generate = vi.fn().mockResolvedValueOnce(repeated).mockResolvedValueOnce(expanded);
+    const repackaged = {
+      ...expanded,
+      steps: [
+        {
+          ...expanded.steps[0]!,
+          id: 'micro-repackaged',
+          title: '换个标题再说一次',
+          blocks: [result.steps[0]!.blocks[0]!, expanded.steps[0]!.blocks[1]!],
+        },
+        expanded.steps[1]!,
+      ],
+    };
+    const generate = vi.fn().mockResolvedValueOnce(repackaged).mockResolvedValueOnce(expanded);
     const service = new TutorService(
       new MemoryAiStateStore(),
       { generate },
@@ -234,7 +241,7 @@ describe('TutorService', () => {
     expect(generate).toHaveBeenNthCalledWith(
       2,
       explainRequest,
-      expect.stringContaining('不能原样返回目标步骤'),
+      expect.stringContaining('不能把目标步骤作为某个微步骤原样返回'),
     );
   });
 

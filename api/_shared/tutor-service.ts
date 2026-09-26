@@ -101,6 +101,7 @@ const requestAwareIssues = (
   if (request.mode !== 'explain_step' || !request.parentContext || !request.targetStepId) {
     return issues;
   }
+  const parentStep = request.parentContext.step;
 
   if (result.steps.some((step) => step.id === request.targetStepId)) {
     issues.push({
@@ -108,18 +109,41 @@ const requestAwareIssues = (
       message: '深入解释必须使用新的微步骤 ID，不能原样返回目标步骤',
     });
   }
-  if (
-    result.steps.every((step) => step.title.trim() === request.parentContext?.step.title.trim())
-  ) {
+  if (result.steps.some((step) => step.title.trim() === parentStep.title.trim())) {
     issues.push({
       path: ['steps'],
-      message: '微步骤标题必须说明新的理解任务，不能全部重复原步骤标题',
+      message: '每个微步骤标题必须说明新的理解任务，不能重复原步骤标题',
     });
   }
 
-  const sourceText = normalizeEducationalText(request.parentContext.step);
+  const sourceText = normalizeEducationalText(parentStep);
   const explanationText = normalizeEducationalText({ title: result.title, steps: result.steps });
+  const normalizedSteps = result.steps.map((step) => normalizeEducationalText(step));
+  const sourceBlocksText = normalizeEducationalText(parentStep.blocks);
   const minimumExpansion = Math.min(80, Math.max(18, Math.ceil(sourceText.length * 0.2)));
+  const repeatsSource = result.steps.some((step) => {
+    const body = normalizeEducationalText(step.blocks);
+    return (
+      sourceBlocksText.length >= 8 &&
+      body.includes(sourceBlocksText) &&
+      body.length < sourceBlocksText.length + minimumExpansion
+    );
+  });
+  if (
+    sourceText.length >= 8 &&
+    (normalizedSteps.some((step) => step === sourceText) || repeatsSource)
+  ) {
+    issues.push({
+      path: ['steps'],
+      message: '不能把目标步骤作为某个微步骤原样返回；必须拆解输入、动作、原因或自检',
+    });
+  }
+  if (new Set(normalizedSteps).size !== normalizedSteps.length) {
+    issues.push({
+      path: ['steps'],
+      message: '微步骤之间必须各自提供不同的教学信息，不能重复填充',
+    });
+  }
   if (
     explanationText === sourceText ||
     explanationText.length < sourceText.length + minimumExpansion
