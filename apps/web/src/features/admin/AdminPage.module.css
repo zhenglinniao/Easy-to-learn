@@ -310,6 +310,61 @@
   font-size: 12px;
   text-align: center;
 }
+.accessHelp {
+  max-width: 760px;
+  margin: 72px auto 0;
+  padding: 30px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--paper);
+  box-shadow: 0 18px 54px rgba(54, 44, 30, 0.07);
+}
+.accessHelp > p {
+  margin: 0 0 9px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 820;
+  letter-spacing: 0.13em;
+}
+.accessHelp h1 {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font: 500 36px/1.1 Georgia, serif;
+}
+.accessHelp > span,
+.accessHelp li {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.75;
+}
+.accessHelp dl {
+  display: grid;
+  gap: 10px;
+  margin: 24px 0;
+}
+.accessHelp dl > div {
+  padding: 13px 15px;
+  border-radius: 14px;
+  background: rgba(80, 70, 58, 0.055);
+}
+.accessHelp dt {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 720;
+}
+.accessHelp dd {
+  margin: 6px 0 0;
+  color: var(--ink);
+  font-size: 13px;
+}
+.accessHelp code {
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.accessHelp ol {
+  margin: 0;
+  padding-left: 20px;
+}
 .dialogBackdrop {
   position: fixed;
   z-index: 100;

@@ -49,6 +49,7 @@ export default function AdminPage() {
     [session?.access_token],
   );
   const [overview, setOverview] = useState<AdminOverview | null>(null);
+  const [access, setAccess] = useState<{ isAdmin: boolean; userId: string } | null>(null);
   const [models, setModels] = useState<AdminProviderView[]>([]);
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
@@ -61,6 +62,14 @@ export default function AdminPage() {
   const load = useCallback(
     async (signal?: AbortSignal) => {
       try {
+        const permission = await client.access(signal);
+        setAccess(permission);
+        if (!permission.isAdmin) {
+          setOverview(null);
+          setModels([]);
+          setError(null);
+          return;
+        }
         const data = await client.overview(page, query, signal);
         setOverview(data);
         setModels(data.models);
@@ -85,6 +94,46 @@ export default function AdminPage() {
 
   if (loading) return <p className="route-loading">正在验证管理员身份…</p>;
   if (!user) return <Navigate to="/login?redirect=/admin" replace />;
+
+  if (!access && !error) {
+    return (
+      <main className={styles.page}>
+        <SiteHeader />
+        <p className={styles.loading}>正在核对管理员白名单…</p>
+      </main>
+    );
+  }
+
+  if (access && !access.isAdmin) {
+    return (
+      <main className={styles.page}>
+        <SiteHeader />
+        <section className={styles.accessHelp} aria-labelledby="admin-access-title">
+          <p>权限诊断</p>
+          <h1 id="admin-access-title">管理员权限尚未生效</h1>
+          <span>当前账户已经登录，但它的 Supabase User UID 不在生产管理员白名单中。</span>
+          <dl>
+            <div>
+              <dt>当前账户</dt>
+              <dd>{user.email}</dd>
+            </div>
+            <div>
+              <dt>应填入 ADMIN_USER_IDS 的 UID</dt>
+              <dd>
+                <code>{access.userId}</code>
+              </dd>
+            </div>
+          </dl>
+          <ol>
+            <li>打开 Vercel → easy-to-learn → Environment Variables。</li>
+            <li>编辑 ADMIN_USER_IDS，Value 只填写上面的 UUID，不要包含变量名或等号。</li>
+            <li>确认环境选择 Production；多个管理员用英文逗号分隔。</li>
+            <li>保存后重新部署 Production，再刷新本页面。</li>
+          </ol>
+        </section>
+      </main>
+    );
+  }
 
   const updateModel = (id: string, patch: Partial<AdminProviderView>) => {
     setModels((items) => items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
