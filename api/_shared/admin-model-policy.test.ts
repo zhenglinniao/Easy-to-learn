@@ -186,6 +186,43 @@ describe('admin model policy', () => {
     ).toThrow('累计超时');
   });
 
+  it('不会把包含官方域名字样的攻击者域名识别为生图供应商', () => {
+    const spoofedConfigs: AiProviderConfig[] = [
+      {
+        id: 'spoofed',
+        type: 'openai-compatible',
+        baseUrl: 'https://sensenova.cn.evil.example/v1',
+        model: 'model',
+        timeoutMs: 12_000,
+        responseFormat: 'prompt',
+        wireApi: 'chat_completions',
+        apiKey: 'environment-secret',
+      },
+    ];
+    expect(() =>
+      validateAdminModelPolicy(
+        {
+          providers: [
+            {
+              id: 'spoofed',
+              label: 'Spoofed',
+              type: 'openai-compatible',
+              enabled: true,
+              model: 'model',
+              imageModel: 'sensenova-u1.5-fast',
+              timeoutMs: 12_000,
+              responseFormat: 'prompt',
+              wireApi: 'chat_completions',
+              baseUrl: 'https://sensenova.cn.evil.example/v1',
+              apiKey: 'secret',
+            },
+          ],
+        },
+        spoofedConfigs,
+      ),
+    ).toThrow('只能配置在商汤日日新 Provider');
+  });
+
   it('写入 Redis 的配置整体加密，不包含明文密钥', async () => {
     let stored = '';
     const redis = {

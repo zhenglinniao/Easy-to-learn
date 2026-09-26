@@ -60,13 +60,23 @@ export interface AdminModelPolicyView {
   updatedBy: string | null;
 }
 
+const baseUrlMatchesHost = (baseUrl: string, expectedHost: string): boolean => {
+  try {
+    const hostname = new URL(baseUrl).hostname.toLowerCase();
+    return hostname === expectedHost || hostname.endsWith(`.${expectedHost}`);
+  } catch {
+    return false;
+  }
+};
+
 const isDeepSeekProvider = (
   provider: Pick<StoredOpenAiProvider, 'id' | 'baseUrl' | 'responseFormat' | 'wireApi'>,
-): boolean => provider.id === 'deepseek' || provider.baseUrl.includes('api.deepseek.com');
+): boolean =>
+  provider.id === 'deepseek' || baseUrlMatchesHost(provider.baseUrl, 'api.deepseek.com');
 
 const isSenseNovaProvider = (
   provider: Pick<StoredOpenAiProvider, 'id' | 'baseUrl' | 'responseFormat' | 'wireApi'>,
-): boolean => provider.id === 'sensenova' || provider.baseUrl.includes('sensenova.cn');
+): boolean => provider.id === 'sensenova' || baseUrlMatchesHost(provider.baseUrl, 'sensenova.cn');
 
 const effectiveTimeoutMs = (provider: StoredAdminProvider): number =>
   provider.type === 'openai-compatible' && isSenseNovaProvider(provider)
@@ -258,7 +268,7 @@ export const validateAdminModelPolicy = (
     )
       throw new ApiFault('INVALID_INPUT', '推理强度不受支持');
     const baseUrl = cleanBaseUrl(candidate.baseUrl, hosts);
-    if (imageModel && id !== 'sensenova' && !baseUrl.includes('sensenova.cn')) {
+    if (imageModel && id !== 'sensenova' && !baseUrlMatchesHost(baseUrl, 'sensenova.cn')) {
       throw new ApiFault('INVALID_INPUT', 'U1.5 生图模型只能配置在商汤日日新 Provider');
     }
     const openAiProvider: StoredOpenAiProvider = {

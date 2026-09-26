@@ -89,8 +89,16 @@ const parseProvider = (
     } catch {
       throw new AiProviderConfigurationError(`${prefix}_BASE_URL 不是有效 URL`);
     }
-    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-      throw new AiProviderConfigurationError(`${prefix}_BASE_URL 只允许 http 或 https`);
+    const isLoopback = ['localhost', '127.0.0.1', '::1'].includes(parsedUrl.hostname);
+    const allowsLocalHttp =
+      parsedUrl.protocol === 'http:' && isLoopback && environment.NODE_ENV !== 'production';
+    if (parsedUrl.protocol !== 'https:' && !allowsLocalHttp) {
+      throw new AiProviderConfigurationError(
+        `${prefix}_BASE_URL 必须使用 HTTPS；仅非生产环境允许 HTTP localhost`,
+      );
+    }
+    if (parsedUrl.username || parsedUrl.password || parsedUrl.search || parsedUrl.hash) {
+      throw new AiProviderConfigurationError(`${prefix}_BASE_URL 不允许包含凭据、参数或锚点`);
     }
     const responseFormat = (environment[`${prefix}_RESPONSE_FORMAT`]?.trim() ??
       'json_schema') as OpenAiResponseFormat;

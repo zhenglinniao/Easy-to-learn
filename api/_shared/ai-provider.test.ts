@@ -112,6 +112,32 @@ describe('AI Provider 配置', () => {
     ).toThrow(AiProviderConfigurationError);
     expect(() =>
       loadAiProviderConfigs({
+        AI_PROVIDERS: 'plain_http',
+        AI_PROVIDER_PLAIN_HTTP_TYPE: 'openai-compatible',
+        AI_PROVIDER_PLAIN_HTTP_MODEL: 'model',
+        AI_PROVIDER_PLAIN_HTTP_BASE_URL: 'http://provider.example.test/v1',
+      }),
+    ).toThrow(/HTTPS/);
+    expect(
+      loadAiProviderConfigs({
+        NODE_ENV: 'development',
+        AI_PROVIDERS: 'local',
+        AI_PROVIDER_LOCAL_TYPE: 'openai-compatible',
+        AI_PROVIDER_LOCAL_MODEL: 'local-model',
+        AI_PROVIDER_LOCAL_BASE_URL: 'http://127.0.0.1:11434/v1',
+      }),
+    ).toMatchObject([{ baseUrl: 'http://127.0.0.1:11434/v1' }]);
+    expect(() =>
+      loadAiProviderConfigs({
+        NODE_ENV: 'production',
+        AI_PROVIDERS: 'local',
+        AI_PROVIDER_LOCAL_TYPE: 'openai-compatible',
+        AI_PROVIDER_LOCAL_MODEL: 'local-model',
+        AI_PROVIDER_LOCAL_BASE_URL: 'http://localhost:11434/v1',
+      }),
+    ).toThrow(/HTTPS/);
+    expect(() =>
+      loadAiProviderConfigs({
         AI_PROVIDERS: 'one,two,three',
         AI_PROVIDER_ONE_TYPE: 'gemini',
         AI_PROVIDER_ONE_MODEL: 'model-one',
