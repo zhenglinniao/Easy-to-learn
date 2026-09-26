@@ -15,6 +15,7 @@ export interface TutorActor {
 
 export interface TutorModel {
   generate(request: TutorRequest, correction?: string): Promise<unknown>;
+  fallbackCandidates?(): readonly TutorModel[];
 }
 
 export interface BoardAuthorizer {
@@ -125,17 +126,47 @@ export class TutorService {
       });
     }
     try {
-      let candidate = await this.model.generate(request);
-      let validated = tutorResultSchema.safeParse(normalizeKnownModelDrift(candidate));
-      const initialIssues = validated.success ? [] : safeIssueSummary(validated.error.issues);
-      if (!validated.success) {
-        candidate = await this.model.generate(
-          request,
-          correctionFromIssues(validated.error.issues),
-        );
-        validated = tutorResultSchema.safeParse(normalizeKnownModelDrift(candidate));
+      const candidates = this.model.fallbackCandidates?.() ?? [this.model];
+      let successfulResult: TutorResponse['data']['result'] | undefined;
+      let lastProviderError: ProviderTimeoutError | ProviderUnavailableError | undefined;
+      const invalidAttempts: Array<{
+        providerIndex: number;
+        initialIssues: ReturnType<typeof safeIssueSummary>;
+        correctionIssues: ReturnType<typeof safeIssueSummary>;
+      }> = [];
+
+      for (const [providerIndex, candidateModel] of candidates.entries()) {
+        try {
+          let candidate = await candidateModel.generate(request);
+          let validated = tutorResultSchema.safeParse(normalizeKnownModelDrift(candidate));
+          const initialIssues = validated.success ? [] : safeIssueSummary(validated.error.issues);
+          if (!validated.success) {
+            candidate = await candidateModel.generate(
+              request,
+              correctionFromIssues(validated.error.issues),
+            );
+            validated = tutorResultSchema.safeParse(normalizeKnownModelDrift(candidate));
+          }
+          if (validated.success) {
+            successfulResult = validated.data;
+            break;
+          }
+          invalidAttempts.push({
+            providerIndex,
+            initialIssues,
+            correctionIssues: safeIssueSummary(validated.error.issues),
+          });
+        } catch (error) {
+          if (error instanceof ProviderTimeoutError || error instanceof ProviderUnavailableError) {
+            lastProviderError = error;
+            continue;
+          }
+          throw error;
+        }
       }
-      if (!validated.success) {
+
+      if (!successfulResult) {
+        if (invalidAttempts.length === 0 && lastProviderError) throw lastProviderError;
         // 只记录契约字段路径和规则，不记录题目、图片或模型原文。
         console.warn(
           JSON.stringify({
@@ -143,15 +174,14 @@ export class TutorService {
             level: 'warning',
             event: 'ai_model_output_invalid',
             requestId: request.requestId,
-            initialIssues,
-            correctionIssues: safeIssueSummary(validated.error.issues),
+            attempts: invalidAttempts,
           }),
         );
         throw new ApiFault('INVALID_MODEL_OUTPUT', 'AI 返回内容无法安全展示');
       }
       const data: TutorResponse['data'] = {
         requestId: request.requestId,
-        result: validated.data,
+        result: successfulResult,
         quota: quota.quota,
       };
       await this.state.cache(actorKey, request.requestId, data, this.now());
