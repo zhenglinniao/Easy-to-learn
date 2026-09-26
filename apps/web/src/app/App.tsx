@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/react';
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AnalyticsTracker } from '../features/analytics/AnalyticsTracker';
 import { AuthProvider } from '../features/auth';
 
 const LandingPage = lazy(() => import('../pages/LandingPage'));
@@ -27,6 +28,7 @@ export function App() {
     >
       <AuthProvider>
         <BrowserRouter>
+          <AnalyticsTracker />
           <Suspense fallback={<p className="route-loading">正在打开你的学习空间…</p>}>
             <Routes>
               <Route path="/" element={<LandingPage />} />

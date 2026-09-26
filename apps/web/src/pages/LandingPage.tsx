@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { ProductMetrics } from '../features/analytics/ProductMetrics';
 import { ApplicationScenes } from './ApplicationScenes';
 import { LearningCompanion } from './LearningCompanion';
 import { SiteHeader } from './SiteHeader';
@@ -61,6 +62,7 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+      <ProductMetrics />
       <section className={styles.section} aria-labelledby="features-title">
         <p className={styles.eyebrow}>为什么好用</p>
         <h2 id="features-title">少一次切换，多一点专注。</h2>
