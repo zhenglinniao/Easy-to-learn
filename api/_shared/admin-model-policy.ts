@@ -70,7 +70,7 @@ const isSenseNovaProvider = (
 
 const effectiveTimeoutMs = (provider: StoredAdminProvider): number =>
   provider.type === 'openai-compatible' && isSenseNovaProvider(provider)
-    ? Math.max(provider.timeoutMs, 25_000)
+    ? Math.max(provider.timeoutMs, 35_000)
     : provider.timeoutMs;
 
 const compatibleResponseFormat = (
@@ -276,7 +276,10 @@ export const validateAdminModelPolicy = (
   });
   const active = providers.filter((provider) => provider.enabled);
   if (active.length === 0) throw new ApiFault('INVALID_INPUT', '至少需要启用一个 AI Provider');
-  if (active.reduce((sum, provider) => sum + provider.timeoutMs, 0) > MAX_PROVIDER_CHAIN_TIMEOUT_MS)
+  if (
+    active.reduce((sum, provider) => sum + effectiveTimeoutMs(provider), 0) >
+    MAX_PROVIDER_CHAIN_TIMEOUT_MS
+  )
     throw new ApiFault(
       'INVALID_INPUT',
       `启用模型的累计超时不能超过 ${MAX_PROVIDER_CHAIN_TIMEOUT_MS} 毫秒`,

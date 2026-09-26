@@ -221,6 +221,66 @@ describe('TutorService', () => {
     });
   });
 
+  it('本地修复 SenseNova 的展示枚举漂移，避免额外模型纠错调用', async () => {
+    const generate = vi.fn().mockResolvedValue({
+      ...result,
+      contentProfile: {
+        contentKind: 'exercise',
+        learningGoal: 'solve',
+        goalSource: 'explicit',
+        confidence: 'high',
+      },
+      answerPresentation: {
+        problemType: 'linear_equation',
+        conclusionPosition: 'first_step',
+      },
+      steps: [
+        {
+          id: 'solve-equation',
+          title: '先看等式',
+          blocks: [
+            { type: 'math', latex: '2x+3=11', display: true },
+            {
+              type: 'diagram',
+              diagram: {
+                type: 'comic-strip',
+                layout: 'single',
+                panels: [
+                  {
+                    id: 'calculation-panel',
+                    motif: 'calculation',
+                    pose: 'calculate',
+                    label: '两边减 3',
+                    caption: '保持等式平衡',
+                    color: 'blue',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+      metadata: { ...result.metadata, promptVersion: 'v5' },
+    });
+    const service = new TutorService(
+      new MemoryAiStateStore(),
+      { generate },
+      boards,
+      () => new Date('2026-09-22T00:00:00.000Z'),
+    );
+
+    const response = await service.execute(actor, request);
+
+    expect(response.data.result.answerPresentation?.problemType).toBe('simple');
+    expect(response.data.result.steps[0]?.blocks[1]).toMatchObject({
+      type: 'diagram',
+      diagram: {
+        panels: [{ motif: 'numbers', pose: 'observe' }],
+      },
+    });
+    expect(generate).toHaveBeenCalledOnce();
+  });
+
   it('执行五分钟间隔与上海自然日三次配额', async () => {
     const state = new MemoryAiStateStore();
     const model: TutorModel = { generate: vi.fn().mockResolvedValue(result) };
