@@ -7,6 +7,9 @@ export interface CanvasAiTask {
   id: string;
   action: CanvasAiTaskAction;
   stage: CanvasAiTaskStage;
+  sourceKey?: string;
+  startedAt: number;
+  screenPosition?: { x: number; y: number };
   elementCount?: number;
 }
 
@@ -17,11 +20,43 @@ interface ActiveCanvasAiTask extends CanvasAiTask {
 export class CanvasAiTaskRegistry {
   private readonly tasks = new Map<string, ActiveCanvasAiTask>();
 
-  start(id: string, action: CanvasAiTaskAction): AbortController | null {
-    if (this.tasks.has(id) || this.tasks.size >= MAX_CONCURRENT_CANVAS_AI_TASKS) return null;
+  start(
+    id: string,
+    action: CanvasAiTaskAction,
+    context: Pick<CanvasAiTask, 'sourceKey' | 'screenPosition'> = {},
+  ): AbortController | null {
+    if (
+      this.tasks.has(id) ||
+      (context.sourceKey && this.findBySourceKey(context.sourceKey)) ||
+      this.tasks.size >= MAX_CONCURRENT_CANVAS_AI_TASKS
+    )
+      return null;
     const controller = new AbortController();
-    this.tasks.set(id, { id, action, stage: 'preparing', controller });
+    this.tasks.set(id, {
+      id,
+      action,
+      stage: 'preparing',
+      startedAt: Date.now(),
+      ...context,
+      controller,
+    });
     return controller;
+  }
+
+  findBySourceKey(sourceKey: string): CanvasAiTask | null {
+    const task = Array.from(this.tasks.values()).find(
+      (candidate) => candidate.sourceKey === sourceKey,
+    );
+    if (!task) return null;
+    return {
+      id: task.id,
+      action: task.action,
+      stage: task.stage,
+      startedAt: task.startedAt,
+      ...(task.sourceKey === undefined ? {} : { sourceKey: task.sourceKey }),
+      ...(task.screenPosition === undefined ? {} : { screenPosition: task.screenPosition }),
+      ...(task.elementCount === undefined ? {} : { elementCount: task.elementCount }),
+    };
   }
 
   update(id: string, update: Partial<Pick<CanvasAiTask, 'stage' | 'elementCount'>>): void {
@@ -49,6 +84,9 @@ export class CanvasAiTaskRegistry {
       id: task.id,
       action: task.action,
       stage: task.stage,
+      startedAt: task.startedAt,
+      ...(task.sourceKey === undefined ? {} : { sourceKey: task.sourceKey }),
+      ...(task.screenPosition === undefined ? {} : { screenPosition: task.screenPosition }),
       ...(task.elementCount === undefined ? {} : { elementCount: task.elementCount }),
     }));
   }

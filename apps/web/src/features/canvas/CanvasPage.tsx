@@ -31,7 +31,7 @@ import {
   type SyncState,
 } from '@easy-to-learn/persistence';
 import { RadialMenu, TutorBoard, type RadialMenuAction } from '@easy-to-learn/ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { getOptionalSupabaseClient, useAuth } from '../auth';
@@ -84,6 +84,21 @@ const taskStageLabel = (stage: CanvasAiTask['stage']): string => {
   if (stage === 'preparing') return '准备选区';
   if (stage === 'answering') return '生成答案';
   return '生成插画';
+};
+
+const radialLoadingAction = (task: CanvasAiTask | undefined): RadialMenuAction | null =>
+  task?.action === 'solve' || task?.action === 'hint' ? task.action : null;
+
+const taskProgress = (task: CanvasAiTask): number => {
+  if (task.stage === 'preparing') return 18;
+  if (task.stage === 'answering') return task.action === 'hint' ? 76 : 62;
+  return 90;
+};
+
+const elapsedLabel = (startedAt: number, now: number): string => {
+  const seconds = Math.max(0, Math.floor((now - startedAt) / 1_000));
+  if (seconds < 60) return `已等待 ${seconds} 秒`;
+  return `已等待 ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 };
 
 type FeedbackState = 'idle' | 'sending' | 'sent' | 'error';
@@ -276,6 +291,7 @@ export default function CanvasPage() {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [menu, setMenuState] = useState<OpenMenu | null>(null);
   const [activeAiTasks, setActiveAiTasks] = useState<CanvasAiTask[]>([]);
+  const [aiTaskClock, setAiTaskClock] = useState(() => Date.now());
   const [prepared, setPrepared] = useState<PreparedSummary | null>(null);
   const [preparationError, setPreparationError] = useState<string | null>(null);
   const [tutorBoards, setTutorBoards] = useState<PersistedTutorBoardV2[]>([]);
@@ -329,6 +345,12 @@ export default function CanvasPage() {
     const registry = aiTaskRegistry.current;
     return () => registry.cancelAll();
   }, [boardId]);
+
+  useEffect(() => {
+    if (activeAiTasks.length === 0) return;
+    const timer = window.setInterval(() => setAiTaskClock(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [activeAiTasks.length]);
 
   const refreshQuota = useCallback(
     async (signal?: AbortSignal) => {
@@ -864,8 +886,21 @@ export default function CanvasPage() {
       setPreparationError(quotaError);
       return;
     }
+    const appState = api.getAppState();
+    const sourceKey = selectionSignature(appState.selectedElementIds);
+    const currentMenu = menuRef.current;
+    const duplicate = aiTaskRegistry.current.findBySourceKey(sourceKey);
+    if (duplicate) {
+      setPreparationError(
+        `这个选区正在${taskActionLabel(duplicate.action)}，无需重复点击；你可以继续选择其他题目。`,
+      );
+      return;
+    }
     const requestId = crypto.randomUUID();
-    const controller = aiTaskRegistry.current.start(requestId, action);
+    const controller = aiTaskRegistry.current.start(requestId, action, {
+      sourceKey,
+      ...(currentMenu ? { screenPosition: { x: currentMenu.x, y: currentMenu.y } } : {}),
+    });
     if (!controller) {
       setPreparationError(
         `同一时间最多处理 ${MAX_CONCURRENT_CANVAS_AI_TASKS} 个 AI 任务，请等待任一任务完成。`,
@@ -873,7 +908,6 @@ export default function CanvasPage() {
       return;
     }
     syncActiveAiTasks();
-    const appState = api.getAppState();
     const selection = getTutorSelection(api.getSceneElements(), appState.selectedElementIds);
     setMenu(null);
     setPreparationError(null);
@@ -1222,11 +1256,56 @@ export default function CanvasPage() {
             <RadialMenu
               x={menu.x}
               y={menu.y}
-              loadingAction={null}
+              loadingAction={radialLoadingAction(
+                activeAiTasks.find((task) => task.sourceKey === menu.selectionSignature),
+              )}
               onAction={(action) => void handleAction(action)}
               onClose={() => setMenu(null)}
             />
           ) : null}
+          {activeAiTasks.map((task) =>
+            task.screenPosition ? (
+              <article
+                key={`feedback-${task.id}`}
+                className={styles.aiTaskFeedback}
+                style={
+                  {
+                    left: task.screenPosition.x,
+                    top: task.screenPosition.y,
+                    '--task-progress': `${taskProgress(task)}%`,
+                  } as CSSProperties
+                }
+                role="status"
+                aria-live="polite"
+                aria-label={`${taskActionLabel(task.action)}任务：${taskStageLabel(task.stage)}，${elapsedLabel(task.startedAt, aiTaskClock)}`}
+              >
+                <span className={styles.aiTaskSpinner} aria-hidden="true" />
+                <p>
+                  <strong>
+                    {taskActionLabel(task.action)}中 · {taskStageLabel(task.stage)}
+                  </strong>
+                  <span>{elapsedLabel(task.startedAt, aiTaskClock)}，完成后会自动放到画布</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    aiTaskRegistry.current.cancel(task.id);
+                    syncActiveAiTasks();
+                  }}
+                >
+                  取消
+                </button>
+                <span
+                  className={styles.aiTaskProgress}
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={taskProgress(task)}
+                  aria-valuetext={taskStageLabel(task.stage)}
+                />
+              </article>
+            ) : null,
+          )}
           {activeAiTasks.length > 0 ? (
             <section
               className={styles.aiTaskDock}
@@ -1248,6 +1327,7 @@ export default function CanvasPage() {
                       <span>
                         {taskStageLabel(task.stage)}
                         {task.elementCount ? ` · ${task.elementCount} 个元素` : ''}
+                        {` · ${elapsedLabel(task.startedAt, aiTaskClock)}`}
                       </span>
                     </p>
                     <button

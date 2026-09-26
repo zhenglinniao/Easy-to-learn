@@ -216,6 +216,90 @@
   backdrop-filter: blur(12px);
 }
 
+.aiTaskFeedback {
+  position: absolute;
+  z-index: 23;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: min(330px, calc(100% - 28px));
+  overflow: hidden;
+  padding: 11px 12px 14px;
+  transform: translate(-50%, 14px);
+  border: 1px solid rgba(238, 108, 77, 0.24);
+  border-radius: 16px;
+  color: #332d27;
+  background: rgba(255, 253, 249, 0.97);
+  box-shadow: 0 16px 36px rgba(48, 40, 30, 0.17);
+  backdrop-filter: blur(14px);
+}
+
+.aiTaskFeedback p {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  margin: 0;
+}
+
+.aiTaskFeedback p strong {
+  font-size: 12px;
+}
+
+.aiTaskFeedback p span {
+  overflow: hidden;
+  color: #746d64;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aiTaskFeedback button {
+  padding: 5px 8px;
+  border: 1px solid rgba(163, 59, 44, 0.18);
+  border-radius: 999px;
+  color: #a33b2c;
+  background: #fff8f5;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.aiTaskSpinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(238, 108, 77, 0.22);
+  border-top-color: #ee6c4d;
+  border-radius: 50%;
+  animation: ai-task-spin 800ms linear infinite;
+}
+
+.aiTaskProgress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: rgba(238, 108, 77, 0.13);
+}
+
+.aiTaskProgress::after {
+  display: block;
+  width: var(--task-progress);
+  height: 100%;
+  border-radius: inherit;
+  background: #ee6c4d;
+  content: '';
+  transition: width 320ms ease;
+}
+
+@keyframes ai-task-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .aiTaskDock {
   position: absolute;
   z-index: 24;
@@ -629,9 +713,20 @@
 :global(html[data-theme='dark']) .mode,
 :global(html[data-theme='dark']) .guide,
 :global(html[data-theme='dark']) .notice,
+:global(html[data-theme='dark']) .aiTaskFeedback,
 :global(html[data-theme='dark']) .aiTaskDock {
   border-color: rgba(255, 255, 255, 0.1);
   background: rgba(40, 37, 33, 0.94);
+}
+
+:global(html[data-theme='dark']) .aiTaskFeedback p span {
+  color: #aaa197;
+}
+
+:global(html[data-theme='dark']) .aiTaskFeedback button {
+  border-color: rgba(255, 180, 163, 0.2);
+  color: #ffb4a3;
+  background: #35231f;
 }
 
 :global(html[data-theme='dark']) .notice {
@@ -657,6 +752,17 @@
   border-color: rgba(255, 180, 163, 0.2);
   color: #ffb4a3;
   background: #35231f;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aiTaskSpinner {
+    animation: none;
+    border-color: #ee6c4d;
+  }
+
+  .aiTaskProgress::after {
+    transition: none;
+  }
 }
 
 :global(html[data-theme='dark']) .dataDialog,
