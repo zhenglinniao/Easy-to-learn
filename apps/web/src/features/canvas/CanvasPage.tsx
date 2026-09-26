@@ -50,6 +50,7 @@ import {
   type CanvasAiTask,
 } from './aiTaskRegistry';
 import { ConflictResolutionDialog } from './ConflictResolutionDialog';
+import { DebouncedLatestTask } from './debouncedLatestTask';
 import { HANDWRITING_FONT_FAMILY, migrateElementsToHandwriting } from './handwriting';
 
 interface OpenMenu {
@@ -132,6 +133,15 @@ type CanvasElements = Parameters<
   NonNullable<React.ComponentProps<typeof Excalidraw>['onChange']>
 >[0];
 type CanvasFiles = Parameters<NonNullable<React.ComponentProps<typeof Excalidraw>['onChange']>>[2];
+
+interface CanvasSaveSnapshot {
+  boardId: string;
+  elements: CanvasElements;
+  appState: AppState;
+  files: CanvasFiles;
+  tutorBoards: PersistedTutorBoardV2[];
+  ownerId: string;
+}
 
 const blobToDataUrl = (blob: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -289,7 +299,8 @@ export default function CanvasPage() {
   const repositoryRef = useRef<LocalBoardRepository | null>(null);
   const syncEngineRef = useRef<BoardSyncEngine | null>(null);
   const syncCoordinatorRef = useRef<BroadcastSyncCoordinator | null>(null);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveQueueRef = useRef<DebouncedLatestTask<CanvasSaveSnapshot> | null>(null);
+  const latestCanvasSnapshotRef = useRef<CanvasSaveSnapshot | null>(null);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sourceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hydratedBoard = useRef<string | null>(null);
@@ -376,6 +387,31 @@ export default function CanvasPage() {
         }
         const repository = new LocalBoardRepository(database);
         repositoryRef.current = repository;
+        saveQueueRef.current = new DebouncedLatestTask(
+          (snapshot) =>
+            persistBoard(
+              repository,
+              snapshot.boardId,
+              snapshot.elements,
+              snapshot.appState,
+              snapshot.files,
+              snapshot.tutorBoards,
+              snapshot.ownerId,
+            ),
+          {
+            onStart: () => {
+              if (active) setSyncState('local-saving');
+            },
+            onSuccess: () => {
+              if (active) setSyncState('dirty');
+            },
+            onError: () => {
+              if (!active) return;
+              setSyncState('failed-local');
+              setPreparationError('本地自动保存失败，请导出副本后再继续。');
+            },
+          },
+        );
         await repository.cleanupExpiredGuestMigrations();
         let stored = await repository.getBoard(boardId);
         const client = getOptionalSupabaseClient();
@@ -468,16 +504,38 @@ export default function CanvasPage() {
       .catch(() => setPreparationError('本地画板无法恢复，请先导出重要数据后再重试。'));
     return () => {
       active = false;
-      if (saveTimer.current) clearTimeout(saveTimer.current);
       if (syncTimer.current) clearTimeout(syncTimer.current);
       if (sourceTimer.current) clearTimeout(sourceTimer.current);
       syncCoordinatorRef.current?.close();
       syncCoordinatorRef.current = null;
       syncEngineRef.current = null;
       repositoryRef.current = null;
-      closeDatabase?.();
+      latestCanvasSnapshotRef.current = null;
+      const saveQueue = saveQueueRef.current;
+      saveQueueRef.current = null;
+      if (saveQueue) {
+        void saveQueue
+          .dispose({ flush: true })
+          .catch(() => undefined)
+          .finally(() => closeDatabase?.());
+      } else {
+        closeDatabase?.();
+      }
     };
   }, [api, boardId, navigate, user]);
+
+  useEffect(() => {
+    const flushPendingSave = () => void saveQueueRef.current?.flush().catch(() => undefined);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushPendingSave();
+    };
+    window.addEventListener('pagehide', flushPendingSave);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', flushPendingSave);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [boardId]);
 
   const setMenu = useCallback((next: OpenMenu | null) => {
     menuRef.current = next;
@@ -600,56 +658,41 @@ export default function CanvasPage() {
       setMenu(null);
     }
     if (hydratedBoard.current !== boardId || !repositoryRef.current) return;
+    const snapshot: CanvasSaveSnapshot = {
+      boardId,
+      elements: normalizedElements,
+      appState,
+      files,
+      tutorBoards: tutorBoardsRef.current,
+      ownerId: user?.id ?? 'local',
+    };
+    latestCanvasSnapshotRef.current = snapshot;
     if (sourceTimer.current) clearTimeout(sourceTimer.current);
     if (tutorBoardsRef.current.length > 0) {
       sourceTimer.current = setTimeout(() => {
+        const sourceSnapshot = latestCanvasSnapshotRef.current;
+        if (!sourceSnapshot || sourceSnapshot.boardId !== boardId) return;
         void Promise.all(
           tutorBoardsRef.current.map(async (board) =>
             resolveTutorSource(
               board,
-              await inspectTutorSource(normalizedElements, board.source.elementIds),
+              await inspectTutorSource(sourceSnapshot.elements, board.source.elementIds),
             ),
           ),
         ).then((next) => {
+          if (latestCanvasSnapshotRef.current?.elements !== sourceSnapshot.elements) return;
           if (JSON.stringify(next) !== JSON.stringify(tutorBoardsRef.current)) {
-            // 同步更新 ref，避免同一时刻排队的画布自动保存用旧辅导板覆盖锚点状态。
             tutorBoardsRef.current = next;
             setTutorBoards(next);
-            void persistBoard(
-              repositoryRef.current!,
-              boardId,
-              normalizedElements,
-              appState,
-              files,
-              next,
-              user?.id ?? 'local',
-            )
-              .then(() => setSyncState('dirty'))
-              .catch(() => setPreparationError('辅导板锚点保存失败，请稍后重试。'));
+            const nextSnapshot = { ...sourceSnapshot, tutorBoards: next };
+            latestCanvasSnapshotRef.current = nextSnapshot;
+            saveQueueRef.current?.schedule(nextSnapshot, 0);
+            void saveQueueRef.current?.flush().catch(() => undefined);
           }
         });
       }, 250);
     }
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      setSyncState('local-saving');
-      void persistBoard(
-        repositoryRef.current!,
-        boardId,
-        normalizedElements,
-        appState,
-        files,
-        tutorBoardsRef.current,
-        user?.id ?? 'local',
-      )
-        .then(() => {
-          setSyncState('dirty');
-        })
-        .catch(() => {
-          setSyncState('failed-local');
-          setPreparationError('本地自动保存失败，请导出副本后再继续。');
-        });
-    }, 250);
+    saveQueueRef.current?.schedule(snapshot, 250);
   };
 
   const commitTutorBoards = (
@@ -660,34 +703,39 @@ export default function CanvasPage() {
     tutorBoardsRef.current = next;
     setTutorBoards(next);
     if (!api || !repositoryRef.current || hydratedBoard.current !== boardId) return;
-    void persistBoard(
-      repositoryRef.current,
+    const snapshot: CanvasSaveSnapshot = {
       boardId,
-      api.getSceneElementsIncludingDeleted(),
-      api.getAppState(),
-      api.getFiles(),
-      next,
-      user?.id ?? 'local',
-    )
-      .then(() => {
-        setSyncState('dirty');
-      })
-      .catch(() => setPreparationError('辅导板本地保存失败，请导出副本后再继续。'));
+      elements: api.getSceneElementsIncludingDeleted(),
+      appState: api.getAppState(),
+      files: api.getFiles(),
+      tutorBoards: next,
+      ownerId: user?.id ?? 'local',
+    };
+    latestCanvasSnapshotRef.current = snapshot;
+    saveQueueRef.current?.schedule(snapshot, 0);
+    void saveQueueRef.current?.flush().catch(() => undefined);
+  };
+
+  const flushCurrentCanvas = async () => {
+    if (!api || !saveQueueRef.current || hydratedBoard.current !== boardId) return;
+    const snapshot: CanvasSaveSnapshot = {
+      boardId,
+      elements: api.getSceneElementsIncludingDeleted(),
+      appState: api.getAppState(),
+      files: api.getFiles(),
+      tutorBoards: tutorBoardsRef.current,
+      ownerId: user?.id ?? 'local',
+    };
+    latestCanvasSnapshotRef.current = snapshot;
+    saveQueueRef.current.schedule(snapshot, 0);
+    await saveQueueRef.current.flush();
   };
 
   const exportBoard = async (format: 'excalidraw' | 'complete') => {
     if (!api || !repositoryRef.current) return;
     setPreparationError(null);
     try {
-      await persistBoard(
-        repositoryRef.current,
-        boardId,
-        api.getSceneElementsIncludingDeleted(),
-        api.getAppState(),
-        api.getFiles(),
-        tutorBoards,
-        user?.id ?? 'local',
-      );
+      await flushCurrentCanvas();
       const [stored, assets] = await Promise.all([
         repositoryRef.current.getBoard(boardId),
         repositoryRef.current.getAssets(boardId),
@@ -711,17 +759,20 @@ export default function CanvasPage() {
 
   const openLocalData = async () => {
     if (!repositoryRef.current) return;
+    await flushCurrentCanvas();
     setLocalBoards(await repositoryRef.current.listLocalBoards());
     setShowLocalData(true);
   };
 
   const exportRawLocalData = async () => {
     if (!repositoryRef.current) return;
+    await flushCurrentCanvas();
     downloadJson('easy-to-learn-local-backup.json', await repositoryRef.current.exportRawData());
   };
 
   const deleteLocalBoard = async (targetBoardId: string) => {
     if (!repositoryRef.current) return;
+    if (targetBoardId === boardId) await flushCurrentCanvas();
     await repositoryRef.current.deleteLocalBoard(targetBoardId);
     setPendingLocalDelete(null);
     if (targetBoardId === boardId) {
@@ -734,6 +785,7 @@ export default function CanvasPage() {
 
   const clearLocalData = async () => {
     if (!repositoryRef.current) return;
+    await flushCurrentCanvas();
     await repositoryRef.current.clearAllLocalData();
     setConfirmClearLocal(false);
     setShowLocalData(false);
