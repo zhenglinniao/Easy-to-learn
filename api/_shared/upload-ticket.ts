@@ -7,6 +7,7 @@ import { ApiFault } from './fault.js';
 import type { TutorActor } from './tutor-service.js';
 
 const TICKET_TTL_SECONDS = 10 * 60;
+const UPLOAD_RETENTION_MS = 60 * 60 * 1_000;
 
 export interface UploadTicketInput {
   requestId: string;
@@ -65,6 +66,17 @@ export class UploadTicketService {
       .from('ai-temp')
       .createSignedUploadUrl(uploadPath, { upsert: false });
     if (error || !data) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '临时图片上传服务不可用');
+    const { error: cleanupError } = await supabase.from('asset_cleanup_jobs').upsert(
+      {
+        object_path: uploadPath,
+        reason: 'temp_expired',
+        not_before: new Date(Date.now() + UPLOAD_RETENTION_MS).toISOString(),
+        status: 'pending',
+        attempts: 0,
+      },
+      { onConflict: 'object_path' },
+    );
+    if (cleanupError) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '临时图片清理任务创建失败');
     const record: TicketRecord = { ...input, uploadPath };
     await this.redis.set(this.ticketKey(actorHash, input.requestId), record, {
       ex: TICKET_TTL_SECONDS,
