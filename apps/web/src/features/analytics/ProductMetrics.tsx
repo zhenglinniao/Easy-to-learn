@@ -10,6 +10,23 @@ interface ProductMetricsData {
   generatedAt: string;
 }
 
+const METRICS_TIMEOUT_MS = 5_000;
+
+const isProductMetricsData = (value: unknown): value is ProductMetricsData => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    ['totalVisits', 'visitors30d', 'registeredUsers'].every(
+      (key) =>
+        typeof candidate[key] === 'number' &&
+        Number.isSafeInteger(candidate[key]) &&
+        candidate[key] >= 0,
+    ) &&
+    typeof candidate.generatedAt === 'string' &&
+    Number.isFinite(Date.parse(candidate.generatedAt))
+  );
+};
+
 const metricItems = [
   ['totalVisits', '累计访问', '按 30 分钟会话合并'],
   ['visitors30d', '近 30 天访客', '匿名去重浏览器'],
@@ -27,16 +44,25 @@ export function ProductMetrics() {
   useEffect(() => {
     if (typeof fetch !== 'function') return undefined;
     const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      setUnavailable(true);
+      controller.abort();
+    }, METRICS_TIMEOUT_MS);
     void fetch(metricsEndpoint, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error('metrics unavailable');
-        const result = (await response.json()) as { data: ProductMetricsData };
+        const result = (await response.json()) as { data?: unknown };
+        if (!isProductMetricsData(result.data)) throw new Error('invalid metrics response');
         setMetrics(result.data);
       })
       .catch((error: unknown) => {
         if ((error as { name?: string }).name !== 'AbortError') setUnavailable(true);
-      });
-    return () => controller.abort();
+      })
+      .finally(() => window.clearTimeout(timeout));
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
   }, []);
 
   return (

@@ -1,10 +1,13 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { formatMetricValue } from './metric-format';
 import { ProductMetrics } from './ProductMetrics';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe('ProductMetrics', () => {
   it('展示服务端返回的真实聚合指标', async () => {
@@ -35,6 +38,30 @@ describe('ProductMetrics', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     render(<ProductMetrics />);
 
+    await waitFor(() => expect(screen.getAllByText('暂未连接')).toHaveLength(3));
+  });
+
+  it('超时或返回非法指标时结束加载态', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise(() => undefined)),
+    );
+    const { unmount } = render(<ProductMetrics />);
+
+    await act(async () => vi.advanceTimersByTime(5_000));
+    expect(screen.getAllByText('暂未连接')).toHaveLength(3);
+    unmount();
+
+    vi.useRealTimers();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: { totalVisits: -1 } }),
+      }),
+    );
+    render(<ProductMetrics />);
     await waitFor(() => expect(screen.getAllByText('暂未连接')).toHaveLength(3));
   });
 
