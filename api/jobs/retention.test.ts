@@ -99,6 +99,19 @@ describe('retention job', () => {
     expect(createClient).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'Bearer cron-secreu',
+    'Bearer cron-secret-extra',
+    'bearer cron-secret',
+    'Basic cron-secret',
+  ])('rejects a near-match cron credential: %s', async (authorization) => {
+    const output = response();
+    await handler({ method: 'GET', headers: { authorization } }, output.value);
+
+    expect(output.statusCode()).toBe(403);
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
   it('reports a clean empty run with an observable request id', async () => {
     from
       .mockReturnValueOnce(query({ data: [], error: null }))

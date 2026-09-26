@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -17,12 +17,17 @@ const required = (name: string): string => {
   return value;
 };
 
+const validCronCredential = (authorization: string | undefined, secret: string): boolean => {
+  const digest = (value: string) => createHash('sha256').update(value).digest();
+  return timingSafeEqual(digest(authorization ?? ''), digest(`Bearer ${secret}`));
+};
+
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
   const requestId = randomUUID();
   disableResponseCaching(response);
   try {
     if (request.method !== 'GET') throw new ApiFault('INVALID_INPUT', '仅支持 GET 请求');
-    if (header(request, 'authorization') !== `Bearer ${required('CRON_SECRET')}`)
+    if (!validCronCredential(header(request, 'authorization'), required('CRON_SECRET')))
       throw new ApiFault('FORBIDDEN', '定时任务凭据无效');
     const client = createClient(required('SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
       auth: { persistSession: false, autoRefreshToken: false },
