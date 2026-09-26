@@ -447,6 +447,7 @@ export class LocalBoardRepository {
         .objectStore('assets')
         .index('by-board')
         .getAll(sourceBoardId);
+      const sourceAssetsByFileId = new Map(sourceAssets.map((asset) => [asset.fileId, asset]));
       const manifests = conflict.snapshot.assets.map((manifest) => ({
         ...manifest,
         objectPath: `${ownerId}/${targetBoardId}/${manifest.contentHash}`,
@@ -467,7 +468,7 @@ export class LocalBoardRepository {
         updatedAt: this.now().toISOString(),
       };
       for (const manifest of manifests) {
-        const source = sourceAssets.find(({ fileId }) => fileId === manifest.fileId);
+        const source = sourceAssetsByFileId.get(manifest.fileId);
         if (!source || source.contentHash !== manifest.contentHash) {
           throw new LocalPersistenceError(
             'MISSING_ASSET',
@@ -522,8 +523,11 @@ export class LocalBoardRepository {
   ): Promise<StoredBoard> {
     const snapshot = parsePersistedCanvas(snapshotInput);
     const downloadedAssets: StoredAsset[] = [];
+    const downloadsByFileId = new Map(
+      downloads.map((download) => [download.manifest.fileId, download]),
+    );
     for (const manifest of snapshot.assets) {
-      const download = downloads.find(({ manifest: item }) => item.fileId === manifest.fileId);
+      const download = downloadsByFileId.get(manifest.fileId);
       if (!download || download.manifest.contentHash !== manifest.contentHash) {
         throw new LocalPersistenceError(
           'MISSING_ASSET',
