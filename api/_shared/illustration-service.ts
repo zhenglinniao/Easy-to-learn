@@ -39,6 +39,8 @@ export interface ImageGenerator {
   generate(prompt: string): Promise<GeneratedImage>;
 }
 
+class NonRetryableImageProviderError extends ProviderUnavailableError {}
+
 interface StoredIllustration {
   fileId: string;
   objectPath: string;
@@ -89,50 +91,26 @@ export class SenseNovaImageGenerator implements ImageGenerator {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs ?? 45_000);
     try {
-      const response = await this.fetchImpl(
-        `${this.config.baseUrl.replace(/\/$/, '')}/images/generations`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${this.config.apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            prompt,
-            n: 1,
-            size: '1024x1024',
-            output_format: 'jpeg',
-            response_format: 'b64_json',
-            prompt_extend: true,
-            watermark: true,
-          }),
-          signal: controller.signal,
-        },
-      );
-      if (!response.ok) {
-        throw new ProviderUnavailableError(
-          `sensenova image request failed with status ${response.status}`,
-        );
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          return await this.generateOnce(prompt, controller.signal);
+        } catch (error) {
+          if (controller.signal.aborted) {
+            throw new ProviderTimeoutError('sensenova image timeout');
+          }
+          if (error instanceof NonRetryableImageProviderError) throw error;
+          lastError = error;
+          if (attempt === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 250));
+          }
+        }
       }
-      const body = (await response.json()) as { data?: Array<{ b64_json?: unknown }> };
-      const encoded = body.data?.[0]?.b64_json;
-      if (
-        typeof encoded !== 'string' ||
-        encoded.length === 0 ||
-        encoded.length > MAX_ENCODED_IMAGE_LENGTH ||
-        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)
-      ) {
-        throw new ProviderUnavailableError('sensenova image response is invalid');
-      }
-      const bytes = Buffer.from(encoded, 'base64');
-      const dimensions = readJpegSize(bytes);
-      if (!dimensions || bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) {
-        throw new ProviderUnavailableError('sensenova image payload is invalid');
-      }
-      return { bytes, mimeType: 'image/jpeg', ...dimensions };
+      if (lastError instanceof ProviderUnavailableError) throw lastError;
+      throw new ProviderUnavailableError('sensenova image request failed', { cause: lastError });
     } catch (error) {
       if (error instanceof ProviderUnavailableError) throw error;
+      if (error instanceof ProviderTimeoutError) throw error;
       if (error instanceof Error && error.name === 'AbortError') {
         throw new ProviderTimeoutError('sensenova image timeout');
       }
@@ -140,6 +118,53 @@ export class SenseNovaImageGenerator implements ImageGenerator {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private async generateOnce(prompt: string, signal: AbortSignal): Promise<GeneratedImage> {
+    const response = await this.fetchImpl(
+      `${this.config.baseUrl.replace(/\/$/, '')}/images/generations`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          prompt,
+          n: 1,
+          size: '1024x1024',
+          output_format: 'jpeg',
+          response_format: 'b64_json',
+          prompt_extend: true,
+          watermark: true,
+        }),
+        signal,
+      },
+    );
+    if (!response.ok) {
+      const message = `sensenova image request failed with status ${response.status}`;
+      if (response.status !== 429 && response.status < 500) {
+        throw new NonRetryableImageProviderError(message);
+      }
+      throw new ProviderUnavailableError(message);
+    }
+    const body = (await response.json()) as { data?: Array<{ b64_json?: unknown }> };
+    const encoded = body.data?.[0]?.b64_json;
+    if (
+      typeof encoded !== 'string' ||
+      encoded.length === 0 ||
+      encoded.length > MAX_ENCODED_IMAGE_LENGTH ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)
+    ) {
+      throw new ProviderUnavailableError('sensenova image response is invalid');
+    }
+    const bytes = Buffer.from(encoded, 'base64');
+    const dimensions = readJpegSize(bytes);
+    if (!dimensions || bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) {
+      throw new ProviderUnavailableError('sensenova image payload is invalid');
+    }
+    return { bytes, mimeType: 'image/jpeg', ...dimensions };
   }
 }
 
