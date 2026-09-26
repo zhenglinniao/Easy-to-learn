@@ -91,7 +91,15 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
       > = [
         {
           type: 'text',
-          text: buildTutorPrompt(request, correction, this.promptVersion),
+          text: [
+            buildTutorPrompt(request, correction, this.promptVersion),
+            ...(this.responseFormat === 'prompt'
+              ? [
+                  '以下 JSON Schema 是唯一允许的输出结构。必须完整遵守 required、enum、oneOf、additionalProperties 等约束；不得输出 Markdown 代码围栏或解释文字：',
+                  JSON.stringify(domainJsonSchemas.tutorResultV1),
+                ]
+              : []),
+          ].join('\n'),
         },
       ];
       if (request.image) {

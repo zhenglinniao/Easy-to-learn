@@ -296,13 +296,22 @@ const VISUAL_GOALS = new Set([
   'compare',
   'explore',
 ]);
+const ILLUSTRATABLE_DIAGRAM_TYPES = new Set(['flow', 'comic-strip', 'part-map']);
+
+const hasIllustratableDiagram = (result: TutorResultV1): boolean =>
+  result.steps.some((step) =>
+    step.blocks.some(
+      (block) => block.type === 'diagram' && ILLUSTRATABLE_DIAGRAM_TYPES.has(block.diagram.type),
+    ),
+  );
 
 export const shouldGenerateIllustration = (result: TutorResultV1): boolean =>
   result.mode === 'solve' &&
   Boolean(
     result.contentProfile &&
     VISUAL_CONTENT_KINDS.has(result.contentProfile.contentKind) &&
-    VISUAL_GOALS.has(result.contentProfile.learningGoal),
+    (VISUAL_GOALS.has(result.contentProfile.learningGoal) ||
+      (result.contentProfile.learningGoal === 'solve' && hasIllustratableDiagram(result))),
   );
 
 export const buildIllustrationPrompt = (result: TutorResultV1): string => {

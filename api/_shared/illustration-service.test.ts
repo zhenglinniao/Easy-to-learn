@@ -176,6 +176,37 @@ describe('SenseNova image generation', () => {
         },
       }),
     ).toBe(false);
+    expect(
+      shouldGenerateIllustration({
+        ...result,
+        contentProfile: {
+          contentKind: 'question',
+          learningGoal: 'solve',
+          goalSource: 'explicit',
+          confidence: 'high',
+        },
+        steps: [
+          {
+            id: 'bfs-step',
+            title: '按层扩散',
+            blocks: [
+              {
+                type: 'diagram',
+                diagram: {
+                  type: 'flow',
+                  direction: 'LR',
+                  nodes: [
+                    { id: 'start', label: '起点', shape: 'rounded', color: 'green' },
+                    { id: 'next', label: '下一层', shape: 'rectangle', color: 'blue' },
+                  ],
+                  edges: [{ id: 'advance', from: 'start', to: 'next', style: 'solid' }],
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    ).toBe(true);
     expect(buildIllustrationPrompt(result)).toContain('不生成文字、数字、公式');
   });
 

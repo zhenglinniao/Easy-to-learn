@@ -7,7 +7,7 @@
   "regions": ["hkg1"],
   "functions": {
     "api/ai/tutor.ts": { "maxDuration": 60 },
-    "api/ai/illustration.ts": { "maxDuration": 60 },
+    "api/ai/illustration.ts": { "maxDuration": 120 },
     "api/jobs/retention.ts": { "maxDuration": 60 }
   },
   "rewrites": [

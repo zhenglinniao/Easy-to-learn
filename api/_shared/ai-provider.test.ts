@@ -184,6 +184,39 @@ describe('AI Provider 执行', () => {
     });
   });
 
+  it('提示词约束模式会发送完整 Tutor Schema 且不声明 response_format', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: JSON.stringify(modelResult) } }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    const model = createTutorModelFromEnvironment(
+      vi.fn(),
+      {
+        AI_PROVIDERS: 'sensenova',
+        AI_PROVIDER_SENSENOVA_TYPE: 'openai-compatible',
+        AI_PROVIDER_SENSENOVA_BASE_URL: 'https://token.sensenova.cn/v1',
+        AI_PROVIDER_SENSENOVA_API_KEY: 'server-only-secret',
+        AI_PROVIDER_SENSENOVA_MODEL: 'sensenova-6.8-flash-lite',
+        AI_PROVIDER_SENSENOVA_RESPONSE_FORMAT: 'prompt',
+      },
+      fetchMock,
+    );
+
+    await model.generate(request);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    const prompt = body.messages[1].content[0].text as string;
+
+    expect(body.response_format).toBeUndefined();
+    expect(prompt).toContain('以下 JSON Schema 是唯一允许的输出结构');
+    expect(prompt).toContain('"additionalProperties"');
+    expect(prompt).toContain('"contentProfile"');
+  });
+
   it('通过 Responses API 发送 JSON Schema、图像与关闭推理参数', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
