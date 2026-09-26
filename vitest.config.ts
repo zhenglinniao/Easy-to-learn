@@ -6,6 +6,10 @@ export default defineConfig({
     // Worker threads retain per-file isolation and browser-compatible globals,
     // while avoiding the process startup overhead of Vitest's default forks.
     pool: 'threads',
+    // Coverage instrumentation and React user-event can legitimately exceed
+    // Vitest's 5 s default on loaded developer/CI machines. Aborting mid-input
+    // leaves queued keyboard events that can contaminate the following test.
+    testTimeout: 15_000,
     globals: true,
     include: ['apps/**/*.test.{ts,tsx}', 'packages/**/*.test.{ts,tsx}', 'api/**/*.test.ts'],
     setupFiles: ['./vitest.setup.ts'],
