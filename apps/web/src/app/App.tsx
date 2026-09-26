@@ -13,6 +13,7 @@ const LegalPage = lazy(() => import('../pages/LegalPage'));
 const CanvasSpikePage = lazy(() => import('../spikes/CanvasSpikePage'));
 const CanvasPage = lazy(() => import('../features/canvas/CanvasPage'));
 const TutorBoardSpikePage = lazy(() => import('../spikes/TutorBoardSpikePage'));
+const AdminPage = lazy(() => import('../features/admin/AdminPage'));
 
 export function App() {
   return (
@@ -40,6 +41,7 @@ export function App() {
               <Route path="/boards" element={<BoardsPage />} />
               <Route path="/canvas" element={<CanvasPage />} />
               <Route path="/canvas/:boardId" element={<CanvasPage />} />
+              <Route path="/admin" element={<AdminPage />} />
               <Route path="/spikes/excalidraw" element={<CanvasSpikePage />} />
               <Route path="/spikes/tutor-board" element={<TutorBoardSpikePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

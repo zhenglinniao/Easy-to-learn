@@ -20,7 +20,8 @@ export default async function handler(request: HttpRequest, response: HttpRespon
       throw new ApiFault('UNSUPPORTED_MEDIA_TYPE', 'Content-Type 必须是 application/json');
     }
     const { actor, accessToken } = await resolveActor(request);
-    const result = await createTutorService(actor, accessToken).execute(actor, request.body);
+    const service = await createTutorService(actor, accessToken);
+    const result = await service.execute(actor, request.body);
     response.setHeader('X-Request-Id', result.data.requestId);
     response.status(200).json(result);
   } catch (error) {

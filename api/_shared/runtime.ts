@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
 
-import { AiProviderConfigurationError } from './ai-provider-config.js';
-import { createTutorModelFromEnvironment } from './ai-provider.js';
+import { AiProviderConfigurationError, loadAiProviderConfigs } from './ai-provider-config.js';
+import { createTutorModelFromConfigs } from './ai-provider.js';
+import { AdminModelPolicyStore, applyAdminModelPolicy } from './admin-model-policy.js';
 import { ApiFault } from './fault.js';
 import { cookieValue, header, type HttpRequest } from './http.js';
-import { TutorPromptConfigurationError } from './model-prompt.js';
+import { resolveTutorPromptVersion, TutorPromptConfigurationError } from './model-prompt.js';
 import { RedisAiStateStore } from './redis-ai-state.js';
 import { verifyAnonymousSession, type SessionKey } from './session.js';
 import {
@@ -105,13 +106,20 @@ class SupabaseBoardAuthorizer implements BoardAuthorizer {
   }
 }
 
-export const createTutorService = (actor: TutorActor, accessToken?: string): TutorService => {
+export const createTutorService = async (
+  actor: TutorActor,
+  accessToken?: string,
+): Promise<TutorService> => {
   let model: TutorModel;
   try {
     // 文字题和小型内嵌图片不依赖对象存储。仅在模型实际需要读取上传图片时，
     // 再创建需要 Supabase service role 的票据服务，避免无关配置阻断匿名文字辅导。
-    model = createTutorModelFromEnvironment((...args) =>
-      createUploadTicketService().resolve(actor, ...args),
+    const configs = loadAiProviderConfigs(process.env);
+    const policy = await new AdminModelPolicyStore(Redis.fromEnv()).read(configs);
+    model = createTutorModelFromConfigs(
+      applyAdminModelPolicy(configs, policy),
+      (...args) => createUploadTicketService().resolve(actor, ...args),
+      resolveTutorPromptVersion(process.env.AI_PROMPT_VERSION),
     );
   } catch (error) {
     if (
