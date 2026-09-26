@@ -625,17 +625,19 @@ export default function CanvasPage() {
     }
     if (hydratedBoard.current !== boardId || !repositoryRef.current) return;
     if (sourceTimer.current) clearTimeout(sourceTimer.current);
-    if (tutorBoards.length > 0) {
+    if (tutorBoardsRef.current.length > 0) {
       sourceTimer.current = setTimeout(() => {
         void Promise.all(
-          tutorBoards.map(async (board) =>
+          tutorBoardsRef.current.map(async (board) =>
             resolveTutorSource(
               board,
               await inspectTutorSource(normalizedElements, board.source.elementIds),
             ),
           ),
         ).then((next) => {
-          if (JSON.stringify(next) !== JSON.stringify(tutorBoards)) {
+          if (JSON.stringify(next) !== JSON.stringify(tutorBoardsRef.current)) {
+            // 同步更新 ref，避免同一时刻排队的画布自动保存用旧辅导板覆盖锚点状态。
+            tutorBoardsRef.current = next;
             setTutorBoards(next);
             void persistBoard(
               repositoryRef.current!,
@@ -661,7 +663,7 @@ export default function CanvasPage() {
         normalizedElements,
         appState,
         files,
-        tutorBoards,
+        tutorBoardsRef.current,
         user?.id ?? 'local',
       )
         .then(() => {
