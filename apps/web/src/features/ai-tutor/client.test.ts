@@ -222,6 +222,41 @@ describe('TutorApiClient', () => {
     expect(fetcher).toHaveBeenCalledOnce();
   });
 
+  it('请求独立生图链路并校验生成资产', async () => {
+    const quota = guestQuota('2026-09-23T00:05:00.000Z');
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        data: {
+          status: 'generated',
+          asset: {
+            fileId: '00000000-0000-4000-8000-000000000020',
+            downloadUrl: 'https://storage.example.test/ai-temp/image.jpg?token=opaque',
+            mimeType: 'image/jpeg',
+            byteSize: 1024,
+            width: 1024,
+            height: 1024,
+          },
+          quota,
+        },
+      }),
+    );
+    const input = {
+      requestId: '00000000-0000-4000-8000-000000000010',
+      boardId: '00000000-0000-4000-8000-000000000001',
+    };
+
+    await expect(
+      new TutorApiClient(async () => 'jwt', fetcher).generateIllustration(input),
+    ).resolves.toMatchObject({ status: 'generated', asset: { mimeType: 'image/jpeg' } });
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/ai/illustration',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(input) }),
+    );
+    expect(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get('Authorization')).toBe(
+      'Bearer jwt',
+    );
+  });
+
   it('优先显示结构化 API 错误并拒绝非法模型响应', async () => {
     const request = {
       requestId: 'request-1',

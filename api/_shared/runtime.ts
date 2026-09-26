@@ -22,6 +22,11 @@ import {
   type AuthenticatedAccount,
 } from './account-deletion.js';
 import { AiFeedbackService, SupabaseAiFeedbackStore } from './ai-feedback.js';
+import {
+  IllustrationArtifactStore,
+  IllustrationService,
+  SenseNovaImageGenerator,
+} from './illustration-service.js';
 
 const required = (name: string): string => {
   const value = process.env[name];
@@ -134,6 +139,38 @@ export const createTutorService = async (
     throw error;
   }
   return new TutorService(createAiStateStore(), model, new SupabaseBoardAuthorizer(accessToken));
+};
+
+export const createIllustrationService = async (
+  accessToken?: string,
+): Promise<IllustrationService> => {
+  const configs = loadAiProviderConfigs(process.env);
+  const policy = await new AdminModelPolicyStore(
+    Redis.fromEnv(),
+    required('AI_CACHE_ENCRYPTION_KEY'),
+  ).read(configs);
+  const provider = policy.providers.find(
+    (item) => item.type === 'openai-compatible' && item.imageModel && item.apiKey,
+  );
+  const generator =
+    provider?.type === 'openai-compatible' && provider.imageModel && provider.apiKey
+      ? new SenseNovaImageGenerator({
+          baseUrl: provider.baseUrl,
+          model: provider.imageModel,
+          apiKey: provider.apiKey,
+        })
+      : null;
+  return new IllustrationService(
+    createAiStateStore(),
+    new SupabaseBoardAuthorizer(accessToken),
+    new IllustrationArtifactStore(
+      Redis.fromEnv(),
+      required('ACTOR_HASH_SECRET'),
+      required('SUPABASE_URL'),
+      required('SUPABASE_SERVICE_ROLE_KEY'),
+    ),
+    generator,
+  );
 };
 
 export const resolveAuthenticatedAccount = async (
