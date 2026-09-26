@@ -536,7 +536,7 @@ export default function AdminPage() {
                   <input
                     type="number"
                     min={1000}
-                    max={25000}
+                    max={MAX_PROVIDER_TIMEOUT_BUDGET_MS}
                     step={500}
                     value={provider.timeoutMs}
                     onChange={(event) =>

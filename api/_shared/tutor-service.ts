@@ -66,6 +66,14 @@ const normalizeKnownModelDrift = (candidate: unknown): unknown => {
         blocks: stepRecord.blocks.map((block) => {
           if (block === null || typeof block !== 'object' || Array.isArray(block)) return block;
           const blockRecord = block as Record<string, unknown>;
+          if (
+            typeof blockRecord.type === 'string' &&
+            ['coordinate-plane', 'geometry', 'flow', 'comic-strip', 'part-map'].includes(
+              blockRecord.type,
+            )
+          ) {
+            return { type: 'diagram', diagram: blockRecord };
+          }
           const diagram = blockRecord.diagram;
           if (
             blockRecord.type !== 'diagram' ||
