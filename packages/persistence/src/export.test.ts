@@ -72,4 +72,35 @@ describe('画板导出', () => {
       code: 'MISSING_ASSET',
     });
   });
+
+  it('按顺序编码资产，避免大画板并发复制全部二进制', async () => {
+    let active = 0;
+    let peak = 0;
+    class MeasuredBlob extends Blob {
+      override async arrayBuffer(): Promise<ArrayBuffer> {
+        active += 1;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        const result = await super.arrayBuffer();
+        active -= 1;
+        return result;
+      }
+    }
+    const manifests = ['a', 'b'].map((seed, index) => ({
+      ...snapshot.assets[0]!,
+      fileId: `file-${index}`,
+      contentHash: seed.repeat(64),
+      objectPath: `owner/local_test/${seed.repeat(64)}`,
+    }));
+    const measuredAssets = manifests.map((manifest) => ({
+      ...asset,
+      fileId: manifest.fileId,
+      contentHash: manifest.contentHash,
+      objectPath: manifest.objectPath,
+      blob: new MeasuredBlob([bytes], { type: 'image/png' }),
+    }));
+
+    await createCompleteExport({ ...snapshot, assets: manifests }, measuredAssets);
+    expect(peak).toBe(1);
+  });
 });

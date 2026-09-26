@@ -13,18 +13,27 @@ const blobToBase64 = async (blob: Blob): Promise<string> => {
   return btoa(binary);
 };
 
-const verifiedAssets = (canvas: PersistedCanvasV2, assets: readonly StoredAsset[]): StoredAsset[] =>
-  canvas.assets.map((manifest) => {
-    const asset = assets.find(
-      (candidate) =>
-        candidate.boardId === canvas.boardId &&
-        candidate.fileId === manifest.fileId &&
-        candidate.contentHash === manifest.contentHash,
-    );
+const verifiedAssets = (
+  canvas: PersistedCanvasV2,
+  assets: readonly StoredAsset[],
+): StoredAsset[] => {
+  const byIdentity = new Map(
+    assets.map(
+      (asset) => [`${asset.boardId}\0${asset.fileId}\0${asset.contentHash}`, asset] as const,
+    ),
+  );
+  return canvas.assets.map((manifest) => {
+    const asset = byIdentity.get(`${canvas.boardId}\0${manifest.fileId}\0${manifest.contentHash}`);
     if (!asset || asset.byteSize !== manifest.byteSize || asset.mimeType !== manifest.mimeType)
       throw new LocalPersistenceError('MISSING_ASSET', `导出缺少完整资产：${manifest.fileId}`);
     return asset;
   });
+};
+
+const ensureExportSize = (assets: readonly StoredAsset[]): void => {
+  if (assets.reduce((sum, asset) => sum + asset.byteSize, 0) > MAX_EXPORT_BYTES)
+    throw new LocalPersistenceError('QUOTA_EXCEEDED', '画板导出不能超过 100 MiB');
+};
 
 export interface EasyToLearnExportV1 {
   format: 'easy-to-learn';
@@ -46,21 +55,22 @@ export const createCompleteExport = async (
 ): Promise<EasyToLearnExportV1> => {
   const canvas = parsePersistedCanvas(snapshotInput);
   const selected = verifiedAssets(canvas, assets);
-  if (selected.reduce((sum, asset) => sum + asset.byteSize, 0) > MAX_EXPORT_BYTES)
-    throw new LocalPersistenceError('QUOTA_EXCEEDED', '完整导出不能超过 100 MiB');
+  ensureExportSize(selected);
+  const embeddedAssets: EasyToLearnExportV1['embeddedAssets'] = [];
+  for (const asset of selected) {
+    embeddedAssets.push({
+      fileId: asset.fileId,
+      mimeType: asset.mimeType,
+      contentHash: asset.contentHash,
+      base64: await blobToBase64(asset.blob),
+    });
+  }
   return {
     format: 'easy-to-learn',
     exportVersion: 1,
     exportedAt: now.toISOString(),
     canvas,
-    embeddedAssets: await Promise.all(
-      selected.map(async (asset) => ({
-        fileId: asset.fileId,
-        mimeType: asset.mimeType,
-        contentHash: asset.contentHash,
-        base64: await blobToBase64(asset.blob),
-      })),
-    ),
+    embeddedAssets,
   };
 };
 
@@ -70,23 +80,18 @@ export const createExcalidrawExport = async (
 ) => {
   const canvas = parsePersistedCanvas(snapshotInput);
   const selected = verifiedAssets(canvas, assets);
-  const files = Object.fromEntries(
-    await Promise.all(
-      selected.map(
-        async (asset) =>
-          [
-            asset.fileId,
-            {
-              id: asset.fileId,
-              mimeType: asset.mimeType,
-              dataURL: `data:${asset.mimeType};base64,${await blobToBase64(asset.blob)}`,
-              created: Date.now(),
-              lastRetrieved: Date.now(),
-            },
-          ] as const,
-      ),
-    ),
-  );
+  ensureExportSize(selected);
+  const files: Record<string, object> = {};
+  for (const asset of selected) {
+    const timestamp = Date.now();
+    files[asset.fileId] = {
+      id: asset.fileId,
+      mimeType: asset.mimeType,
+      dataURL: `data:${asset.mimeType};base64,${await blobToBase64(asset.blob)}`,
+      created: timestamp,
+      lastRetrieved: timestamp,
+    };
+  }
   return {
     type: 'excalidraw',
     version: 2,
