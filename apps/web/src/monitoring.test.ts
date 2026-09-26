@@ -4,7 +4,11 @@ vi.mock('@sentry/react', () => ({ init: vi.fn(), captureException: vi.fn() }));
 
 import * as Sentry from '@sentry/react';
 
-import { initializeMonitoring, sanitizeMonitoringUrl } from './monitoring';
+import {
+  captureMonitoringException,
+  initializeMonitoring,
+  sanitizeMonitoringUrl,
+} from './monitoring';
 
 describe('浏览器监控', () => {
   it('没有 DSN 时保持禁用', async () => {
@@ -24,6 +28,19 @@ describe('浏览器监控', () => {
         tracesSampleRate: 0,
       }),
     );
+  });
+
+  it('仅在监控成功初始化后上报错误', async () => {
+    await initializeMonitoring({
+      dsn: 'https://public@example.test/1',
+      environment: 'test',
+    });
+    const error = new Error('render failed');
+
+    await expect(captureMonitoringException(error, { componentStack: 'App' })).resolves.toBe(true);
+    expect(Sentry.captureException).toHaveBeenCalledWith(error, {
+      contexts: { react: { componentStack: 'App' } },
+    });
   });
 
   it('移除 URL 查询参数和片段，避免泄露凭据或题目', () => {

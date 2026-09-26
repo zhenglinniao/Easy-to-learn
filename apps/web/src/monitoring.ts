@@ -25,34 +25,39 @@ export const initializeMonitoring = async ({
 }: MonitoringConfiguration): Promise<boolean> => {
   if (!dsn) return false;
 
-  monitoringClientPromise ??= import('@sentry/react');
-  const Sentry = await monitoringClientPromise;
+  try {
+    monitoringClientPromise ??= import('@sentry/react');
+    const Sentry = await monitoringClientPromise;
 
-  Sentry.init({
-    dsn,
-    environment,
-    sendDefaultPii: false,
-    tracesSampleRate: 0,
-    beforeSend(event) {
-      // 画板、题目、凭据和查询参数均不应进入监控事件。
-      const sanitized = { ...event };
-      delete sanitized.user;
-      if (event.request?.url) {
-        sanitized.request = { url: sanitizeMonitoringUrl(event.request.url) as string };
-      } else {
-        delete sanitized.request;
-      }
-      return sanitized;
-    },
-    beforeBreadcrumb(breadcrumb) {
-      if (!breadcrumb.data?.url) return breadcrumb;
-      return {
-        ...breadcrumb,
-        data: { url: sanitizeMonitoringUrl(breadcrumb.data.url) },
-      };
-    },
-  });
-  return true;
+    Sentry.init({
+      dsn,
+      environment,
+      sendDefaultPii: false,
+      tracesSampleRate: 0,
+      beforeSend(event) {
+        // 画板、题目、凭据和查询参数均不应进入监控事件。
+        const sanitized = { ...event };
+        delete sanitized.user;
+        if (event.request?.url) {
+          sanitized.request = { url: sanitizeMonitoringUrl(event.request.url) as string };
+        } else {
+          delete sanitized.request;
+        }
+        return sanitized;
+      },
+      beforeBreadcrumb(breadcrumb) {
+        if (!breadcrumb.data?.url) return breadcrumb;
+        return {
+          ...breadcrumb,
+          data: { url: sanitizeMonitoringUrl(breadcrumb.data.url) },
+        };
+      },
+    });
+    return true;
+  } catch {
+    monitoringClientPromise = null;
+    return false;
+  }
 };
 
 export const captureMonitoringException = async (
@@ -60,7 +65,11 @@ export const captureMonitoringException = async (
   context?: Record<string, unknown>,
 ): Promise<boolean> => {
   if (!monitoringClientPromise) return false;
-  const Sentry = await monitoringClientPromise;
-  Sentry.captureException(error, context ? { contexts: { react: context } } : undefined);
-  return true;
+  try {
+    const Sentry = await monitoringClientPromise;
+    Sentry.captureException(error, context ? { contexts: { react: context } } : undefined);
+    return true;
+  } catch {
+    return false;
+  }
 };
