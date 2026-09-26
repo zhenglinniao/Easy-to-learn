@@ -32,7 +32,7 @@ import {
   type SyncState,
 } from '@easy-to-learn/persistence';
 import { RadialMenu, TutorBoard, type RadialMenuAction } from '@easy-to-learn/ui';
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { getOptionalSupabaseClient, useAuth } from '../auth';
@@ -43,6 +43,7 @@ import { ThemeToggle, useTheme } from '../theme';
 
 import '@excalidraw/excalidraw/index.css';
 import styles from './CanvasPage.module.css';
+import { AiTaskActivity } from './AiTaskActivity';
 import {
   CanvasAiTaskRegistry,
   MAX_CONCURRENT_CANVAS_AI_TASKS,
@@ -81,26 +82,8 @@ const taskActionLabel = (action: CanvasAiTask['action']): string => {
   return '解释步骤';
 };
 
-const taskStageLabel = (stage: CanvasAiTask['stage']): string => {
-  if (stage === 'preparing') return '准备选区';
-  if (stage === 'answering') return '生成答案';
-  return '生成插画';
-};
-
 const radialLoadingAction = (task: CanvasAiTask | undefined): RadialMenuAction | null =>
   task?.action === 'solve' || task?.action === 'hint' ? task.action : null;
-
-const taskProgress = (task: CanvasAiTask): number => {
-  if (task.stage === 'preparing') return 18;
-  if (task.stage === 'answering') return task.action === 'hint' ? 76 : 62;
-  return 90;
-};
-
-const elapsedLabel = (startedAt: number, now: number): string => {
-  const seconds = Math.max(0, Math.floor((now - startedAt) / 1_000));
-  if (seconds < 60) return `已等待 ${seconds} 秒`;
-  return `已等待 ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-};
 
 type FeedbackState = 'idle' | 'sending' | 'sent' | 'error';
 const AI_FEEDBACK_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -275,7 +258,6 @@ export default function CanvasPage() {
   const [canvasFiles, setCanvasFiles] = useState<CanvasFiles>({});
   const [menu, setMenuState] = useState<OpenMenu | null>(null);
   const [activeAiTasks, setActiveAiTasks] = useState<CanvasAiTask[]>([]);
-  const [aiTaskClock, setAiTaskClock] = useState(() => Date.now());
   const [prepared, setPrepared] = useState<PreparedSummary | null>(null);
   const [preparationError, setPreparationError] = useState<string | null>(null);
   const [tutorBoards, setTutorBoards] = useState<PersistedTutorBoardV2[]>([]);
@@ -329,12 +311,6 @@ export default function CanvasPage() {
     const registry = aiTaskRegistry.current;
     return () => registry.cancelAll();
   }, [boardId]);
-
-  useEffect(() => {
-    if (activeAiTasks.length === 0) return;
-    const timer = window.setInterval(() => setAiTaskClock(Date.now()), 1_000);
-    return () => window.clearInterval(timer);
-  }, [activeAiTasks.length]);
 
   const refreshQuota = useCallback(
     async (signal?: AbortSignal) => {
@@ -1263,88 +1239,13 @@ export default function CanvasPage() {
               onClose={() => setMenu(null)}
             />
           ) : null}
-          {activeAiTasks.map((task) =>
-            task.screenPosition ? (
-              <article
-                key={`feedback-${task.id}`}
-                className={styles.aiTaskFeedback}
-                style={
-                  {
-                    left: task.screenPosition.x,
-                    top: task.screenPosition.y,
-                    '--task-progress': `${taskProgress(task)}%`,
-                  } as CSSProperties
-                }
-                role="status"
-                aria-live="polite"
-                aria-label={`${taskActionLabel(task.action)}任务：${taskStageLabel(task.stage)}，${elapsedLabel(task.startedAt, aiTaskClock)}`}
-              >
-                <span className={styles.aiTaskSpinner} aria-hidden="true" />
-                <p>
-                  <strong>
-                    {taskActionLabel(task.action)}中 · {taskStageLabel(task.stage)}
-                  </strong>
-                  <span>{elapsedLabel(task.startedAt, aiTaskClock)}，完成后会自动放到画布</span>
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    aiTaskRegistry.current.cancel(task.id);
-                    syncActiveAiTasks();
-                  }}
-                >
-                  取消
-                </button>
-                <span
-                  className={styles.aiTaskProgress}
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={taskProgress(task)}
-                  aria-valuetext={taskStageLabel(task.stage)}
-                />
-              </article>
-            ) : null,
-          )}
-          {activeAiTasks.length > 0 ? (
-            <section
-              className={styles.aiTaskDock}
-              aria-label="正在运行的 AI 任务"
-              aria-live="polite"
-            >
-              <header>
-                <strong>AI 并发任务</strong>
-                <span>
-                  {activeAiTasks.length}/{MAX_CONCURRENT_CANVAS_AI_TASKS}
-                </span>
-              </header>
-              <div>
-                {activeAiTasks.map((task, index) => (
-                  <article key={task.id}>
-                    <span className={styles.aiTaskIndex}>{index + 1}</span>
-                    <p>
-                      <strong>{taskActionLabel(task.action)}</strong>
-                      <span>
-                        {taskStageLabel(task.stage)}
-                        {task.elementCount ? ` · ${task.elementCount} 个元素` : ''}
-                        {` · ${elapsedLabel(task.startedAt, aiTaskClock)}`}
-                      </span>
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        aiTaskRegistry.current.cancel(task.id);
-                        syncActiveAiTasks();
-                      }}
-                      aria-label={`取消${taskActionLabel(task.action)}任务`}
-                    >
-                      取消
-                    </button>
-                  </article>
-                ))}
-              </div>
-            </section>
-          ) : null}
+          <AiTaskActivity
+            tasks={activeAiTasks}
+            onCancel={(taskId) => {
+              aiTaskRegistry.current.cancel(taskId);
+              syncActiveAiTasks();
+            }}
+          />
           {tutorBoards.map((board) => {
             const clientPoint = viewportState
               ? scenePointToClient(board.sceneAnchor, viewportState)
