@@ -142,6 +142,36 @@
   letter-spacing: 0.015em;
   line-height: 1.4;
 }
+.stepIllustration {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 14px;
+  padding: 9px;
+  border: 1px solid rgba(181, 80, 57, 0.18);
+  border-radius: 16px 13px 17px 12px;
+  background: #fffaf1;
+}
+.stepIllustration span {
+  color: #b55039;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+.stepIllustration img {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  border-radius: 11px;
+  object-fit: contain;
+  background: #f8f1e5;
+}
+.stepIllustration figcaption {
+  margin: 0;
+  color: #625a51;
+  font-size: 12px;
+  line-height: 1.55;
+}
 .blocks {
   display: grid;
   gap: 12px;

@@ -87,7 +87,7 @@ describe('SenseNova image generation', () => {
       output_format: 'jpeg',
       response_format: 'b64_json',
       watermark: true,
-      prompt_extend: true,
+      prompt_extend: false,
     });
   });
 
@@ -207,7 +207,10 @@ describe('SenseNova image generation', () => {
         ],
       }),
     ).toBe(true);
-    expect(buildIllustrationPrompt(result)).toContain('不生成文字、数字、公式');
+    const prompt = buildIllustrationPrompt(result);
+    expect(prompt).toContain('唯一目标步骤：第 1 步“观察各层”');
+    expect(prompt).toContain('不要生成文字、数字、公式');
+    expect(prompt).not.toContain('理解组合');
   });
 
   it('原子扣减额度、保存资产并返回可下载结果', async () => {
@@ -235,10 +238,16 @@ describe('SenseNova image generation', () => {
       data: {
         status: 'generated',
         asset: artifact,
+        placement: {
+          stepId: 'step-1',
+          stepTitle: '观察各层',
+          altText: expect.stringContaining('第 1 步'),
+          caption: expect.stringContaining('从上往下观察'),
+        },
         quota: { image: { dailyRemaining: 1, periodRemaining: 19 } },
       },
     });
-    expect(generator.generate).toHaveBeenCalledWith(expect.stringContaining('汉堡的结构'));
+    expect(generator.generate).toHaveBeenCalledWith(expect.stringContaining('唯一目标步骤'));
   });
 
   it('供应商失败时返还图片额度且不影响已经缓存的文字结果', async () => {

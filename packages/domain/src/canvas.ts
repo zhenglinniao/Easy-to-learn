@@ -86,12 +86,32 @@ export const persistedTutorBoardSchema = z
     }),
     parentTutorBoardId: nonEmptyStringSchema.optional(),
     targetStepId: nonEmptyStringSchema.optional(),
+    stepIllustration: z
+      .strictObject({
+        stepId: nonEmptyStringSchema,
+        fileId: z.string().min(1).max(100),
+        altText: z.string().min(1).max(240),
+        caption: z.string().min(1).max(500),
+      })
+      .optional(),
     createdAt: isoDateTimeSchema,
     updatedAt: isoDateTimeSchema,
   })
-  .refine(({ stepIndex, result }) => stepIndex < result.steps.length, {
-    message: 'stepIndex 必须指向已有步骤',
-    path: ['stepIndex'],
+  .superRefine(({ stepIndex, result, stepIllustration }, context) => {
+    if (stepIndex >= result.steps.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'stepIndex 必须指向已有步骤',
+        path: ['stepIndex'],
+      });
+    }
+    if (stepIllustration && !result.steps.some((step) => step.id === stepIllustration.stepId)) {
+      context.addIssue({
+        code: 'custom',
+        message: '教学插画必须关联已有步骤',
+        path: ['stepIllustration', 'stepId'],
+      });
+    }
   });
 
 export const persistedCanvasSchema = z

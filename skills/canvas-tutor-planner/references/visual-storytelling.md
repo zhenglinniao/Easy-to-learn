@@ -52,6 +52,16 @@ For exercises, code, or explicit learning questions, a step should make four thi
 
 Do not impose a fixed number of steps. A one-relation question may be one complete illustrated card. A longer problem needs one card per real cognitive transition, followed by verification or a compact synthesis.
 
+## Optional generated illustration
+
+A generated raster illustration is not another answer channel. It may reinforce one step when a hand-drawn scene makes that step's process, composition, spatial relation, or state change easier to grasp.
+
+- Bind one generated image to one existing step ID. Use that step's validated diagram and concise explanatory blocks as the complete semantic brief.
+- Show the image inside the target step card with its step title, explanation, and a concrete caption. Do not place it as an unlabelled object beside the tutor board.
+- Depict only the target step's input, current action, arrow direction, and stage result. Do not combine all lesson steps, preview later conclusions, or turn the image into a decorative overview poster.
+- Keep exact Chinese prose, formulas, code, numbers, node names, and legends in Tutor DSL. The raster image uses subjects, states, shapes, actions, and arrows; it must remain understandable when paired with the adjacent caption.
+- If the image cannot add information beyond the existing exact diagram, skip it. A failed or unavailable image never removes the structured explanation.
+
 ## Originality boundary
 
 Reference images may establish general qualities such as cream paper, loose ink, arrows, numbered tabs, exploded layers, callout labels, a recurring guide, or a bottom-line summary. They do not authorize copying a creator's mascot, handle, logo, brand palette, exact wording, distinctive layout, or recognizable composition. Easy to learn keeps its own 小易 character and controlled semantic colors.

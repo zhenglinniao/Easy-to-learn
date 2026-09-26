@@ -207,11 +207,19 @@ const generatedIllustrationSchema = z.strictObject({
   height: z.int().positive().max(8192),
 });
 
+const illustrationPlacementSchema = z.strictObject({
+  stepId: nonEmptyStringSchema,
+  stepTitle: z.string().min(1).max(120),
+  altText: z.string().min(1).max(240),
+  caption: z.string().min(1).max(500),
+});
+
 export const illustrationResponseSchema = createDataResponseSchema(
   z.discriminatedUnion('status', [
     z.strictObject({
       status: z.literal('generated'),
       asset: generatedIllustrationSchema,
+      placement: illustrationPlacementSchema,
       quota: quotaStatusSchema,
     }),
     z.strictObject({

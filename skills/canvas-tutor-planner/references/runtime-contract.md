@@ -36,6 +36,8 @@ Prompt `v2` Solve results contain `answerPresentation.problemType` and `answerPr
 
 The hand-drawn look, stroke animation, mascot, navigation, and reduced-motion behavior remain frontend responsibilities. Model output expresses semantic visual relationships only through the safe blocks below.
 
+The optional image-generation chain selects one eligible Tutor step from the already validated result. It sends only that step's semantic diagram and explanation to the image provider, returns a target step ID plus caption/alt text, and stores the generated asset as a board file. The frontend renders the asset inside that step card; it does not add a separate, unexplained canvas image. Exact text and symbols remain in Tutor DSL because raster providers are not authoritative for labels.
+
 The model does not output HTML, arbitrary SVG, CSS, executable animation, URLs, external resources, or UI controls. React components own rendering and navigation. Server code overwrites model, prompt version, and generation time metadata.
 
 ## Validation and failure behavior

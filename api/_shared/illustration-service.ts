@@ -68,7 +68,7 @@ interface StoredIllustration {
 
 type GeneratedIllustrationData = Omit<
   Extract<IllustrationResponse['data'], { status: 'generated' }>,
-  'quota'
+  'quota' | 'placement'
 >;
 
 export interface IllustrationArtifactRepository {
@@ -153,7 +153,8 @@ export class SenseNovaImageGenerator implements ImageGenerator {
           size: '1024x1024',
           output_format: 'jpeg',
           response_format: 'b64_json',
-          prompt_extend: true,
+          // 教学插画必须忠实于已验证的目标步骤，关闭自动扩写，避免模型自行拼贴整份答案。
+          prompt_extend: false,
           watermark: true,
         }),
         signal,
@@ -298,6 +299,56 @@ const VISUAL_GOALS = new Set([
 ]);
 const ILLUSTRATABLE_DIAGRAM_TYPES = new Set(['flow', 'comic-strip', 'part-map']);
 
+type IllustrationPlacement = Extract<
+  IllustrationResponse['data'],
+  { status: 'generated' }
+>['placement'];
+
+interface IllustrationTarget {
+  step: TutorResultV1['steps'][number];
+  stepIndex: number;
+  placement: IllustrationPlacement;
+}
+
+const explanatoryText = (step: TutorResultV1['steps'][number]): string => {
+  const summary = step.blocks
+    .filter((block) => block.type !== 'diagram')
+    .map((block) => {
+      if (block.type === 'paragraph' || block.type === 'callout') return block.text;
+      if (block.type === 'math') return `公式：${block.latex}`;
+      if (block.type === 'code') return `代码展示 ${block.language} 中的数据或执行关系`;
+      return block.items.join('；');
+    })
+    .join(' ')
+    .trim();
+  return summary.slice(0, 360);
+};
+
+const resolveIllustrationTarget = (result: TutorResultV1): IllustrationTarget | null => {
+  if (result.steps.length === 0) return null;
+  const preferredIndex = result.steps.findIndex((step) =>
+    step.blocks.some(
+      (block) => block.type === 'diagram' && ILLUSTRATABLE_DIAGRAM_TYPES.has(block.diagram.type),
+    ),
+  );
+  const stepIndex = preferredIndex >= 0 ? preferredIndex : 0;
+  const step = result.steps[stepIndex]!;
+  const explanation = explanatoryText(step);
+  return {
+    step,
+    stepIndex,
+    placement: {
+      stepId: step.id,
+      stepTitle: step.title,
+      altText: `“${result.title}”第 ${stepIndex + 1} 步“${step.title}”的教学插画`.slice(0, 240),
+      caption: (explanation
+        ? `这张图只对应“${step.title}”：${explanation}`
+        : `这张图只对应“${step.title}”，请按本步骤中的关系和箭头阅读。`
+      ).slice(0, 500),
+    },
+  };
+};
+
 const hasIllustratableDiagram = (result: TutorResultV1): boolean =>
   result.steps.some((step) =>
     step.blocks.some(
@@ -315,17 +366,24 @@ export const shouldGenerateIllustration = (result: TutorResultV1): boolean =>
   );
 
 export const buildIllustrationPrompt = (result: TutorResultV1): string => {
-  const steps = result.steps
-    .slice(0, 6)
-    .map((step, index) => `${index + 1}. ${step.title}`)
-    .join('；');
+  const target = resolveIllustrationTarget(result);
+  if (!target) throw new ProviderUnavailableError('illustration target step is missing');
+  const diagramPlan = target.step.blocks
+    .filter((block) => block.type === 'diagram')
+    .map((block) => block.diagram);
+  const explanation = explanatoryText(target.step);
   return [
-    '创作一张适合中文学习画板的教育拆解插画。',
-    `主题：${result.title}。`,
-    `需要直观表现的顺序或组成：${steps}。`,
-    '采用温暖纸张背景、清晰主体、手绘线稿与柔和配色，构图像教材中的爆炸拆解图或步骤信息图。',
-    '只使用图形、部件、动作和箭头表达关系，不生成文字、数字、公式、品牌标志或额外水印。',
-    '画面简洁，留白充足，适合放入白板继续标注。',
+    '创作一张嵌入单个讲解步骤的中文教学插画，不是整份答案的总览海报。',
+    `课程主题：${result.title}。`,
+    `唯一目标步骤：第 ${target.stepIndex + 1} 步“${target.step.title}”。`,
+    explanation ? `这一步的讲解要点：${explanation}` : '',
+    diagramPlan.length > 0
+      ? `必须忠实表现的已验证关系（字段标签只用于理解，不要抄写到画面）：${JSON.stringify(diagramPlan)}`
+      : '',
+    '画面必须只解释这一步：主体、动作、箭头方向、前后状态和数量关系必须与上述步骤一致；不得拼贴其他步骤、最终总结或无关知识。',
+    '采用温暖纸张背景、清晰主体、手绘线稿与柔和配色；先突出当前动作，再用箭头呈现输入到阶段结果的阅读顺序。',
+    '只使用图形、部件、状态、动作和箭头表达；不要生成文字、数字、公式、代码、品牌标志或额外水印，准确文字由步骤卡片和图注负责。',
+    '构图简洁、单一焦点、留白充足，缩放到步骤卡片宽度后仍能看懂。',
   ].join('\n');
 };
 
@@ -355,10 +413,12 @@ export class IllustrationService {
     if (!shouldGenerateIllustration(completed.result)) {
       return { data: { status: 'not_applicable', quota } };
     }
+    const target = resolveIllustrationTarget(completed.result);
+    if (!target) return { data: { status: 'not_applicable', quota } };
     if (!this.generator) return { data: { status: 'unavailable', quota } };
 
     const cached = await this.artifacts.read(actor, requestId);
-    if (cached) return { data: { ...cached, quota } };
+    if (cached) return { data: { ...cached, placement: target.placement, quota } };
     const reservation = await this.state.reserveImages(actorKey, requestId, 1, this.now());
     if (!reservation.granted) {
       return { data: { status: 'quota_exhausted', quota: reservation.quota } };
@@ -369,7 +429,11 @@ export class IllustrationService {
         const existing = await this.artifacts.read(actor, requestId);
         if (existing) {
           return {
-            data: { ...existing, quota: await this.state.status(actorKey, this.now()) },
+            data: {
+              ...existing,
+              placement: target.placement,
+              quota: await this.state.status(actorKey, this.now()),
+            },
           };
         }
       }
@@ -380,7 +444,13 @@ export class IllustrationService {
     try {
       const image = await this.generator.generate(buildIllustrationPrompt(completed.result));
       const asset = await this.artifacts.write(actor, requestId, image);
-      return { data: { ...asset, quota: await this.state.status(actorKey, this.now()) } };
+      return {
+        data: {
+          ...asset,
+          placement: target.placement,
+          quota: await this.state.status(actorKey, this.now()),
+        },
+      };
     } catch (error) {
       await this.state.refundImages(actorKey, requestId, this.now());
       if (error instanceof ApiFault) throw error;
