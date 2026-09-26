@@ -1,6 +1,10 @@
 import type { TutorRequest } from '@easy-to-learn/domain';
 
-import { AiProviderConfigurationError, loadAiProviderConfigs } from './ai-provider-config.js';
+import {
+  AiProviderConfigurationError,
+  loadAiProviderConfigs,
+  type AiProviderConfig,
+} from './ai-provider-config.js';
 import { GeminiTutorModel } from './gemini-model.js';
 import { resolveTutorPromptVersion, type TutorImageResolver } from './model-prompt.js';
 import { OpenAiCompatibleTutorModel } from './openai-compatible-model.js';
@@ -43,7 +47,21 @@ export const createTutorModelFromEnvironment = (
   fetchImpl: typeof fetch = fetch,
 ): TutorModel => {
   const promptVersion = resolveTutorPromptVersion(environment.AI_PROMPT_VERSION);
-  const models = loadAiProviderConfigs(environment).map((config): TutorModel => {
+  return createTutorModelFromConfigs(
+    loadAiProviderConfigs(environment),
+    resolveImage,
+    promptVersion,
+    fetchImpl,
+  );
+};
+
+export const createTutorModelFromConfigs = (
+  configs: readonly AiProviderConfig[],
+  resolveImage: TutorImageResolver,
+  promptVersion: string,
+  fetchImpl: typeof fetch = fetch,
+): TutorModel => {
+  const models = configs.map((config): TutorModel => {
     if (config.type === 'gemini') {
       return new GeminiTutorModel(
         config.apiKey,

@@ -5,6 +5,7 @@ import { logApiError } from './logger.js';
 
 export interface HttpRequest {
   method?: string;
+  url?: string;
   body?: unknown;
   headers: Record<string, string | string[] | undefined>;
 }
