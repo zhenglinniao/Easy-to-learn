@@ -68,6 +68,11 @@ const isSenseNovaProvider = (
   provider: Pick<StoredOpenAiProvider, 'id' | 'baseUrl' | 'responseFormat' | 'wireApi'>,
 ): boolean => provider.id === 'sensenova' || provider.baseUrl.includes('sensenova.cn');
 
+const effectiveTimeoutMs = (provider: StoredAdminProvider): number =>
+  provider.type === 'openai-compatible' && isSenseNovaProvider(provider)
+    ? Math.max(provider.timeoutMs, 25_000)
+    : provider.timeoutMs;
+
 const compatibleResponseFormat = (
   provider: Pick<StoredOpenAiProvider, 'id' | 'baseUrl' | 'responseFormat' | 'wireApi'>,
 ): OpenAiResponseFormat =>
@@ -80,8 +85,7 @@ const compatibleWireApi = (
 ): OpenAiWireApi =>
   isSenseNovaProvider(provider)
     ? 'chat_completions'
-    : isDeepSeekProvider(provider) &&
-  provider.responseFormat === 'json_schema'
+    : isDeepSeekProvider(provider) && provider.responseFormat === 'json_schema'
       ? 'responses'
       : provider.wireApi;
 
@@ -266,7 +270,10 @@ export const validateAdminModelPolicy = (
   const active = providers.filter((provider) => provider.enabled);
   if (active.length === 0) throw new ApiFault('INVALID_INPUT', '至少需要启用一个 AI Provider');
   if (active.reduce((sum, provider) => sum + provider.timeoutMs, 0) > MAX_PROVIDER_CHAIN_TIMEOUT_MS)
-    throw new ApiFault('INVALID_INPUT', '启用模型的累计超时不能超过 25000 毫秒');
+    throw new ApiFault(
+      'INVALID_INPUT',
+      `启用模型的累计超时不能超过 ${MAX_PROVIDER_CHAIN_TIMEOUT_MS} 毫秒`,
+    );
   return {
     providers,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : null,
@@ -277,6 +284,7 @@ export const validateAdminModelPolicy = (
 export const toAdminModelPolicyView = (policy: AdminModelPolicy): AdminModelPolicyView => ({
   providers: policy.providers.map(({ apiKey, ...provider }) => ({
     ...provider,
+    timeoutMs: effectiveTimeoutMs(provider),
     ...(provider.type === 'openai-compatible'
       ? {
           responseFormat: compatibleResponseFormat(provider),
@@ -295,6 +303,7 @@ export const applyAdminModelPolicy = (policy: AdminModelPolicy): AiProviderConfi
       const config = { ...provider } as Partial<StoredAdminProvider> & Record<string, unknown>;
       delete config.enabled;
       delete config.label;
+      config.timeoutMs = effectiveTimeoutMs(provider);
       if (provider.type === 'openai-compatible') {
         config.responseFormat = compatibleResponseFormat(provider);
         config.wireApi = compatibleWireApi(provider);

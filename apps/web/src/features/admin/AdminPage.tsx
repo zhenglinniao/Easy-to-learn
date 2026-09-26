@@ -17,7 +17,7 @@ import {
 } from './modelCatalog';
 import styles from './AdminPage.module.css';
 
-const MAX_PROVIDER_TIMEOUT_BUDGET_MS = 25_000;
+const MAX_PROVIDER_TIMEOUT_BUDGET_MS = 50_000;
 
 const dateLabel = (value: string | null): string =>
   value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '从未登录';
@@ -36,7 +36,7 @@ const providerPresets: Record<'sensenova' | 'deepseek', AdminProviderView> = {
     enabled: false,
     baseUrl: 'https://token.sensenova.cn/v1',
     model: 'sensenova-6.8-flash-lite',
-    timeoutMs: 12_000,
+    timeoutMs: 25_000,
     responseFormat: 'prompt',
     wireApi: 'chat_completions',
     hasApiKey: false,
