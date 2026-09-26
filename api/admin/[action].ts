@@ -1,6 +1,7 @@
 import { AdminService, requireAdmin, resolveAdminAccess } from '../_shared/admin.js';
 import { ApiFault } from '../_shared/fault.js';
 import {
+  disableResponseCaching,
   header,
   requireAllowedOrigin,
   sendError,
@@ -20,6 +21,7 @@ const requireJson = (request: HttpRequest): void => {
 };
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
+  disableResponseCaching(response);
   try {
     requireAllowedOrigin(request);
     const action = actionFrom(request);

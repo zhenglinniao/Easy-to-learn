@@ -1,6 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { requireAllowedOrigin, type HttpRequest } from './http.js';
+import {
+  disableResponseCaching,
+  requireAllowedOrigin,
+  type HttpRequest,
+  type HttpResponse,
+} from './http.js';
 
 const request = (method: string, headers: HttpRequest['headers']): HttpRequest => ({
   method,
@@ -41,5 +46,15 @@ describe('requireAllowedOrigin', () => {
     expect(() =>
       requireAllowedOrigin(request('PATCH', { 'sec-fetch-site': 'same-origin' })),
     ).toThrow('请求来源不被允许');
+  });
+});
+
+describe('disableResponseCaching', () => {
+  it('marks private API responses as non-cacheable', () => {
+    const setHeader = vi.fn();
+    disableResponseCaching({ setHeader } as unknown as HttpResponse);
+
+    expect(setHeader).toHaveBeenCalledWith('Cache-Control', 'private, no-store, max-age=0');
+    expect(setHeader).toHaveBeenCalledWith('Pragma', 'no-cache');
   });
 });

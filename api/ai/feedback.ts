@@ -2,6 +2,7 @@ import { aiFeedbackInputSchema } from '@easy-to-learn/domain';
 
 import { ApiFault } from '../_shared/fault.js';
 import {
+  disableResponseCaching,
   header,
   requireAllowedOrigin,
   sendError,
@@ -13,6 +14,7 @@ import { createAiFeedbackService, resolveActor } from '../_shared/runtime.js';
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
   const parsed = aiFeedbackInputSchema.safeParse(request.body);
   const requestId = parsed.success ? parsed.data.requestId : undefined;
+  disableResponseCaching(response);
   try {
     if (request.method !== 'POST') throw new ApiFault('INVALID_INPUT', '仅支持 POST 请求');
     requireAllowedOrigin(request);

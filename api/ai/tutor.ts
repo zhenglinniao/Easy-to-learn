@@ -1,5 +1,6 @@
 import { ApiFault } from '../_shared/fault.js';
 import {
+  disableResponseCaching,
   header,
   requireAllowedOrigin,
   sendError,
@@ -13,6 +14,7 @@ export default async function handler(request: HttpRequest, response: HttpRespon
     request.body && typeof request.body === 'object' && 'requestId' in request.body
       ? String(request.body.requestId)
       : undefined;
+  disableResponseCaching(response);
   try {
     if (request.method !== 'POST') throw new ApiFault('INVALID_INPUT', '仅支持 POST 请求');
     requireAllowedOrigin(request);

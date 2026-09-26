@@ -1,5 +1,6 @@
 import { ApiFault } from '../_shared/fault.js';
 import {
+  disableResponseCaching,
   requireAllowedOrigin,
   sendError,
   type HttpRequest,
@@ -8,6 +9,7 @@ import {
 import { createAiStateStore, resolveActor } from '../_shared/runtime.js';
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
+  disableResponseCaching(response);
   try {
     if (request.method !== 'GET') throw new ApiFault('INVALID_INPUT', '仅支持 GET 请求');
     requireAllowedOrigin(request);

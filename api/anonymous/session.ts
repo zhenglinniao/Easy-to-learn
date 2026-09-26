@@ -1,6 +1,7 @@
 import { ApiFault } from '../_shared/fault.js';
 import {
   cookieValue,
+  disableResponseCaching,
   requireAllowedOrigin,
   sendError,
   type HttpRequest,
@@ -14,6 +15,7 @@ import {
 } from '../_shared/session.js';
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
+  disableResponseCaching(response);
   try {
     if (request.method !== 'POST') throw new ApiFault('INVALID_INPUT', '仅支持 POST 请求');
     requireAllowedOrigin(request);

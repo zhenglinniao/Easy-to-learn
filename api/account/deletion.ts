@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { ApiFault } from '../_shared/fault.js';
 import {
+  disableResponseCaching,
   requireAllowedOrigin,
   sendError,
   type HttpRequest,
@@ -11,6 +12,7 @@ import { createAccountDeletionService, resolveAuthenticatedAccount } from '../_s
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
   const requestId = randomUUID();
+  disableResponseCaching(response);
   try {
     if (request.method !== 'POST' && request.method !== 'DELETE')
       throw new ApiFault('INVALID_INPUT', '仅支持 POST 或 DELETE 请求');

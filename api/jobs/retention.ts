@@ -3,7 +3,13 @@ import { createHmac, randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 
 import { ApiFault } from '../_shared/fault.js';
-import { header, sendError, type HttpRequest, type HttpResponse } from '../_shared/http.js';
+import {
+  disableResponseCaching,
+  header,
+  sendError,
+  type HttpRequest,
+  type HttpResponse,
+} from '../_shared/http.js';
 
 const required = (name: string): string => {
   const value = process.env[name];
@@ -13,6 +19,7 @@ const required = (name: string): string => {
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
   const requestId = randomUUID();
+  disableResponseCaching(response);
   try {
     if (request.method !== 'GET') throw new ApiFault('INVALID_INPUT', '仅支持 GET 请求');
     if (header(request, 'authorization') !== `Bearer ${required('CRON_SECRET')}`)

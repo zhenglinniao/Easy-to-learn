@@ -17,6 +17,11 @@ export interface HttpResponse {
   end(): void;
 }
 
+export const disableResponseCaching = (response: HttpResponse): void => {
+  response.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  response.setHeader('Pragma', 'no-cache');
+};
+
 export const header = (request: HttpRequest, name: string): string | undefined => {
   const value = request.headers[name.toLowerCase()] ?? request.headers[name];
   return Array.isArray(value) ? value[0] : value;
@@ -61,6 +66,7 @@ export const sendError = (response: HttpResponse, error: unknown, requestId?: st
   const fault = asApiFault(error);
   const id = requestId || randomUUID();
   logApiError(fault, id);
+  disableResponseCaching(response);
   response.setHeader('X-Request-Id', id);
   response.status(fault.httpStatus).json(fault.toResponse(id));
 };
