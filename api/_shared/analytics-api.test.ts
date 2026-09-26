@@ -6,9 +6,9 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({ rpc })),
 }));
 
-import type { HttpRequest, HttpResponse } from '../_shared/http.js';
-import metricsHandler from './metrics.js';
-import visitHandler from './visit.js';
+import metricsHandler from '../analytics/metrics.js';
+import visitHandler from '../analytics/visit.js';
+import type { HttpRequest, HttpResponse } from './http.js';
 
 const createResponse = () => {
   const headers = new Map<string, string>();
