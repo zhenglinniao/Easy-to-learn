@@ -48,7 +48,7 @@ export class FallbackTutorModel implements TutorModel {
 export const createTutorModelFromEnvironment = (
   resolveImage: TutorImageResolver,
   environment: Environment = process.env,
-  fetchImpl: OpenAiFetch = fetch as unknown as OpenAiFetch,
+  fetchImpl?: OpenAiFetch,
 ): TutorModel => {
   const promptVersion = resolveTutorPromptVersion(environment.AI_PROMPT_VERSION);
   return createTutorModelFromConfigs(
@@ -63,7 +63,7 @@ export const createTutorModelFromConfigs = (
   configs: readonly AiProviderConfig[],
   resolveImage: TutorImageResolver,
   promptVersion: string,
-  fetchImpl: OpenAiFetch = fetch as unknown as OpenAiFetch,
+  fetchImpl?: OpenAiFetch,
 ): TutorModel => {
   const models = configs.map((config): TutorModel => {
     if (config.type === 'gemini') {

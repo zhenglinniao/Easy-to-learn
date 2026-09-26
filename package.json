@@ -29,6 +29,9 @@
     "audit:dependencies": "pnpm audit --audit-level high",
     "check": "pnpm check:peers && pnpm lint && pnpm typecheck && pnpm test && pnpm db:static && pnpm build && pnpm format:check"
   },
+  "dependencies": {
+    "undici": "8.11.2"
+  },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",

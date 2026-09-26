@@ -73,6 +73,13 @@ const effectiveTimeoutMs = (provider: StoredAdminProvider): number =>
     ? Math.max(provider.timeoutMs, 35_000)
     : provider.timeoutMs;
 
+const runtimeTimeoutMs = (provider: StoredAdminProvider, activeProviderCount: number): number =>
+  activeProviderCount === 1 &&
+  provider.type === 'openai-compatible' &&
+  isSenseNovaProvider(provider)
+    ? MAX_PROVIDER_CHAIN_TIMEOUT_MS
+    : effectiveTimeoutMs(provider);
+
 const compatibleResponseFormat = (
   provider: Pick<StoredOpenAiProvider, 'id' | 'baseUrl' | 'responseFormat' | 'wireApi'>,
 ): OpenAiResponseFormat =>
@@ -291,35 +298,38 @@ export const validateAdminModelPolicy = (
   };
 };
 
-export const toAdminModelPolicyView = (policy: AdminModelPolicy): AdminModelPolicyView => ({
-  providers: policy.providers.map(({ apiKey, ...provider }) => ({
-    ...provider,
-    timeoutMs: effectiveTimeoutMs(provider),
-    ...(provider.type === 'openai-compatible'
-      ? {
-          responseFormat: compatibleResponseFormat(provider),
-          wireApi: compatibleWireApi(provider),
-        }
-      : {}),
-    hasApiKey: Boolean(apiKey),
-  })),
-  updatedAt: policy.updatedAt,
-  updatedBy: policy.updatedBy,
-});
-export const applyAdminModelPolicy = (policy: AdminModelPolicy): AiProviderConfig[] =>
-  policy.providers
-    .filter(({ enabled }) => enabled)
-    .map((provider) => {
-      const config = { ...provider } as Partial<StoredAdminProvider> & Record<string, unknown>;
-      delete config.enabled;
-      delete config.label;
-      config.timeoutMs = effectiveTimeoutMs(provider);
-      if (provider.type === 'openai-compatible') {
-        config.responseFormat = compatibleResponseFormat(provider);
-        config.wireApi = compatibleWireApi(provider);
-      }
-      return config as unknown as AiProviderConfig;
-    });
+export const toAdminModelPolicyView = (policy: AdminModelPolicy): AdminModelPolicyView => {
+  const activeProviderCount = policy.providers.filter(({ enabled }) => enabled).length;
+  return {
+    providers: policy.providers.map(({ apiKey, ...provider }) => ({
+      ...provider,
+      timeoutMs: runtimeTimeoutMs(provider, activeProviderCount),
+      ...(provider.type === 'openai-compatible'
+        ? {
+            responseFormat: compatibleResponseFormat(provider),
+            wireApi: compatibleWireApi(provider),
+          }
+        : {}),
+      hasApiKey: Boolean(apiKey),
+    })),
+    updatedAt: policy.updatedAt,
+    updatedBy: policy.updatedBy,
+  };
+};
+export const applyAdminModelPolicy = (policy: AdminModelPolicy): AiProviderConfig[] => {
+  const activeProviders = policy.providers.filter(({ enabled }) => enabled);
+  return activeProviders.map((provider) => {
+    const config = { ...provider } as Partial<StoredAdminProvider> & Record<string, unknown>;
+    delete config.enabled;
+    delete config.label;
+    config.timeoutMs = runtimeTimeoutMs(provider, activeProviders.length);
+    if (provider.type === 'openai-compatible') {
+      config.responseFormat = compatibleResponseFormat(provider);
+      config.wireApi = compatibleWireApi(provider);
+    }
+    return config as unknown as AiProviderConfig;
+  });
+};
 
 export class AdminModelPolicyStore {
   constructor(

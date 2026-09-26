@@ -145,4 +145,34 @@ describe.skipIf(!runIntegration)('真实 AI Provider 黄金集', () => {
     expect(tutorResultSchema.safeParse(result).success).toBe(true);
     expect(result.contentProfile).toBeDefined();
   }, 35_000);
+
+  it('把既有步骤拆成新的微步骤，而不是原样复述', async () => {
+    const input = request('请深入解释“BFS 按距离一层层扩散”这一步。');
+    const explainRequest: TutorRequest = {
+      ...input,
+      mode: 'explain_step',
+      parentTutorBoardId: 'parent-bfs',
+      targetStepId: 'bfs-layer',
+      parentContext: {
+        title: '广度优先搜索',
+        step: {
+          id: 'bfs-layer',
+          title: '按距离一层层扩散',
+          blocks: [
+            {
+              type: 'paragraph',
+              text: '先访问距离为 1 的节点，再访问距离为 2 的节点。',
+            },
+          ],
+        },
+      },
+    };
+
+    const result = await execute(explainRequest, true);
+    expect(result.mode).toBe('explain_step');
+    expect(result.steps.length).toBeGreaterThanOrEqual(2);
+    expect(result.steps.length).toBeLessThanOrEqual(4);
+    expect(result.steps.every((step) => step.id !== 'bfs-layer')).toBe(true);
+    expect(result.steps.some((step) => step.title !== '按距离一层层扩散')).toBe(true);
+  }, 60_000);
 });

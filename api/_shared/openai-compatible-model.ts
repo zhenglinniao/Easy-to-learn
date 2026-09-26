@@ -1,4 +1,5 @@
 import { domainJsonSchemas, type TutorRequest } from '@easy-to-learn/domain';
+import { Agent, fetch as undiciFetch, type Dispatcher } from 'undici';
 
 import {
   attachTrustedMetadata,
@@ -45,8 +46,29 @@ export type OpenAiFetch = (
     headers?: Record<string, string>;
     body?: string;
     signal?: AbortSignal;
+    dispatcher?: Dispatcher;
   },
 ) => Promise<OpenAiFetchResponse>;
+
+const senseNovaDispatchers = new Map<string, Agent>();
+
+const senseNovaDispatcher = (requestUrl: string, timeoutMs: number): Agent => {
+  const origin = new URL(requestUrl).origin;
+  const connectTimeout = Math.max(10_000, Math.min(20_000, timeoutMs - 5_000));
+  const key = `${origin}:${connectTimeout}`;
+  const existing = senseNovaDispatchers.get(key);
+  if (existing) return existing;
+
+  const dispatcher = new Agent({
+    connect: { timeout: connectTimeout },
+    headersTimeout: timeoutMs,
+    bodyTimeout: timeoutMs,
+    keepAliveTimeout: 30_000,
+    keepAliveMaxTimeout: 60_000,
+  });
+  senseNovaDispatchers.set(key, dispatcher);
+  return dispatcher;
+};
 
 const responseText = (payload: ChatCompletionResponse): string | undefined => {
   const content = payload.choices?.[0]?.message?.content;
@@ -82,7 +104,7 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
     private readonly reasoningEffort?: ModelReasoningEffort,
     private readonly resolveImage?: TutorImageResolver,
     private readonly promptVersion = DEFAULT_TUTOR_PROMPT_VERSION,
-    private readonly fetchImpl: OpenAiFetch = fetch as unknown as OpenAiFetch,
+    private readonly fetchImpl: OpenAiFetch = undiciFetch as unknown as OpenAiFetch,
   ) {}
 
   async generate(request: TutorRequest, correction?: string): Promise<unknown> {
@@ -204,6 +226,7 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,
+        ...(isSenseNova ? { dispatcher: senseNovaDispatcher(requestUrl, this.timeoutMs) } : {}),
       };
       let response: OpenAiFetchResponse | undefined;
       let lastTransportError: unknown;

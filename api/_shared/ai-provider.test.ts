@@ -215,6 +215,7 @@ describe('AI Provider 执行', () => {
     const body = JSON.parse(String(init.body));
     const prompt = body.messages[1].content[0].text as string;
 
+    expect((init as RequestInit & { dispatcher?: unknown }).dispatcher).toBeDefined();
     expect(body.response_format).toBeUndefined();
     expect(body.max_tokens).toBe(2048);
     expect(body.reasoning_effort).toBe('none');
@@ -223,6 +224,35 @@ describe('AI Provider 执行', () => {
     expect(prompt).toContain('explain_step 必须使用 2-4 个新的微步骤');
     expect(prompt).toContain('contentProfile');
     expect(prompt).not.toContain('"additionalProperties"');
+  });
+
+  it('SenseNova 在相同运行实例复用连接池，减少跨区重复握手', async () => {
+    const dispatchers: unknown[] = [];
+    const fetchMock = vi.fn().mockImplementation((_url, init) => {
+      dispatchers.push((init as { dispatcher?: unknown }).dispatcher);
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: JSON.stringify(modelResult) } }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    });
+    const environment = {
+      AI_PROVIDERS: 'sensenova',
+      AI_PROVIDER_SENSENOVA_TYPE: 'openai-compatible',
+      AI_PROVIDER_SENSENOVA_BASE_URL: 'https://token.sensenova.cn/v1',
+      AI_PROVIDER_SENSENOVA_API_KEY: 'server-only-secret',
+      AI_PROVIDER_SENSENOVA_MODEL: 'sensenova-6.8-flash-lite',
+      AI_PROVIDER_SENSENOVA_RESPONSE_FORMAT: 'prompt',
+      AI_PROVIDER_SENSENOVA_TIMEOUT_MS: '25000',
+    };
+
+    await createTutorModelFromEnvironment(vi.fn(), environment, fetchMock).generate(request);
+    await createTutorModelFromEnvironment(vi.fn(), environment, fetchMock).generate(request);
+
+    expect(dispatchers).toHaveLength(2);
+    expect(dispatchers[0]).toBeDefined();
+    expect(dispatchers[1]).toBe(dispatchers[0]);
   });
 
   it('SenseNova 瞬时断连时会在同一超时预算内重试一次', async () => {
