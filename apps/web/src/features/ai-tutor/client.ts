@@ -60,13 +60,14 @@ export class TutorApiClient {
     await this.ensureActor(accessToken, signal);
     const headers = new Headers({ 'Content-Type': 'application/json' });
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-    const response = await this.fetcher('/api/ai/tutor', {
+    const init: RequestInit = {
       method: 'POST',
       headers,
       body: JSON.stringify(request),
       credentials: 'same-origin',
       ...(signal ? { signal } : {}),
-    });
+    };
+    const response = await this.fetchTutorWithNetworkRetry(init, signal);
     if (!response.ok) throw await this.error(response);
     return tutorResponseSchema.parse(await response.json()).data;
   }
@@ -156,6 +157,23 @@ export class TutorApiClient {
       ...(signal ? { signal } : {}),
     });
     if (!session.ok) throw await this.error(session);
+  }
+
+  private async fetchTutorWithNetworkRetry(
+    init: RequestInit,
+    signal?: AbortSignal,
+  ): Promise<Response> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await this.fetcher('/api/ai/tutor', init);
+      } catch (error) {
+        if (signal?.aborted || !(error instanceof TypeError)) throw error;
+        if (attempt === 1) {
+          throw new Error('AI 响应连接中断，请检查网络后重试。', { cause: error });
+        }
+      }
+    }
+    throw new Error('AI 响应连接中断，请检查网络后重试。');
   }
 
   private async error(response: Response): Promise<Error> {
