@@ -230,6 +230,64 @@ describe('TutorApiClient', () => {
     expect(fetcher).toHaveBeenCalledOnce();
   });
 
+  it('响应传输中断时使用同一 requestId 自动重试且不暴露 Failed to fetch', async () => {
+    const request = {
+      requestId: 'request-network-retry',
+      schemaVersion: 1 as const,
+      boardId: '00000000-0000-4000-8000-000000000001',
+      mode: 'solve' as const,
+      text: '2x + 3 = 11',
+      locale: 'zh-CN' as const,
+      source: {
+        elementIds: ['element-1'],
+        selectionBounds: { x: 0, y: 0, width: 100, height: 40 },
+        contentHash: 'hash',
+      },
+    };
+    const success = Response.json({
+      data: {
+        requestId: request.requestId,
+        result: {
+          schemaVersion: 1,
+          mode: 'solve',
+          title: '解题',
+          steps: [
+            {
+              id: 'step-1',
+              title: '观察',
+              blocks: [{ type: 'paragraph', text: '先观察等式两边。' }],
+            },
+          ],
+          metadata: {
+            model: 'test-model',
+            promptVersion: 'v1',
+            generatedAt: '2026-09-22T00:00:00.000Z',
+          },
+        },
+        quota: guestQuota('2026-09-22T00:05:00.000Z'),
+      },
+    });
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(success);
+
+    await expect(
+      new TutorApiClient(async () => 'jwt', fetcher).execute(request),
+    ).resolves.toMatchObject({ requestId: request.requestId });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[0]?.[1]?.body).toBe(fetcher.mock.calls[1]?.[1]?.body);
+    expect(fetcher.mock.calls[1]?.[1]?.body).toContain(request.requestId);
+
+    const alwaysFails = vi
+      .fn<typeof fetch>()
+      .mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(
+      new TutorApiClient(async () => 'jwt', alwaysFails).execute(request),
+    ).rejects.toThrow('AI 响应连接中断，请检查网络后重试。');
+    expect(alwaysFails).toHaveBeenCalledTimes(2);
+  });
+
   it('请求独立生图链路并校验生成资产', async () => {
     const quota = guestQuota('2026-09-23T00:05:00.000Z');
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
