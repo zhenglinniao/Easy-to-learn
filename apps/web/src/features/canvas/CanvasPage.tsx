@@ -54,7 +54,10 @@ import { ConflictResolutionDialog } from './ConflictResolutionDialog';
 import { DebouncedLatestTask } from './debouncedLatestTask';
 import { HANDWRITING_FONT_FAMILY, migrateElementsToHandwriting } from './handwriting';
 import { addStepIllustrationFile, blobToDataUrl } from './illustrationAsset';
+import { mapWithConcurrency } from './mapWithConcurrency';
 import { useOnlineStatus } from './useOnlineStatus';
+
+const ASSET_IO_CONCURRENCY = 4;
 
 interface OpenMenu {
   x: number;
@@ -376,11 +379,11 @@ export default function CanvasPage() {
             try {
               const remoteRepository = new RemoteBoardRepository(client);
               const snapshot = await remoteRepository.read(boardId);
-              for (const manifest of snapshot.assets) {
+              await mapWithConcurrency(snapshot.assets, ASSET_IO_CONCURRENCY, async (manifest) => {
                 const blob = await remoteRepository.downloadAsset(manifest.objectPath);
                 await repository.putAsset(manifest, blob);
                 await repository.markAssetState(boardId, manifest.fileId, 'uploaded');
-              }
+              });
               stored = await repository.storeRemoteSnapshot(snapshot);
             } catch (error) {
               if (!stored) throw error;
@@ -412,15 +415,13 @@ export default function CanvasPage() {
           setTutorBoards(stored.snapshot.tutorBoards);
           setSyncState(stored.dirty || handwriting.changed ? 'dirty' : 'synced');
           const assets = await repository.getAssets(boardId);
-          const files = await Promise.all(
-            assets.map(async (asset) => ({
-              id: asset.fileId,
-              dataURL: await blobToDataUrl(asset.blob),
-              mimeType: asset.mimeType,
-              created: Date.now(),
-              lastRetrieved: Date.now(),
-            })),
-          );
+          const files = await mapWithConcurrency(assets, ASSET_IO_CONCURRENCY, async (asset) => ({
+            id: asset.fileId,
+            dataURL: await blobToDataUrl(asset.blob),
+            mimeType: asset.mimeType,
+            created: Date.now(),
+            lastRetrieved: Date.now(),
+          }));
           files.forEach((file, index) => {
             const asset = assets[index];
             if (asset) assetCache.seed(file, asset);
@@ -770,11 +771,13 @@ export default function CanvasPage() {
     try {
       const remote = new RemoteBoardRepository(client);
       const snapshot = await remote.read(boardId);
-      const downloads = await Promise.all(
-        snapshot.assets.map(async (manifest) => ({
+      const downloads = await mapWithConcurrency(
+        snapshot.assets,
+        ASSET_IO_CONCURRENCY,
+        async (manifest) => ({
           manifest,
           blob: await remote.downloadAsset(manifest.objectPath),
-        })),
+        }),
       );
       await repositoryRef.current.resolveConflictWithRemote(snapshot, downloads);
       const assets = await repositoryRef.current.getAssets(boardId);
@@ -800,15 +803,13 @@ export default function CanvasPage() {
         });
       }
       api.addFiles(
-        (await Promise.all(
-          assets.map(async (asset) => ({
-            id: asset.fileId,
-            dataURL: await blobToDataUrl(asset.blob),
-            mimeType: asset.mimeType,
-            created: Date.now(),
-            lastRetrieved: Date.now(),
-          })),
-        )) as never,
+        (await mapWithConcurrency(assets, ASSET_IO_CONCURRENCY, async (asset) => ({
+          id: asset.fileId,
+          dataURL: await blobToDataUrl(asset.blob),
+          mimeType: asset.mimeType,
+          created: Date.now(),
+          lastRetrieved: Date.now(),
+        }))) as never,
       );
       setTutorBoards(snapshot.tutorBoards);
       hydratedBoard.current = boardId;
