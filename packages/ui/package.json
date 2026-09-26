@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@easy-to-learn/domain": "workspace:*",
-    "katex": "0.18.7"
+    "katex": "0.18.9"
   },
   "devDependencies": {
     "@types/react": "19.3.0",
