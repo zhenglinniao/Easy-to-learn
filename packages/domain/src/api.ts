@@ -95,6 +95,7 @@ export const quotaStatusSchema = z
     action: actionQuotaSchema,
     image: imageQuotaSchema,
     mode: z.enum(['full', 'vector_only', 'paused']),
+    unlimited: z.literal(true).optional(),
   })
   .refine(({ dailyLimit, remaining }) => remaining <= dailyLimit, {
     message: '每日剩余额度不能超过每日上限',

@@ -94,6 +94,7 @@ const canSubmitFeedback = (board: PersistedTutorBoardV2): boolean =>
 
 const quotaBlockReason = (quota: QuotaStatus | null, now: number): string | null => {
   if (!quota) return null;
+  if (quota.unlimited) return null;
   if (quota.action.dailyRemaining === 0)
     return `今天的 ${quota.action.dailyLimit} 次 AI 额度已用完，明天再来吧。`;
   if (quota.action.periodRemaining === 0) return '近 30 天 AI 额度已用完，请在额度恢复后再试。';
@@ -1105,7 +1106,9 @@ export default function CanvasPage() {
     ? Math.max(0, Math.ceil((Date.parse(quota.action.nextAllowedAt) - quotaClock) / 1_000))
     : 0;
   const compactQuota = quota
-    ? `AI ${quota.action.dailyRemaining}/${quota.action.dailyLimit}`
+    ? quota.unlimited
+      ? '管理员不限额'
+      : `AI ${quota.action.dailyRemaining}/${quota.action.dailyLimit}`
     : quotaUnavailable
       ? '额度暂不可用'
       : '读取额度';
@@ -1125,37 +1128,45 @@ export default function CanvasPage() {
             aria-live="polite"
             aria-label={
               quota
-                ? `今日 AI 剩余 ${quota.action.dailyRemaining} 次，近 30 天剩余 ${quota.action.periodRemaining} 次，今日插画剩余 ${quota.image.dailyRemaining} 张`
+                ? quota.unlimited
+                  ? '管理员 AI 与插画不限额'
+                  : `今日 AI 剩余 ${quota.action.dailyRemaining} 次，近 30 天剩余 ${quota.action.periodRemaining} 次，今日插画剩余 ${quota.image.dailyRemaining} 张`
                 : compactQuota
             }
           >
             {quota ? (
-              <>
+              quota.unlimited ? (
                 <span>
-                  今日 AI{' '}
-                  <b>
-                    {quota.action.dailyRemaining}/{quota.action.dailyLimit}
-                  </b>
+                  <b>管理员不限额</b>
                 </span>
-                <span>
-                  30 天{' '}
-                  <b>
-                    {quota.action.periodRemaining}/{quota.action.periodLimit}
-                  </b>
-                </span>
-                <span>
-                  插画{' '}
-                  <b>
-                    {quota.image.dailyRemaining}/{quota.image.dailyLimit}
-                  </b>
-                </span>
-                {cooldownSeconds > 0 ? (
-                  <span className={styles.cooldown}>
-                    等待 {Math.floor(cooldownSeconds / 60)}:
-                    {String(cooldownSeconds % 60).padStart(2, '0')}
+              ) : (
+                <>
+                  <span>
+                    今日 AI{' '}
+                    <b>
+                      {quota.action.dailyRemaining}/{quota.action.dailyLimit}
+                    </b>
                   </span>
-                ) : null}
-              </>
+                  <span>
+                    30 天{' '}
+                    <b>
+                      {quota.action.periodRemaining}/{quota.action.periodLimit}
+                    </b>
+                  </span>
+                  <span>
+                    插画{' '}
+                    <b>
+                      {quota.image.dailyRemaining}/{quota.image.dailyLimit}
+                    </b>
+                  </span>
+                  {cooldownSeconds > 0 ? (
+                    <span className={styles.cooldown}>
+                      等待 {Math.floor(cooldownSeconds / 60)}:
+                      {String(cooldownSeconds % 60).padStart(2, '0')}
+                    </span>
+                  ) : null}
+                </>
+              )
             ) : (
               <span>{compactQuota}</span>
             )}

@@ -20,7 +20,7 @@ export default async function handler(request: HttpRequest, response: HttpRespon
     }
     const { actor, accessToken } = await resolveActor(request);
     const result = await (
-      await createIllustrationService(accessToken)
+      await createIllustrationService(actor, accessToken)
     ).execute(actor, request.body);
     response.setHeader('X-Request-Id', requestId);
     response.status(200).json(result);
