@@ -84,6 +84,41 @@ describe('admin model policy', () => {
     expect(policy.providers[1]).toMatchObject({ imageModel: 'sensenova-u1.5-fast' });
   });
 
+  it('将 SenseNova 的不兼容组合规范化为 Chat Completions 与提示词约束', () => {
+    const policy = validateAdminModelPolicy(
+      {
+        providers: [
+          {
+            id: 'sensenova',
+            label: 'SenseNova 6.8 Flash Lite',
+            type: 'openai-compatible',
+            enabled: true,
+            baseUrl: 'https://token.sensenova.cn/v1',
+            model: 'sensenova-6.8-flash-lite',
+            timeoutMs: 12_000,
+            responseFormat: 'json_schema',
+            wireApi: 'responses',
+            apiKey: 'secret-sensenova',
+          },
+        ],
+      },
+      configs,
+    );
+
+    expect(policy.providers[0]).toMatchObject({
+      responseFormat: 'prompt',
+      wireApi: 'chat_completions',
+    });
+    expect(toAdminModelPolicyView(policy).providers[0]).toMatchObject({
+      responseFormat: 'prompt',
+      wireApi: 'chat_completions',
+    });
+    expect(applyAdminModelPolicy(policy)[0]).toMatchObject({
+      responseFormat: 'prompt',
+      wireApi: 'chat_completions',
+    });
+  });
+
   it('拒绝内网/未知域名、无密钥启用和超过总超时预算', () => {
     const base = {
       id: 'new_model',

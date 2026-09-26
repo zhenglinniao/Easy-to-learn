@@ -25,6 +25,9 @@ const dateLabel = (value: string | null): string =>
 const isDeepSeekProvider = (provider: AdminProviderView): boolean =>
   provider.id === 'deepseek' || provider.baseUrl?.includes('api.deepseek.com') === true;
 
+const isSenseNovaProvider = (provider: AdminProviderView): boolean =>
+  provider.id === 'sensenova' || provider.baseUrl?.includes('sensenova.cn') === true;
+
 const providerPresets: Record<'sensenova' | 'deepseek', AdminProviderView> = {
   sensenova: {
     id: 'sensenova',
@@ -157,6 +160,11 @@ export default function AdminPage() {
     provider: AdminProviderView,
     wireApi: 'chat_completions' | 'responses',
   ) => {
+    if (isSenseNovaProvider(provider) && wireApi === 'responses') {
+      updateModel(provider.id, { wireApi: 'chat_completions', responseFormat: 'prompt' });
+      setNotice('SenseNova 文字模型使用 Chat Completions，结构化输出已设为仅提示词约束。');
+      return;
+    }
     const requiresJsonObject =
       isDeepSeekProvider(provider) &&
       wireApi === 'chat_completions' &&
@@ -175,6 +183,11 @@ export default function AdminPage() {
     provider: AdminProviderView,
     responseFormat: 'json_schema' | 'json_object' | 'prompt',
   ) => {
+    if (isSenseNovaProvider(provider) && responseFormat === 'json_schema') {
+      updateModel(provider.id, { wireApi: 'chat_completions', responseFormat: 'prompt' });
+      setNotice('SenseNova 当前不使用 JSON Schema，已改为 Chat Completions 与仅提示词约束。');
+      return;
+    }
     const requiresResponses =
       isDeepSeekProvider(provider) &&
       responseFormat === 'json_schema' &&
@@ -481,12 +494,17 @@ export default function AdminPage() {
                         }
                       >
                         <option value="chat_completions">Chat Completions</option>
-                        <option value="responses">Responses</option>
+                        <option value="responses" disabled={isSenseNovaProvider(provider)}>
+                          Responses
+                        </option>
                       </select>
                       {isDeepSeekProvider(provider) && (
                         <small>
                           Chat Completions 使用 JSON Object；JSON Schema 使用 Responses。
                         </small>
+                      )}
+                      {isSenseNovaProvider(provider) && (
+                        <small>SenseNova 文字模型使用 Chat Completions。</small>
                       )}
                     </label>
                     <label>
@@ -501,10 +519,15 @@ export default function AdminPage() {
                           )
                         }
                       >
-                        <option value="json_schema">JSON Schema</option>
+                        <option value="json_schema" disabled={isSenseNovaProvider(provider)}>
+                          JSON Schema
+                        </option>
                         <option value="json_object">JSON Object</option>
                         <option value="prompt">仅提示词约束</option>
                       </select>
+                      {isSenseNovaProvider(provider) && (
+                        <small>推荐仅提示词约束；确认模型支持时可测试 JSON Object。</small>
+                      )}
                     </label>
                   </>
                 )}
