@@ -27,12 +27,20 @@ const adminIds = (): Set<string> =>
       .filter(Boolean),
   );
 
-export const requireAdmin = async (request: HttpRequest): Promise<string> => {
+export const resolveAdminAccess = async (
+  request: HttpRequest,
+): Promise<{ isAdmin: boolean; userId: string | null }> => {
   const { actor } = await resolveActor(request);
-  if (actor.kind !== 'user' || !adminIds().has(actor.id)) {
+  if (actor.kind !== 'user') return { isAdmin: false, userId: null };
+  return { isAdmin: adminIds().has(actor.id), userId: actor.id };
+};
+
+export const requireAdmin = async (request: HttpRequest): Promise<string> => {
+  const access = await resolveAdminAccess(request);
+  if (!access.isAdmin || !access.userId) {
     throw new ApiFault('FORBIDDEN', '当前账户没有管理员权限');
   }
-  return actor.id;
+  return access.userId;
 };
 
 const maskEmail = (email?: string): string => {

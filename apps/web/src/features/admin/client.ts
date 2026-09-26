@@ -46,6 +46,13 @@ export class AdminApiClient {
     });
   }
 
+  async access(signal?: AbortSignal): Promise<{ isAdmin: boolean }> {
+    return this.request<{ isAdmin: boolean }>('/api/admin/access', {
+      method: 'GET',
+      ...(signal ? { signal } : {}),
+    });
+  }
+
   async updateModels(providers: AdminProviderView[]): Promise<void> {
     await this.request('/api/admin/models', {
       method: 'PATCH',
