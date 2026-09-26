@@ -54,7 +54,7 @@ describe('AI Provider 配置', () => {
         model: 'vision-model',
         responseFormat: 'json_object',
         wireApi: 'chat_completions',
-        timeoutMs: 12_500,
+        timeoutMs: 25_000,
       },
       {
         id: 'backup',
@@ -98,7 +98,7 @@ describe('AI Provider 配置', () => {
         type: 'gemini',
         apiKey: 'legacy-key',
         model: 'legacy-model',
-        timeoutMs: 25_000,
+        timeoutMs: 50_000,
       },
     ]);
     expect(isAiProviderEnvironmentConfigured({})).toBe(false);
@@ -112,15 +112,19 @@ describe('AI Provider 配置', () => {
     ).toThrow(AiProviderConfigurationError);
     expect(() =>
       loadAiProviderConfigs({
-        AI_PROVIDERS: 'one,two',
+        AI_PROVIDERS: 'one,two,three',
         AI_PROVIDER_ONE_TYPE: 'gemini',
         AI_PROVIDER_ONE_MODEL: 'model-one',
         AI_PROVIDER_ONE_API_KEY: 'secret-one',
-        AI_PROVIDER_ONE_TIMEOUT_MS: '20000',
+        AI_PROVIDER_ONE_TIMEOUT_MS: '17000',
         AI_PROVIDER_TWO_TYPE: 'gemini',
         AI_PROVIDER_TWO_MODEL: 'model-two',
         AI_PROVIDER_TWO_API_KEY: 'secret-two',
-        AI_PROVIDER_TWO_TIMEOUT_MS: '20000',
+        AI_PROVIDER_TWO_TIMEOUT_MS: '17000',
+        AI_PROVIDER_THREE_TYPE: 'gemini',
+        AI_PROVIDER_THREE_MODEL: 'model-three',
+        AI_PROVIDER_THREE_API_KEY: 'secret-three',
+        AI_PROVIDER_THREE_TIMEOUT_MS: '17000',
       }),
     ).toThrow(/累计超时/);
   });
@@ -215,6 +219,35 @@ describe('AI Provider 执行', () => {
     expect(prompt).toContain('以下 JSON Schema 是唯一允许的输出结构');
     expect(prompt).toContain('"additionalProperties"');
     expect(prompt).toContain('"contentProfile"');
+  });
+
+  it('SenseNova 瞬时断连时会在同一超时预算内重试一次', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: JSON.stringify(modelResult) } }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    const model = createTutorModelFromEnvironment(
+      vi.fn(),
+      {
+        AI_PROVIDERS: 'sensenova',
+        AI_PROVIDER_SENSENOVA_TYPE: 'openai-compatible',
+        AI_PROVIDER_SENSENOVA_BASE_URL: 'https://token.sensenova.cn/v1',
+        AI_PROVIDER_SENSENOVA_API_KEY: 'server-only-secret',
+        AI_PROVIDER_SENSENOVA_MODEL: 'sensenova-6.8-flash-lite',
+        AI_PROVIDER_SENSENOVA_RESPONSE_FORMAT: 'prompt',
+      },
+      fetchMock,
+    );
+
+    await expect(model.generate(request)).resolves.toMatchObject({
+      metadata: { model: 'sensenova/sensenova-6.8-flash-lite' },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('通过 Responses API 发送 JSON Schema、图像与关闭推理参数', async () => {

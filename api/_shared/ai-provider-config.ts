@@ -8,7 +8,7 @@ type Environment = Record<string, string | undefined>;
 
 export const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash';
 export const MAX_AI_PROVIDERS = 3;
-export const MAX_PROVIDER_CHAIN_TIMEOUT_MS = 25_000;
+export const MAX_PROVIDER_CHAIN_TIMEOUT_MS = 50_000;
 
 interface CommonProviderConfig {
   id: string;

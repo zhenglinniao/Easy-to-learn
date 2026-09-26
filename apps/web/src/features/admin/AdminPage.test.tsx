@@ -229,7 +229,7 @@ describe('AdminPage', () => {
     });
   });
 
-  it('明确提示未保存草稿和启用模型的超时预算错误', async () => {
+  it('明确提示未保存草稿并允许两个 25 秒 Provider', async () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
       const url = String(input);
       if (url === '/api/admin/access') {
@@ -261,12 +261,12 @@ describe('AdminPage', () => {
     expect(await screen.findByText('服务端配置已加载')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '添加商汤日日新' }));
     expect(screen.getByText('有未保存修改')).toBeInTheDocument();
-    const switches = screen.getAllByRole('checkbox');
-    fireEvent.click(switches[1]!);
+    const apiKeys = screen.getAllByLabelText('API Key');
+    fireEvent.change(apiKeys[1]!, { target: { value: 'secret-sensenova' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: '已停用' }));
     await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent('当前累计超时 37000 ms'),
+      expect(screen.getByRole('status')).toHaveTextContent('启用模型超时预算：50000/50000 ms'),
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('DeepSeek 调整为 13000 ms');
-    expect(screen.getByRole('button', { name: '修正后保存' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '保存并生效' })).toBeEnabled();
   });
 });

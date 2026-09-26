@@ -112,10 +112,12 @@ describe('admin model policy', () => {
     expect(toAdminModelPolicyView(policy).providers[0]).toMatchObject({
       responseFormat: 'prompt',
       wireApi: 'chat_completions',
+      timeoutMs: 25_000,
     });
     expect(applyAdminModelPolicy(policy)[0]).toMatchObject({
       responseFormat: 'prompt',
       wireApi: 'chat_completions',
+      timeoutMs: 25_000,
     });
   });
 
@@ -150,8 +152,9 @@ describe('admin model policy', () => {
       validateAdminModelPolicy(
         {
           providers: [
-            { ...base, id: 'a', baseUrl: 'https://api.deepseek.com', timeoutMs: 13_000 },
-            { ...base, id: 'b', baseUrl: 'https://api.deepseek.com', timeoutMs: 13_000 },
+            { ...base, id: 'a', baseUrl: 'https://api.deepseek.com', timeoutMs: 20_000 },
+            { ...base, id: 'b', baseUrl: 'https://api.deepseek.com', timeoutMs: 20_000 },
+            { ...base, id: 'c', baseUrl: 'https://api.deepseek.com', timeoutMs: 20_000 },
           ],
         },
         configs,

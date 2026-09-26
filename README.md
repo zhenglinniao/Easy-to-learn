@@ -91,28 +91,28 @@ Copy-Item .env.example .env.local
 
 服务端变量：
 
-| 变量                                                  | 用途                                             |
-| ----------------------------------------------------- | ------------------------------------------------ |
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY`                  | JWT 校验与用户级访问                             |
-| `SUPABASE_SERVICE_ROLE_KEY`                           | 临时 AI 图片、账户删除和保留任务；禁止传到浏览器 |
-| `AI_PROVIDERS`                                        | Provider 标识的有序列表，如 `primary,backup`     |
-| `AI_PROMPT_VERSION`                                   | 已在 Tutor Skill 注册的提示词版本，默认 `v5`     |
-| `AI_PROVIDER_<ID>_TYPE`                               | `gemini` 或 `openai-compatible`                  |
-| `AI_PROVIDER_<ID>_MODEL`                              | 该 Provider 使用的模型名                         |
-| `AI_PROVIDER_<ID>_API_KEY`                            | 该 Provider 的服务端密钥；本地服务可以留空       |
-| `AI_PROVIDER_<ID>_BASE_URL`                           | OpenAI-compatible API 的 `/v1` 基础地址          |
-| `AI_PROVIDER_<ID>_RESPONSE_FORMAT`                    | `json_schema`、`json_object` 或 `prompt`         |
-| `AI_PROVIDER_<ID>_WIRE_API`                           | `chat_completions`（默认）或 `responses`         |
-| `AI_PROVIDER_<ID>_REASONING_EFFORT`                   | 可选：`none`、`low`、`high` 或 `max`             |
-| `AI_PROVIDER_<ID>_TIMEOUT_MS`                         | 单个 Provider 超时，范围 1000–25000 毫秒         |
-| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 配额、限流、票据和幂等缓存                       |
-| `ANON_SESSION_KEYS`                                   | `v2:至少32字符密钥,v1:旧密钥`，第一项用于签发    |
-| `ACTOR_HASH_SECRET`                                   | actor 不可逆摘要和上传路径隔离                   |
-| `ANALYTICS_HASH_SECRET`                               | 第一方匿名访问统计摘要；未配置时兼容 actor 密钥  |
-| `AI_CACHE_ENCRYPTION_KEY`                             | 32 字节随机值的 Base64，保护 24 小时幂等响应     |
-| `AI_ADMIN_ALLOWED_PROVIDER_HOSTS`                     | 后台可新增的额外 AI Provider 域名，逗号分隔      |
-| `CRON_SECRET`                                         | Vercel Cron 调用保留任务的 Bearer 密钥           |
-| `APP_ORIGINS`                                         | 逗号分隔的完整允许 origin                        |
+| 变量                                                  | 用途                                                                      |
+| ----------------------------------------------------- | ------------------------------------------------------------------------- |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY`                  | JWT 校验与用户级访问                                                      |
+| `SUPABASE_SERVICE_ROLE_KEY`                           | 临时 AI 图片、账户删除和保留任务；禁止传到浏览器                          |
+| `AI_PROVIDERS`                                        | Provider 标识的有序列表，如 `primary,backup`                              |
+| `AI_PROMPT_VERSION`                                   | 已在 Tutor Skill 注册的提示词版本，默认 `v5`                              |
+| `AI_PROVIDER_<ID>_TYPE`                               | `gemini` 或 `openai-compatible`                                           |
+| `AI_PROVIDER_<ID>_MODEL`                              | 该 Provider 使用的模型名                                                  |
+| `AI_PROVIDER_<ID>_API_KEY`                            | 该 Provider 的服务端密钥；本地服务可以留空                                |
+| `AI_PROVIDER_<ID>_BASE_URL`                           | OpenAI-compatible API 的 `/v1` 基础地址                                   |
+| `AI_PROVIDER_<ID>_RESPONSE_FORMAT`                    | `json_schema`、`json_object` 或 `prompt`                                  |
+| `AI_PROVIDER_<ID>_WIRE_API`                           | `chat_completions`（默认）或 `responses`                                  |
+| `AI_PROVIDER_<ID>_REASONING_EFFORT`                   | 可选：`none`、`low`、`high` 或 `max`                                      |
+| `AI_PROVIDER_<ID>_TIMEOUT_MS`                         | 单个 Provider 超时，范围 1000–50000 毫秒；管理台仍限制单项最多 25000 毫秒 |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 配额、限流、票据和幂等缓存                                                |
+| `ANON_SESSION_KEYS`                                   | `v2:至少32字符密钥,v1:旧密钥`，第一项用于签发                             |
+| `ACTOR_HASH_SECRET`                                   | actor 不可逆摘要和上传路径隔离                                            |
+| `ANALYTICS_HASH_SECRET`                               | 第一方匿名访问统计摘要；未配置时兼容 actor 密钥                           |
+| `AI_CACHE_ENCRYPTION_KEY`                             | 32 字节随机值的 Base64，保护 24 小时幂等响应                              |
+| `AI_ADMIN_ALLOWED_PROVIDER_HOSTS`                     | 后台可新增的额外 AI Provider 域名，逗号分隔                               |
+| `CRON_SECRET`                                         | Vercel Cron 调用保留任务的 Bearer 密钥                                    |
+| `APP_ORIGINS`                                         | 逗号分隔的完整允许 origin                                                 |
 
 Provider 首次按 `AI_PROVIDERS` 的声明顺序加载；管理员可在 `/admin` 保存完整运行链，之后以加密的 Redis 配置为准，Redis 不可用或配置损坏时回退环境配置。仅当当前 Provider 超时、网络失败或返回供应商错误时才切换；模型成功返回但 DSL 非法时，仍由现有的一次纠错流程处理。`GEMINI_API_KEY`、`AI_MODEL` 和 `AI_TIMEOUT_MS` 仅用于兼容旧部署；声明 `AI_PROVIDERS` 后不再读取它们。
 

@@ -181,15 +181,33 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
               ...(this.reasoningEffort ? { reasoning_effort: this.reasoningEffort } : {}),
             };
       const endpoint = this.wireApi === 'responses' ? '/responses' : '/chat/completions';
-      const response = await this.fetchImpl(`${baseUrl}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      });
+      const attempts = this.providerId === 'sensenova' ? 2 : 1;
+      let response: OpenAiFetchResponse | undefined;
+      let lastTransportError: unknown;
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+          response = await this.fetchImpl(`${baseUrl}${endpoint}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
+            },
+            body: JSON.stringify(requestBody),
+            signal: controller.signal,
+          });
+          const retryableStatus = response.status === 429 || response.status >= 500;
+          if (response.ok || !retryableStatus || attempt === attempts - 1) break;
+        } catch (error) {
+          if (controller.signal.aborted) throw error;
+          lastTransportError = error;
+          if (attempt === attempts - 1) throw error;
+        }
+      }
+      if (!response) {
+        throw new ProviderUnavailableError(`${this.providerId} request failed`, {
+          cause: lastTransportError,
+        });
+      }
       if (!response.ok) {
         throw new ProviderUnavailableError(
           `${this.providerId} request failed with status ${response.status}`,
