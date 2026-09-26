@@ -36,9 +36,25 @@ export const requireAllowedOrigin = (request: HttpRequest): void => {
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
-  if (!origin || !allowed.includes(origin)) {
-    throw new ApiFault('FORBIDDEN', '请求来源不被允许');
+  if (origin && allowed.includes(origin)) return;
+
+  // 浏览器不会保证为同源 GET/HEAD 附带 Origin。此时使用 Referer 的 origin
+  // 完成同样的白名单校验；若隐私策略同时移除了 Referer，则只接受浏览器明确
+  // 标记为 same-origin 的安全读取请求。所有写操作仍必须携带合法 Origin。
+  const method = request.method?.toUpperCase() ?? 'GET';
+  if (method === 'GET' || method === 'HEAD') {
+    const referer = header(request, 'referer');
+    if (referer) {
+      try {
+        if (allowed.includes(new URL(referer).origin)) return;
+      } catch {
+        // 非法 Referer 继续按拒绝处理。
+      }
+    }
+    if (!origin && header(request, 'sec-fetch-site') === 'same-origin') return;
   }
+
+  throw new ApiFault('FORBIDDEN', '请求来源不被允许');
 };
 
 export const sendError = (response: HttpResponse, error: unknown, requestId?: string): void => {
