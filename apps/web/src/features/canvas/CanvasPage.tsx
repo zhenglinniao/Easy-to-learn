@@ -627,12 +627,10 @@ export default function CanvasPage() {
       sourceTimer.current = setTimeout(() => {
         const sourceSnapshot = latestCanvasSnapshotRef.current;
         if (!sourceSnapshot || sourceSnapshot.boardId !== boardId) return;
-        void Promise.all(
-          tutorBoardsRef.current.map(async (board) =>
-            resolveTutorSource(
-              board,
-              await inspectTutorSource(sourceSnapshot.elements, board.source.elementIds),
-            ),
+        void mapWithConcurrency(tutorBoardsRef.current, ASSET_IO_CONCURRENCY, async (board) =>
+          resolveTutorSource(
+            board,
+            await inspectTutorSource(sourceSnapshot.elements, board.source.elementIds),
           ),
         ).then((next) => {
           if (latestCanvasSnapshotRef.current?.elements !== sourceSnapshot.elements) return;
