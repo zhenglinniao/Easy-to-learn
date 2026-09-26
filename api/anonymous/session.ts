@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { ApiFault } from '../_shared/fault.js';
 import {
   cookieValue,
@@ -41,4 +43,3 @@ export default async function handler(request: HttpRequest, response: HttpRespon
     sendError(response, error);
   }
 }
-import { randomUUID } from 'node:crypto';
