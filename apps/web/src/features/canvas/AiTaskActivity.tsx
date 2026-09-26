@@ -59,14 +59,17 @@ export function AiTaskActivity({ tasks, onCancel }: AiTaskActivityProps) {
             }
             role="status"
             aria-live="polite"
-            aria-label={`${actionLabel(task.action)}任务：${stageLabel(task.stage)}，${elapsedLabel(task.startedAt, clock)}`}
+            aria-label={`${actionLabel(task.action)}任务：${stageLabel(task.stage)}`}
           >
             <span className={styles.aiTaskSpinner} aria-hidden="true" />
             <p>
               <strong>
                 {actionLabel(task.action)}中 · {stageLabel(task.stage)}
               </strong>
-              <span>{elapsedLabel(task.startedAt, clock)}，完成后会自动放到画布</span>
+              <span>
+                <span aria-hidden="true">{elapsedLabel(task.startedAt, clock)}，</span>
+                完成后会自动放到画布
+              </span>
             </p>
             <button type="button" onClick={() => onCancel(task.id)}>
               取消
@@ -98,7 +101,7 @@ export function AiTaskActivity({ tasks, onCancel }: AiTaskActivityProps) {
                 <span>
                   {stageLabel(task.stage)}
                   {task.elementCount ? ` · ${task.elementCount} 个元素` : ''}
-                  {` · ${elapsedLabel(task.startedAt, clock)}`}
+                  <span aria-hidden="true">{` · ${elapsedLabel(task.startedAt, clock)}`}</span>
                 </span>
               </p>
               <button

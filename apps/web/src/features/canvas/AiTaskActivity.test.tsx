@@ -29,6 +29,10 @@ describe('AiTaskActivity', () => {
     );
 
     expect(screen.getAllByText(/已等待 5 秒/)).toHaveLength(2);
+    expect(screen.getByRole('status')).toHaveAccessibleName('解题任务：生成答案');
+    for (const elapsed of screen.getAllByText(/已等待 5 秒/)) {
+      expect(elapsed).toHaveAttribute('aria-hidden', 'true');
+    }
     act(() => {
       vi.advanceTimersByTime(1_000);
     });
