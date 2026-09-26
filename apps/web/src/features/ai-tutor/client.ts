@@ -1,9 +1,13 @@
 import {
   aiFeedbackInputSchema,
   anonymousSessionResponseSchema,
+  illustrationRequestSchema,
+  illustrationResponseSchema,
   quotaResponseSchema,
   tutorResponseSchema,
   type AiFeedbackInput,
+  type IllustrationRequest,
+  type IllustrationResponse,
   type QuotaStatus,
   type TutorRequest,
   type TutorResponse,
@@ -65,6 +69,26 @@ export class TutorApiClient {
     });
     if (!response.ok) throw await this.error(response);
     return tutorResponseSchema.parse(await response.json()).data;
+  }
+
+  async generateIllustration(
+    input: IllustrationRequest,
+    signal?: AbortSignal,
+  ): Promise<IllustrationResponse['data']> {
+    const request = illustrationRequestSchema.parse(input);
+    const accessToken = await this.getAccessToken();
+    await this.ensureActor(accessToken, signal);
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+    const response = await this.fetcher('/api/ai/illustration', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(request),
+      credentials: 'same-origin',
+      ...(signal ? { signal } : {}),
+    });
+    if (!response.ok) throw await this.error(response);
+    return illustrationResponseSchema.parse(await response.json()).data;
   }
 
   async uploadImage(

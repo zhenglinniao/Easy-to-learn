@@ -1,4 +1,4 @@
-import { Excalidraw } from '@excalidraw/excalidraw';
+import { convertToExcalidrawElements, Excalidraw } from '@excalidraw/excalidraw';
 import type {
   AppState,
   ExcalidrawImperativeAPI,
@@ -15,6 +15,7 @@ import {
 import {
   tutorRequestSchema,
   type AiFeedbackCategory,
+  type IllustrationResponse,
   type PersistedTutorBoardV2,
   type QuotaStatus,
   type TutorRequest,
@@ -110,6 +111,51 @@ const blobToDataUrl = (blob: Blob): Promise<string> =>
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(blob);
   });
+
+type GeneratedIllustrationAsset = Extract<
+  IllustrationResponse['data'],
+  { status: 'generated' }
+>['asset'];
+
+const addGeneratedIllustration = async (
+  api: ExcalidrawImperativeAPI,
+  asset: GeneratedIllustrationAsset,
+  selectionBounds: { x: number; y: number; width: number; height: number },
+  signal?: AbortSignal,
+): Promise<void> => {
+  const response = await fetch(asset.downloadUrl, signal ? { signal } : undefined);
+  if (!response.ok) throw new Error('生成插画暂时无法下载，文字与矢量图解已保留。');
+  const blob = await response.blob();
+  if (blob.type !== asset.mimeType || blob.size === 0 || blob.size > 10 * 1024 * 1024) {
+    throw new Error('生成插画文件校验失败，文字与矢量图解已保留。');
+  }
+  api.addFiles([
+    {
+      id: asset.fileId,
+      dataURL: await blobToDataUrl(blob),
+      mimeType: asset.mimeType,
+      created: Date.now(),
+      lastRetrieved: Date.now(),
+    },
+  ] as never);
+  const width = Math.min(480, Math.max(280, asset.width));
+  const height = Math.round((width * asset.height) / asset.width);
+  const [image] = convertToExcalidrawElements([
+    {
+      id: crypto.randomUUID(),
+      type: 'image',
+      x: selectionBounds.x,
+      y: selectionBounds.y + selectionBounds.height + 48,
+      width,
+      height,
+      fileId: asset.fileId as never,
+      status: 'saved',
+      scale: [1, 1],
+    },
+  ] as never);
+  if (!image) throw new Error('生成插画暂时无法放入画布，文字与矢量图解已保留。');
+  api.updateScene({ elements: [...api.getSceneElements(), image] as never });
+};
 
 const sha256 = async (blob: Blob): Promise<string> => {
   const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
@@ -839,6 +885,29 @@ export default function CanvasPage() {
         hasImage: input.image !== undefined,
       });
       setMenu(null);
+      if (action === 'solve') {
+        try {
+          const illustration = await client.generateIllustration(
+            { requestId, boardId },
+            requestAbort.current.signal,
+          );
+          setQuota(illustration.quota);
+          if (illustration.status === 'generated') {
+            await addGeneratedIllustration(
+              api,
+              illustration.asset,
+              input.selectionBounds,
+              requestAbort.current.signal,
+            );
+          }
+        } catch (error) {
+          if (!(error instanceof DOMException && error.name === 'AbortError')) {
+            setPreparationError(
+              error instanceof Error ? error.message : '插画生成暂时不可用，文字与矢量图解已保留。',
+            );
+          }
+        }
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
       setPreparationError(

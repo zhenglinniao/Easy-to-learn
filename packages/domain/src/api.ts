@@ -175,6 +175,37 @@ export const tutorResponseSchema = createDataResponseSchema(
   }),
 );
 
+export const illustrationRequestSchema = z.strictObject({
+  requestId: z.uuid(),
+  boardId: nonEmptyStringSchema,
+});
+
+const generatedIllustrationSchema = z.strictObject({
+  fileId: z.uuid(),
+  downloadUrl: z.url(),
+  mimeType: z.literal('image/jpeg'),
+  byteSize: z
+    .int()
+    .positive()
+    .max(10 * 1024 * 1024),
+  width: z.int().positive().max(8192),
+  height: z.int().positive().max(8192),
+});
+
+export const illustrationResponseSchema = createDataResponseSchema(
+  z.discriminatedUnion('status', [
+    z.strictObject({
+      status: z.literal('generated'),
+      asset: generatedIllustrationSchema,
+      quota: quotaStatusSchema,
+    }),
+    z.strictObject({
+      status: z.enum(['not_applicable', 'unavailable', 'quota_exhausted']),
+      quota: quotaStatusSchema,
+    }),
+  ]),
+);
+
 export const aiFeedbackCategorySchema = z.enum([
   'incorrect_answer',
   'unclear_explanation',
@@ -200,6 +231,8 @@ export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 export type QuotaStatus = z.infer<typeof quotaStatusSchema>;
 export type TutorRequest = z.infer<typeof tutorRequestSchema>;
 export type TutorResponse = z.infer<typeof tutorResponseSchema>;
+export type IllustrationRequest = z.infer<typeof illustrationRequestSchema>;
+export type IllustrationResponse = z.infer<typeof illustrationResponseSchema>;
 export type AiFeedbackCategory = z.infer<typeof aiFeedbackCategorySchema>;
 export type AiFeedbackInput = z.infer<typeof aiFeedbackInputSchema>;
 export type AnonymousSessionResponse = z.infer<typeof anonymousSessionResponseSchema>;
