@@ -62,6 +62,7 @@ describe('admin model policy', () => {
             timeoutMs: 10_000,
             responseFormat: 'prompt',
             wireApi: 'chat_completions',
+            imageModel: 'sensenova-u1.5-fast',
             apiKey: 'secret-sensenova',
           },
         ],
@@ -71,6 +72,7 @@ describe('admin model policy', () => {
     );
     expect(policy.providers[0]?.apiKey).toBe('secret-primary');
     expect(policy.providers[1]?.apiKey).toBe('secret-sensenova');
+    expect(policy.providers[1]).toMatchObject({ imageModel: 'sensenova-u1.5-fast' });
   });
 
   it('拒绝内网/未知域名、无密钥启用和超过总超时预算', () => {

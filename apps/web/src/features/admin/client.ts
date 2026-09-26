@@ -11,6 +11,7 @@ export interface AdminProviderView {
   responseFormat?: 'json_schema' | 'json_object' | 'prompt';
   wireApi?: 'chat_completions' | 'responses';
   reasoningEffort?: 'none' | 'low' | 'high' | 'max';
+  imageModel?: 'sensenova-u1.5-lite' | 'sensenova-u1.5-fast' | undefined;
 }
 
 export interface AdminAccountView {
