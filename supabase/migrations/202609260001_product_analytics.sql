@@ -108,7 +108,7 @@ as $$
     (
       select count(distinct visitor_hash)
       from public.analytics_daily_visitors
-      where day >= (pg_catalog.current_date - 29)
+      where day >= (current_date - 29)
     )::bigint,
     (select count(*) from auth.users)::bigint,
     (select count(*) from public.boards)::bigint;
@@ -135,7 +135,7 @@ begin
   get diagnostics cleanup_jobs_deleted = row_count;
 
   delete from public.analytics_daily_visitors
-  where day < pg_catalog.current_date - 90;
+  where day < current_date - 90;
 
   return next;
 end;
@@ -147,4 +147,3 @@ revoke all on function public.get_public_product_metrics()
 from public, anon, authenticated;
 grant execute on function public.record_analytics_visit(text, timestamptz) to service_role;
 grant execute on function public.get_public_product_metrics() to service_role;
-

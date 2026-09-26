@@ -99,7 +99,7 @@ select is(
 
 insert into public.analytics_daily_visitors (day, visitor_hash, last_seen_at)
 values (
-  pg_catalog.current_date - 91,
+  current_date - 91,
   repeat('b', 64),
   pg_catalog.now() - interval '91 days'
 );

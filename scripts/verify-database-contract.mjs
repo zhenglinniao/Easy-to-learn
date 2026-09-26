@@ -101,7 +101,7 @@ assert(
   '运行数据保留期与已确认方案不一致',
 );
 assert(
-  migration.includes('where day < pg_catalog.current_date - 90'),
+  migration.includes('where day < current_date - 90'),
   '匿名访客摘要没有按 90 天保留期清理',
 );
 assert(
