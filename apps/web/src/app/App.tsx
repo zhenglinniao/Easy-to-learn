@@ -1,8 +1,8 @@
-import * as Sentry from '@sentry/react';
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AnalyticsTracker } from '../features/analytics/AnalyticsTracker';
 import { AuthProvider } from '../features/auth';
+import { AppErrorBoundary } from './AppErrorBoundary';
 
 const LandingPage = lazy(() => import('../pages/LandingPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
@@ -17,16 +17,7 @@ const AdminPage = lazy(() => import('../features/admin/AdminPage'));
 
 export function App() {
   return (
-    <Sentry.ErrorBoundary
-      fallback={
-        <main className="fatal-error" role="alert">
-          <p>页面暂时没有正常打开。</p>
-          <button type="button" onClick={() => window.location.reload()}>
-            重新加载
-          </button>
-        </main>
-      }
-    >
+    <AppErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
           <AnalyticsTracker />
@@ -49,6 +40,6 @@ export function App() {
           </Suspense>
         </BrowserRouter>
       </AuthProvider>
-    </Sentry.ErrorBoundary>
+    </AppErrorBoundary>
   );
 }

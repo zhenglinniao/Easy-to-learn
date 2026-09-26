@@ -1,6 +1,7 @@
 import type { PersistedTutorBoardV2 } from '@easy-to-learn/domain';
 import { TutorBoard } from '@easy-to-learn/ui';
 import { useState } from 'react';
+import 'katex/dist/katex.min.css';
 
 import './tutor-board-spike.css';
 

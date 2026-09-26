@@ -3,10 +3,9 @@ import { createRoot } from 'react-dom/client';
 
 import { App } from './app/App';
 import { initializeMonitoring } from './monitoring';
-import 'katex/dist/katex.min.css';
 import './styles/global.css';
 
-initializeMonitoring({
+void initializeMonitoring({
   dsn: import.meta.env.VITE_SENTRY_DSN,
   environment: import.meta.env.VITE_APP_ENV || 'local',
 });

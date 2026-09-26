@@ -1,5 +1,3 @@
-import * as Sentry from '@sentry/react';
-
 interface MonitoringConfiguration {
   dsn?: string;
   environment: string;
@@ -17,8 +15,18 @@ export const sanitizeMonitoringUrl = (value: unknown): unknown => {
   }
 };
 
-export const initializeMonitoring = ({ dsn, environment }: MonitoringConfiguration): boolean => {
+type MonitoringClient = typeof import('@sentry/react');
+
+let monitoringClientPromise: Promise<MonitoringClient> | null = null;
+
+export const initializeMonitoring = async ({
+  dsn,
+  environment,
+}: MonitoringConfiguration): Promise<boolean> => {
   if (!dsn) return false;
+
+  monitoringClientPromise ??= import('@sentry/react');
+  const Sentry = await monitoringClientPromise;
 
   Sentry.init({
     dsn,
@@ -44,5 +52,15 @@ export const initializeMonitoring = ({ dsn, environment }: MonitoringConfigurati
       };
     },
   });
+  return true;
+};
+
+export const captureMonitoringException = async (
+  error: unknown,
+  context?: Record<string, unknown>,
+): Promise<boolean> => {
+  if (!monitoringClientPromise) return false;
+  const Sentry = await monitoringClientPromise;
+  Sentry.captureException(error, context ? { contexts: { react: context } } : undefined);
   return true;
 };
