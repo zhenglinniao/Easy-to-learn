@@ -91,6 +91,51 @@ describe('SenseNova image generation', () => {
     });
   });
 
+  it.each([
+    ['超出单边上限', 4097, 1024],
+    ['超出总像素上限', 4096, 4097],
+  ])('拒绝%s的 JPEG 元数据', async (_name, width, height) => {
+    const jpeg = Buffer.from([
+      0xff,
+      0xd8,
+      0xff,
+      0xc0,
+      0x00,
+      0x11,
+      0x08,
+      (height >> 8) & 0xff,
+      height & 0xff,
+      (width >> 8) & 0xff,
+      width & 0xff,
+      0x03,
+      0x01,
+      0x11,
+      0x00,
+      0x02,
+      0x11,
+      0x00,
+      0x03,
+      0x11,
+      0x00,
+    ]);
+    const fetcher = vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(Response.json({ data: [{ b64_json: jpeg.toString('base64') }] })),
+      );
+    const generator = new SenseNovaImageGenerator(
+      {
+        baseUrl: 'https://token.sensenova.cn/v1',
+        model: 'sensenova-u1.5-lite',
+        apiKey: 'secret',
+      },
+      fetcher,
+    );
+
+    await expect(generator.generate('教学插画')).rejects.toThrow('payload is invalid');
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
   it('瞬时网络失败时最多重试两次，明确 4xx 时不重试', async () => {
     const jpeg = Buffer.from([
       0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x02, 0x00, 0x03, 0x03, 0x01, 0x11, 0x00,

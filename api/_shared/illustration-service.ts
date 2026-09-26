@@ -22,6 +22,8 @@ import type { Dispatcher } from 'undici';
 const IMAGE_TTL_SECONDS = 24 * 60 * 60;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_ENCODED_IMAGE_LENGTH = Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 4;
+const MAX_IMAGE_EDGE = 4096;
+const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
 const MAX_IMAGE_PROVIDER_ATTEMPTS = 3;
 const IMAGE_RETRY_DELAYS_MS = [300, 900] as const;
 
@@ -198,7 +200,16 @@ export class SenseNovaImageGenerator implements ImageGenerator {
     }
     const bytes = Buffer.from(encoded, 'base64');
     const dimensions = readJpegSize(bytes);
-    if (!dimensions || bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) {
+    if (
+      !dimensions ||
+      bytes.length === 0 ||
+      bytes.length > MAX_IMAGE_BYTES ||
+      dimensions.width <= 0 ||
+      dimensions.height <= 0 ||
+      dimensions.width > MAX_IMAGE_EDGE ||
+      dimensions.height > MAX_IMAGE_EDGE ||
+      dimensions.width * dimensions.height > MAX_IMAGE_PIXELS
+    ) {
       throw new ProviderUnavailableError('sensenova image payload is invalid');
     }
     return { bytes, mimeType: 'image/jpeg', ...dimensions };
