@@ -171,4 +171,45 @@ describe('AdminPage', () => {
     expect(imagePicker).toHaveValue('sensenova-u1.5-fast');
     expect(screen.getByText(/U1\.5 加速版/)).toBeInTheDocument();
   });
+
+  it('明确提示未保存草稿和启用模型的超时预算错误', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === '/api/admin/access') {
+        return new Response(JSON.stringify({ data: { isAdmin: true, userId: 'admin-user' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          data: {
+            ...overview,
+            models: [
+              { ...overview.models[0], id: 'deepseek', label: 'DeepSeek', timeoutMs: 25_000 },
+            ],
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+    vi.stubGlobal('fetch', fetcher);
+
+    render(
+      <MemoryRouter>
+        <AdminPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('服务端配置已加载')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '添加商汤日日新' }));
+    expect(screen.getByText('有未保存修改')).toBeInTheDocument();
+    const switches = screen.getAllByRole('checkbox');
+    fireEvent.click(switches[1]!);
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('当前累计超时 37000 ms'),
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('DeepSeek 调整为 13000 ms');
+    expect(screen.getByRole('button', { name: '修正后保存' })).toBeDisabled();
+  });
 });

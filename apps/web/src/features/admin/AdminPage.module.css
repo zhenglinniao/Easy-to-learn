@@ -130,6 +130,32 @@
 .helper {
   margin: 13px 0 18px;
 }
+.policyState {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: -7px 0 14px;
+  padding: 9px 11px;
+  border: 1px solid rgba(52, 96, 68, 0.15);
+  border-radius: 11px;
+  color: #346044;
+  background: #f1f8f2;
+  font-size: 10px;
+}
+.policyState strong {
+  color: inherit;
+  white-space: nowrap;
+}
+.policyState span {
+  line-height: 1.5;
+  text-align: right;
+}
+.policyState[data-error='true'] {
+  border-color: rgba(132, 73, 62, 0.16);
+  color: #84493e;
+  background: #fff0ec;
+}
 .modelList {
   display: grid;
   gap: 9px;
@@ -363,7 +389,9 @@
 .accessHelp h1 {
   margin: 0 0 12px;
   color: var(--ink);
-  font: 500 36px/1.1 Georgia, serif;
+  font:
+    500 36px/1.1 Georgia,
+    serif;
 }
 .accessHelp > span,
 .accessHelp li {

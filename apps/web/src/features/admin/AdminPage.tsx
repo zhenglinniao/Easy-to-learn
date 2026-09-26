@@ -17,6 +17,8 @@ import {
 } from './modelCatalog';
 import styles from './AdminPage.module.css';
 
+const MAX_PROVIDER_TIMEOUT_BUDGET_MS = 25_000;
+
 const dateLabel = (value: string | null): string =>
   value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '从未登录';
 
@@ -57,6 +59,7 @@ export default function AdminPage() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [access, setAccess] = useState<{ isAdmin: boolean; userId: string } | null>(null);
   const [models, setModels] = useState<AdminProviderView[]>([]);
+  const [savedModelsSnapshot, setSavedModelsSnapshot] = useState('');
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -73,12 +76,14 @@ export default function AdminPage() {
         if (!permission.isAdmin) {
           setOverview(null);
           setModels([]);
+          setSavedModelsSnapshot('');
           setError(null);
           return;
         }
         const data = await client.overview(page, query, signal);
         setOverview(data);
         setModels(data.models);
+        setSavedModelsSnapshot(JSON.stringify(data.models));
         setError(null);
       } catch (cause) {
         if (cause instanceof DOMException && cause.name === 'AbortError') return;
@@ -142,6 +147,7 @@ export default function AdminPage() {
   }
 
   const updateModel = (id: string, patch: Partial<AdminProviderView>) => {
+    setNotice(null);
     setModels((items) => items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   };
   const moveModel = (index: number, direction: -1 | 1) => {
@@ -168,6 +174,10 @@ export default function AdminPage() {
     });
   };
   const saveModels = async () => {
+    if (modelPolicyIssue) {
+      setError(modelPolicyIssue);
+      return;
+    }
     setBusy('models');
     setError(null);
     setNotice(null);
@@ -199,6 +209,30 @@ export default function AdminPage() {
   };
 
   const activeModels = models.filter(({ enabled }) => enabled).length;
+  const enabledProviders = models.filter(({ enabled }) => enabled);
+  const activeTimeoutTotal = enabledProviders.reduce(
+    (total, provider) => total + provider.timeoutMs,
+    0,
+  );
+  const timeoutExcess = activeTimeoutTotal - MAX_PROVIDER_TIMEOUT_BUDGET_MS;
+  const missingKeyProvider = models.find(
+    (provider) =>
+      (provider.enabled || provider.imageModel) && !provider.hasApiKey && !provider.apiKey?.trim(),
+  );
+  const firstProviderBudget =
+    enabledProviders.length > 1
+      ? MAX_PROVIDER_TIMEOUT_BUDGET_MS -
+        enabledProviders.slice(1).reduce((total, provider) => total + provider.timeoutMs, 0)
+      : MAX_PROVIDER_TIMEOUT_BUDGET_MS;
+  const modelPolicyIssue =
+    activeModels === 0
+      ? '至少需要启用一个教学模型。'
+      : timeoutExcess > 0
+        ? `当前累计超时 ${activeTimeoutTotal} ms，超出 ${MAX_PROVIDER_TIMEOUT_BUDGET_MS} ms。可将 ${enabledProviders[0]?.label ?? '首个模型'} 调整为 ${Math.max(1_000, firstProviderBudget)} ms。`
+        : missingKeyProvider
+          ? `${missingKeyProvider.label} 启用前必须配置 API Key。`
+          : null;
+  const hasUnsavedModels = Boolean(overview) && JSON.stringify(models) !== savedModelsSnapshot;
   return (
     <main className={styles.page}>
       <SiteHeader />
@@ -252,10 +286,18 @@ export default function AdminPage() {
             </button>
             <button
               type="button"
-              disabled={busy === 'models' || !overview}
+              disabled={
+                busy === 'models' || !overview || !hasUnsavedModels || Boolean(modelPolicyIssue)
+              }
               onClick={() => void saveModels()}
             >
-              {busy === 'models' ? '正在保存…' : '保存并生效'}
+              {busy === 'models'
+                ? '正在保存…'
+                : modelPolicyIssue
+                  ? '修正后保存'
+                  : hasUnsavedModels
+                    ? '保存并生效'
+                    : '当前已生效'}
             </button>
           </div>
         </div>
@@ -263,6 +305,17 @@ export default function AdminPage() {
           顺序代表回退优先级。API Key 只写入服务端加密存储，页面不会回显；服务地址仅允许批准的 HTTPS
           域名。
         </p>
+        <div
+          className={styles.policyState}
+          data-error={modelPolicyIssue ? 'true' : 'false'}
+          role={modelPolicyIssue ? 'alert' : 'status'}
+        >
+          <strong>{hasUnsavedModels ? '有未保存修改' : '服务端配置已加载'}</strong>
+          <span>
+            {modelPolicyIssue ??
+              `启用模型超时预算：${activeTimeoutTotal}/${MAX_PROVIDER_TIMEOUT_BUDGET_MS} ms`}
+          </span>
+        </div>
         <div className={styles.modelList}>
           {models.map((provider, index) => (
             <article className={styles.modelCard} key={provider.id}>
