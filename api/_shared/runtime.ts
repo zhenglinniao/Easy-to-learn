@@ -4,6 +4,8 @@ import { Redis } from '@upstash/redis';
 import { AiProviderConfigurationError, loadAiProviderConfigs } from './ai-provider-config.js';
 import { createTutorModelFromConfigs } from './ai-provider.js';
 import { AdminModelPolicyStore, applyAdminModelPolicy } from './admin-model-policy.js';
+import { isAdminUserId } from './admin-access.js';
+import { UnlimitedAiStateStore, type AiStateStore } from './ai-state.js';
 import { ApiFault } from './fault.js';
 import { cookieValue, header, type HttpRequest } from './http.js';
 import { resolveTutorPromptVersion, TutorPromptConfigurationError } from './model-prompt.js';
@@ -45,12 +47,16 @@ export const sessionKeysFromEnvironment = (): SessionKey[] =>
       return key;
     });
 
-export const createAiStateStore = (): RedisAiStateStore =>
-  new RedisAiStateStore(
+export const createAiStateStore = (actor?: TutorActor): AiStateStore => {
+  const store = new RedisAiStateStore(
     Redis.fromEnv(),
     required('ACTOR_HASH_SECRET'),
     required('AI_CACHE_ENCRYPTION_KEY'),
   );
+  return actor?.kind === 'user' && isAdminUserId(actor.id)
+    ? new UnlimitedAiStateStore(store)
+    : store;
+};
 
 export const createAiFeedbackService = (): AiFeedbackService =>
   new AiFeedbackService(
@@ -138,10 +144,15 @@ export const createTutorService = async (
     }
     throw error;
   }
-  return new TutorService(createAiStateStore(), model, new SupabaseBoardAuthorizer(accessToken));
+  return new TutorService(
+    createAiStateStore(actor),
+    model,
+    new SupabaseBoardAuthorizer(accessToken),
+  );
 };
 
 export const createIllustrationService = async (
+  actor: TutorActor,
   accessToken?: string,
 ): Promise<IllustrationService> => {
   const configs = loadAiProviderConfigs(process.env);
@@ -162,7 +173,7 @@ export const createIllustrationService = async (
         })
       : null;
   return new IllustrationService(
-    createAiStateStore(),
+    createAiStateStore(actor),
     new SupabaseBoardAuthorizer(accessToken),
     new IllustrationArtifactStore(
       Redis.fromEnv(),

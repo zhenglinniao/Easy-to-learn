@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { AI_PERIOD_MS, MemoryAiStateStore } from './ai-state.js';
+import { AI_PERIOD_MS, MemoryAiStateStore, UnlimitedAiStateStore } from './ai-state.js';
 
 describe('AI quota state', () => {
   it('为游客和登录用户返回不同的 30 天及插画额度', async () => {
@@ -116,6 +116,27 @@ describe('AI quota state', () => {
     await expect(state.reserve(actor, 'guest-too-soon', now)).rejects.toMatchObject({
       code: 'RATE_LIMITED',
       details: { retryAfterSeconds: 300 },
+    });
+  });
+
+  it('管理员状态不扣除文字或插画额度', async () => {
+    const state = new UnlimitedAiStateStore(new MemoryAiStateStore());
+    const actor = 'user:admin-1';
+    const now = new Date('2026-09-26T00:00:00.000Z');
+
+    for (let index = 0; index < 20; index += 1) {
+      await expect(state.reserve(actor, `admin-${index}`, now)).resolves.toMatchObject({
+        quota: { unlimited: true },
+      });
+      await expect(
+        state.reserveImages(actor, `admin-image-${index}`, 1, now),
+      ).resolves.toMatchObject({ granted: true, quota: { unlimited: true } });
+    }
+
+    await expect(state.status(actor, now)).resolves.toMatchObject({
+      unlimited: true,
+      action: { dailyRemaining: 10, periodRemaining: 45 },
+      image: { dailyRemaining: 2, periodRemaining: 20 },
     });
   });
 });

@@ -12,7 +12,7 @@ export default async function handler(request: HttpRequest, response: HttpRespon
     if (request.method !== 'GET') throw new ApiFault('INVALID_INPUT', '仅支持 GET 请求');
     requireAllowedOrigin(request);
     const { actor } = await resolveActor(request);
-    const quota = await createAiStateStore().status(`${actor.kind}:${actor.id}`, new Date());
+    const quota = await createAiStateStore(actor).status(`${actor.kind}:${actor.id}`, new Date());
     response.status(200).json({ data: { quota } });
   } catch (error) {
     sendError(response, error);

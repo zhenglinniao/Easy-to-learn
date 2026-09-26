@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
 
 import { loadAiProviderConfigs } from './ai-provider-config.js';
+import { configuredAdminUserIds } from './admin-access.js';
 import {
   AdminModelPolicyStore,
   toAdminModelPolicyView,
@@ -19,13 +20,10 @@ const required = (name: string): string => {
   return value;
 };
 
-const adminIds = (): Set<string> =>
-  new Set(
-    required('ADMIN_USER_IDS')
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean),
-  );
+const adminIds = (): Set<string> => {
+  required('ADMIN_USER_IDS');
+  return configuredAdminUserIds();
+};
 
 export const resolveAdminAccess = async (
   request: HttpRequest,

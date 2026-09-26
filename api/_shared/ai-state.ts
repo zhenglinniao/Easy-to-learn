@@ -59,6 +59,81 @@ export interface AiStateStore {
   cache(actorKey: string, requestId: string, data: TutorResponse['data'], now: Date): Promise<void>;
 }
 
+const unlimitedQuotaStatus = (now: Date): QuotaStatus => {
+  const day = shanghaiDayWindow(now);
+  return {
+    dailyLimit: AUTHENTICATED_AI_DAILY_LIMIT,
+    remaining: AUTHENTICATED_AI_DAILY_LIMIT,
+    nextAllowedAt: null,
+    action: {
+      dailyLimit: AUTHENTICATED_AI_DAILY_LIMIT,
+      dailyRemaining: AUTHENTICATED_AI_DAILY_LIMIT,
+      periodLimit: 45,
+      periodRemaining: 45,
+      nextAllowedAt: null,
+      dailyResetsAt: day.resetsAt,
+      periodResetsAt: null,
+    },
+    image: {
+      dailyLimit: 2,
+      dailyRemaining: 2,
+      periodLimit: 20,
+      periodRemaining: 20,
+      periodResetsAt: null,
+    },
+    mode: 'full',
+    unlimited: true,
+  };
+};
+
+export class UnlimitedAiStateStore implements AiStateStore {
+  constructor(private readonly delegate: AiStateStore) {}
+
+  async getCached(actorKey: string, requestId: string): Promise<TutorResponse['data'] | null> {
+    const cached = await this.delegate.getCached(actorKey, requestId);
+    return cached ? { ...cached, quota: unlimitedQuotaStatus(new Date()) } : null;
+  }
+
+  async status(_actorKey: string, now: Date): Promise<QuotaStatus> {
+    return unlimitedQuotaStatus(now);
+  }
+
+  async reserve(_actorKey: string, _requestId: string, now: Date): Promise<QuotaGrant> {
+    return { quota: unlimitedQuotaStatus(now), duplicateInFlight: false };
+  }
+
+  async refund(): Promise<void> {}
+
+  async reserveImages(
+    _actorKey: string,
+    _requestId: string,
+    _count: number,
+    now: Date,
+  ): Promise<ImageQuotaGrant> {
+    return {
+      quota: unlimitedQuotaStatus(now),
+      granted: true,
+      duplicate: false,
+    };
+  }
+
+  async refundImages(): Promise<void> {}
+
+  async cache(
+    actorKey: string,
+    requestId: string,
+    data: TutorResponse['data'],
+    now: Date,
+  ): Promise<void> {
+    await this.delegate.cache(
+      actorKey,
+      requestId,
+      { ...data, quota: unlimitedQuotaStatus(now) },
+      now,
+    );
+  }
+}
+
 interface ActorState {
   actionDay: string;
   actionDailyUsed: number;
