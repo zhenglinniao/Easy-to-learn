@@ -71,5 +71,14 @@ export const sendError = (response: HttpResponse, error: unknown, requestId?: st
   logApiError(fault, id);
   disableResponseCaching(response);
   response.setHeader('X-Request-Id', id);
+  const retryAfterSeconds = fault.details?.retryAfterSeconds;
+  if (
+    fault.retryable &&
+    typeof retryAfterSeconds === 'number' &&
+    Number.isFinite(retryAfterSeconds) &&
+    retryAfterSeconds > 0
+  ) {
+    response.setHeader('Retry-After', String(Math.min(Math.ceil(retryAfterSeconds), 86_400)));
+  }
   response.status(fault.httpStatus).json(fault.toResponse(id));
 };

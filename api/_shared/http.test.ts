@@ -79,4 +79,29 @@ describe('sendError', () => {
     expect(traceHeader).toMatch(/^[0-9a-f-]{36}$/);
     expect(json).toHaveBeenCalledWith(expect.objectContaining({ requestId: traceHeader }));
   });
+
+  it('publishes a bounded Retry-After header only for retryable faults', () => {
+    const setHeader = vi.fn();
+    const response = {
+      setHeader,
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    } as unknown as HttpResponse;
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    sendError(
+      response,
+      new ApiFault('RATE_LIMITED', '请稍后重试', { retryAfterSeconds: 90_000.2 }),
+      'retry-1',
+    );
+    expect(setHeader).toHaveBeenCalledWith('Retry-After', '86400');
+
+    setHeader.mockClear();
+    sendError(
+      response,
+      new ApiFault('QUOTA_EXCEEDED', '额度已用完', { retryAfterSeconds: 60 }),
+      'quota-1',
+    );
+    expect(setHeader).not.toHaveBeenCalledWith('Retry-After', expect.anything());
+  });
 });
