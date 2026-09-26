@@ -6,6 +6,7 @@ import { ApiFault } from './fault.js';
 
 const COOLING_PERIOD_MS = 7 * 24 * 60 * 60 * 1_000;
 const RECENT_AUTH_MS = 10 * 60 * 1_000;
+const MAX_AUTH_CLOCK_SKEW_MS = 60 * 1_000;
 
 export interface AuthenticatedAccount {
   userId: string;
@@ -42,7 +43,12 @@ export class AccountDeletionService {
     requestId: string,
   ): Promise<{ executeAfter: string }> {
     const now = this.now();
-    if (now.getTime() - account.authenticatedAt.getTime() > RECENT_AUTH_MS) {
+    const authenticationAge = now.getTime() - account.authenticatedAt.getTime();
+    if (
+      !Number.isFinite(authenticationAge) ||
+      authenticationAge < -MAX_AUTH_CLOCK_SKEW_MS ||
+      authenticationAge > RECENT_AUTH_MS
+    ) {
       await this.store.audit(account.userId, 'account_deletion_requested', 'failure', requestId);
       throw new ApiFault('AUTH_REQUIRED', '删除账户前需要在最近 10 分钟内重新登录');
     }

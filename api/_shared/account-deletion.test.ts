@@ -77,6 +77,22 @@ describe('AccountDeletionService', () => {
     expect(store.create).toHaveBeenCalledOnce();
   });
 
+  it('拒绝无效或明显来自未来的认证时间', async () => {
+    const store = createStore();
+    const service = new AccountDeletionService(store, () => now);
+
+    await expect(
+      service.request(
+        { userId: 'u1', authenticatedAt: new Date(now.getTime() + 61_000) },
+        'future',
+      ),
+    ).rejects.toMatchObject({ code: 'AUTH_REQUIRED' });
+    await expect(
+      service.request({ userId: 'u1', authenticatedAt: new Date(Number.NaN) }, 'invalid'),
+    ).rejects.toMatchObject({ code: 'AUTH_REQUIRED' });
+    expect(store.create).not.toHaveBeenCalled();
+  });
+
   it('重复请求幂等，冷静期内可以取消', async () => {
     const pending: DeletionRecord = {
       userId: 'u1',
