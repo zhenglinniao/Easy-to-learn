@@ -42,6 +42,51 @@ const safeIssueSummary = (issues: Array<{ path: PropertyKey[]; message: string }
     message,
   }));
 
+const COMIC_MOTIFS = new Set([
+  'idea',
+  'balance',
+  'magnifier',
+  'puzzle',
+  'numbers',
+  'shapes',
+  'book',
+  'sprout',
+  'food',
+  'gear',
+  'chart',
+]);
+const COMIC_POSES = new Set(['point', 'think', 'cheer', 'observe']);
+const comicMotifAliases: Record<string, string> = {
+  calculation: 'numbers',
+  equation: 'numbers',
+  formula: 'numbers',
+  search: 'magnifier',
+  question: 'puzzle',
+  graph: 'chart',
+  scale: 'balance',
+  lightbulb: 'idea',
+};
+
+const normalizeDiagramDrift = (value: unknown): unknown => {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
+  const diagram = value as Record<string, unknown>;
+  if (diagram.type !== 'comic-strip' || !Array.isArray(diagram.panels)) return diagram;
+  return {
+    ...diagram,
+    panels: diagram.panels.map((panel) => {
+      if (panel === null || typeof panel !== 'object' || Array.isArray(panel)) return panel;
+      const record = panel as Record<string, unknown>;
+      const rawMotif = typeof record.motif === 'string' ? record.motif.toLowerCase() : '';
+      const rawPose = typeof record.pose === 'string' ? record.pose.toLowerCase() : '';
+      return {
+        ...record,
+        motif: COMIC_MOTIFS.has(rawMotif) ? rawMotif : (comicMotifAliases[rawMotif] ?? 'idea'),
+        pose: COMIC_POSES.has(rawPose) ? rawPose : 'observe',
+      };
+    }),
+  };
+};
+
 const normalizeKnownModelDrift = (candidate: unknown): unknown => {
   if (candidate === null || typeof candidate !== 'object' || Array.isArray(candidate)) {
     return candidate;
@@ -55,8 +100,28 @@ const normalizeKnownModelDrift = (candidate: unknown): unknown => {
   );
   if (!Array.isArray(result.steps)) return result;
 
+  const answerPresentation = result.answerPresentation;
+  const normalizedAnswerPresentation =
+    answerPresentation !== null &&
+    typeof answerPresentation === 'object' &&
+    !Array.isArray(answerPresentation)
+      ? (() => {
+          const presentation = answerPresentation as Record<string, unknown>;
+          if (presentation.problemType === 'simple' || presentation.problemType === 'reasoning') {
+            return presentation;
+          }
+          return {
+            ...presentation,
+            problemType: presentation.conclusionPosition === 'first_step' ? 'simple' : 'reasoning',
+          };
+        })()
+      : answerPresentation;
+
   return {
     ...result,
+    ...(normalizedAnswerPresentation === undefined
+      ? {}
+      : { answerPresentation: normalizedAnswerPresentation }),
     steps: result.steps.map((step) => {
       if (step === null || typeof step !== 'object' || Array.isArray(step)) return step;
       const stepRecord = step as Record<string, unknown>;
@@ -72,9 +137,9 @@ const normalizeKnownModelDrift = (candidate: unknown): unknown => {
               blockRecord.type,
             )
           ) {
-            return { type: 'diagram', diagram: blockRecord };
+            return { type: 'diagram', diagram: normalizeDiagramDrift(blockRecord) };
           }
-          const diagram = blockRecord.diagram;
+          const diagram = normalizeDiagramDrift(blockRecord.diagram);
           if (
             blockRecord.type !== 'diagram' ||
             typeof blockRecord.takeaway !== 'string' ||
@@ -84,7 +149,7 @@ const normalizeKnownModelDrift = (candidate: unknown): unknown => {
             (diagram as Record<string, unknown>).type !== 'part-map' ||
             typeof (diagram as Record<string, unknown>).takeaway === 'string'
           ) {
-            return block;
+            return diagram === blockRecord.diagram ? block : { ...blockRecord, diagram };
           }
           const { takeaway, ...safeBlock } = blockRecord;
           return {

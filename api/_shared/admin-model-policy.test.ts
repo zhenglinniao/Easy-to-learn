@@ -112,12 +112,12 @@ describe('admin model policy', () => {
     expect(toAdminModelPolicyView(policy).providers[0]).toMatchObject({
       responseFormat: 'prompt',
       wireApi: 'chat_completions',
-      timeoutMs: 25_000,
+      timeoutMs: 35_000,
     });
     expect(applyAdminModelPolicy(policy)[0]).toMatchObject({
       responseFormat: 'prompt',
       wireApi: 'chat_completions',
-      timeoutMs: 25_000,
+      timeoutMs: 35_000,
     });
   });
 
