@@ -53,6 +53,26 @@
   color: #fff9f3;
   background: var(--ink);
 }
+.siteHeader .adminModeSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+}
+.siteHeader .adminModeSwitch span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.siteHeader .adminModeSwitch[data-active='true'] {
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--line));
+  color: #fff9f3;
+  background: var(--ink);
+}
 .hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(380px, 0.8fr);
