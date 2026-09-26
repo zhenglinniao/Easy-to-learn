@@ -103,7 +103,7 @@ export interface RawLocalDataExport {
   exportVersion: 1;
   exportedAt: string;
   boards: StoredBoard[];
-  assets: StoredAsset[];
+  assets: Array<Omit<StoredAsset, 'blob'> & { base64: string }>;
   outbox: OutboxOperation[];
   preferences: StoredPreference[];
   migrationBackups: MigrationBackup[];

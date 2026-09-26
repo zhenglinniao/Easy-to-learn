@@ -6,6 +6,7 @@ import {
 } from '@easy-to-learn/domain';
 
 import { LocalPersistenceError, toLocalPersistenceError } from './errors';
+import { serializeStoredAssets } from './export';
 import type { LocalDatabase } from './database';
 import type {
   ConflictCopy,
@@ -631,12 +632,13 @@ export class LocalBoardRepository {
         transaction.objectStore('conflictCopies').getAll(),
       ]);
     await transaction.done;
+    const serializedAssets = await serializeStoredAssets(assets);
     return {
       format: 'easy-to-learn-local-backup',
       exportVersion: 1,
       exportedAt: this.now().toISOString(),
       boards,
-      assets,
+      assets: serializedAssets,
       outbox,
       preferences,
       migrationBackups,

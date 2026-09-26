@@ -1,16 +1,36 @@
 import { parsePersistedCanvas, type PersistedCanvasV2 } from '@easy-to-learn/domain';
 
 import { LocalPersistenceError } from './errors';
-import type { StoredAsset } from './schema';
+import type { RawLocalDataExport, StoredAsset } from './schema';
 
 const MAX_EXPORT_BYTES = 100 * 1024 * 1024;
 
-const blobToBase64 = async (blob: Blob): Promise<string> => {
+export const blobToBase64 = async (blob: Blob): Promise<string> => {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let binary = '';
   for (let offset = 0; offset < bytes.length; offset += 32_768)
     binary += String.fromCharCode(...bytes.subarray(offset, offset + 32_768));
   return btoa(binary);
+};
+
+export const serializeStoredAssets = async (
+  assets: readonly StoredAsset[],
+): Promise<RawLocalDataExport['assets']> => {
+  const totalBytes = assets.reduce(
+    (sum, asset) => sum + Math.max(asset.byteSize, asset.blob.size),
+    0,
+  );
+  if (totalBytes > MAX_EXPORT_BYTES)
+    throw new LocalPersistenceError(
+      'QUOTA_EXCEEDED',
+      '本地完整备份不能超过 100 MiB，请改为逐个导出画板。',
+    );
+
+  const serialized: RawLocalDataExport['assets'] = [];
+  for (const { blob, ...asset } of assets) {
+    serialized.push({ ...asset, base64: await blobToBase64(blob) });
+  }
+  return serialized;
 };
 
 const verifiedAssets = (

@@ -1,7 +1,7 @@
 import type { PersistedCanvasV2 } from '@easy-to-learn/domain';
 import { describe, expect, it } from 'vitest';
 
-import { createCompleteExport, createExcalidrawExport } from './export';
+import { createCompleteExport, createExcalidrawExport, serializeStoredAssets } from './export';
 import type { StoredAsset } from './schema';
 
 const bytes = new TextEncoder().encode('asset');
@@ -60,6 +60,17 @@ describe('画板导出', () => {
       embeddedAssets: [{ fileId: 'f1', base64: 'YXNzZXQ=' }],
     });
     expect(JSON.stringify(result.canvas)).not.toContain('YXNzZXQ=');
+  });
+  it('原始恢复备份把 Blob 转为可写入 JSON 的 Base64', async () => {
+    const serialized = await serializeStoredAssets([asset]);
+
+    expect(serialized).toEqual([expect.objectContaining({ fileId: 'f1', base64: 'YXNzZXQ=' })]);
+    expect(serialized[0]).not.toHaveProperty('blob');
+  });
+  it('阻止在内存中构建超大恢复备份', async () => {
+    await expect(
+      serializeStoredAssets([{ ...asset, byteSize: 100 * 1024 * 1024 + 1 }]),
+    ).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
   });
   it('生成兼容 Excalidraw 的逃生格式并拒绝缺失资产', async () => {
     const result = await createExcalidrawExport(snapshot, [asset]);

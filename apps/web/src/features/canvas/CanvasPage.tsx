@@ -730,8 +730,14 @@ export default function CanvasPage() {
 
   const exportRawLocalData = async () => {
     if (!repositoryRef.current) return;
-    await flushCurrentCanvas();
-    downloadJson('easy-to-learn-local-backup.json', await repositoryRef.current.exportRawData());
+    try {
+      await flushCurrentCanvas();
+      downloadJson('easy-to-learn-local-backup.json', await repositoryRef.current.exportRawData());
+    } catch (error) {
+      setPreparationError(
+        error instanceof Error ? error.message : '本地完整备份失败，请稍后重试。',
+      );
+    }
   };
 
   const deleteLocalBoard = async (targetBoardId: string) => {
