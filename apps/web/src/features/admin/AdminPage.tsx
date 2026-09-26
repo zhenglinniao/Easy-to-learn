@@ -10,9 +10,10 @@ import {
   type AdminProviderView,
 } from './client';
 import {
+  imageModelOptionsFor,
+  modelSelectionPatch,
   modelOptionsFor,
   selectedModelDescription,
-  sensenovaImageModels,
 } from './modelCatalog';
 import styles from './AdminPage.module.css';
 
@@ -321,7 +322,7 @@ export default function AdminPage() {
                       aria-label="Model ID"
                       value={provider.model}
                       onChange={(event) =>
-                        updateModel(provider.id, { model: event.target.value })
+                        updateModel(provider.id, modelSelectionPatch(provider, event.target.value))
                       }
                     >
                       {!modelOptionsFor(provider)?.some(({ id }) => id === provider.model) && (
@@ -346,6 +347,33 @@ export default function AdminPage() {
                       maxLength={160}
                       onChange={(event) => updateModel(provider.id, { model: event.target.value })}
                     />
+                  </label>
+                )}
+                {imageModelOptionsFor(provider) && (
+                  <label className={styles.modelPicker}>
+                    生图 Model ID
+                    <select
+                      aria-label="生图 Model ID"
+                      value={provider.imageModel ?? ''}
+                      onChange={(event) =>
+                        updateModel(provider.id, {
+                          imageModel: event.target.value
+                            ? (event.target.value as AdminProviderView['imageModel'])
+                            : undefined,
+                        })
+                      }
+                    >
+                      <option value="">暂不启用生图</option>
+                      {imageModelOptionsFor(provider)?.map((option) => (
+                        <option value={option.id} key={option.id}>
+                          {option.label} · {option.id}
+                        </option>
+                      ))}
+                    </select>
+                    <small>
+                      {imageModelOptionsFor(provider)?.find(({ id }) => id === provider.imageModel)
+                        ?.description ?? '生图模型独立配置，不参与上方教学模型的回退顺序。'}
+                    </small>
                   </label>
                 )}
                 {provider.type === 'openai-compatible' && (
@@ -434,11 +462,8 @@ export default function AdminPage() {
           <small>上次更新：{dateLabel(overview.policyUpdatedAt)}</small>
         )}
         <aside className={styles.imageModelNote}>
-          <strong>独立生图模型</strong>
-          <span>
-            {sensenovaImageModels.map(({ label, id }) => `${label}（${id}）`).join('、')} 不使用本页的
-            Chat Completions 链路，将在独立异步生图配置中接入。
-          </span>
+          <strong>调用关系</strong>
+          <span>教学模型按卡片顺序回退；生图模型独立执行，不占用文字模型的回退位置。</span>
         </aside>
       </section>
 

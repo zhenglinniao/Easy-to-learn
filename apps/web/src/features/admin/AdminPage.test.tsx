@@ -71,9 +71,7 @@ describe('AdminPage', () => {
       </MemoryRouter>,
     );
 
-    expect(
-      await screen.findByRole('heading', { name: '管理员权限尚未生效' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '管理员权限尚未生效' })).toBeInTheDocument();
     expect(screen.getByText('user-uid-to-configure')).toBeInTheDocument();
     expect(screen.getByText(/Value 只填写上面的 UUID/)).toBeInTheDocument();
   });
@@ -82,13 +80,10 @@ describe('AdminPage', () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
       const url = String(input);
       if (url === '/api/admin/access') {
-        return new Response(
-          JSON.stringify({ data: { isAdmin: true, userId: 'admin-user' } }),
-          {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          },
-        );
+        return new Response(JSON.stringify({ data: { isAdmin: true, userId: 'admin-user' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
       }
       if (url.startsWith('/api/admin/overview')) {
         return new Response(JSON.stringify({ data: overview }), {
@@ -118,6 +113,7 @@ describe('AdminPage', () => {
 
     fireEvent.change(modelPicker, { target: { value: 'deepseek-v4-pro' } });
     expect(modelPicker).toHaveValue('deepseek-v4-pro');
+    expect(screen.getByLabelText('显示名称')).toHaveValue('DeepSeek V4 Pro');
     expect(screen.getByText(/面向更高质量复杂推理/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '暂停' }));
@@ -129,5 +125,50 @@ describe('AdminPage', () => {
         expect.objectContaining({ method: 'PATCH' }),
       ),
     );
+  });
+
+  it('SenseNova 卡片可选择独立的 U1.5 生图模型', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === '/api/admin/access') {
+        return new Response(JSON.stringify({ data: { isAdmin: true, userId: 'admin-user' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          data: {
+            ...overview,
+            models: [
+              {
+                ...overview.models[0],
+                id: 'sensenova',
+                label: 'SenseNova 6.8 Flash Lite',
+                baseUrl: 'https://token.sensenova.cn/v1',
+                model: 'sensenova-6.8-flash-lite',
+                responseFormat: 'prompt',
+                wireApi: 'chat_completions',
+              },
+            ],
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+    vi.stubGlobal('fetch', fetcher);
+
+    render(
+      <MemoryRouter>
+        <AdminPage />
+      </MemoryRouter>,
+    );
+
+    const imagePicker = await screen.findByRole('combobox', { name: '生图 Model ID' });
+    expect(screen.getByRole('option', { name: /SenseNova U1\.5 Lite/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /SenseNova U1\.5 Fast/ })).toBeInTheDocument();
+    fireEvent.change(imagePicker, { target: { value: 'sensenova-u1.5-fast' } });
+    expect(imagePicker).toHaveValue('sensenova-u1.5-fast');
+    expect(screen.getByText(/U1\.5 加速版/)).toBeInTheDocument();
   });
 });

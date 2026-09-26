@@ -30,7 +30,9 @@ interface StoredOpenAiProvider extends StoredProviderBase {
   responseFormat: OpenAiResponseFormat;
   wireApi: OpenAiWireApi;
   reasoningEffort?: ModelReasoningEffort;
+  imageModel?: SenseNovaImageModel;
 }
+export type SenseNovaImageModel = 'sensenova-u1.5-lite' | 'sensenova-u1.5-fast';
 export type StoredAdminProvider = StoredGeminiProvider | StoredOpenAiProvider;
 
 export interface AdminProviderView {
@@ -45,6 +47,7 @@ export interface AdminProviderView {
   responseFormat?: OpenAiResponseFormat;
   wireApi?: OpenAiWireApi;
   reasoningEffort?: ModelReasoningEffort;
+  imageModel?: SenseNovaImageModel;
 }
 export interface AdminModelPolicy {
   providers: StoredAdminProvider[];
@@ -175,8 +178,18 @@ export const validateAdminModelPolicy = (
     if (typeof enabled !== 'boolean')
       throw new ApiFault('INVALID_INPUT', 'Provider 启用状态格式不正确');
     const apiKey = cleanApiKey(candidate.apiKey) ?? existing.get(id)?.apiKey;
-    if (enabled && !apiKey) throw new ApiFault('INVALID_INPUT', `${label} 启用前必须配置 API Key`);
+    const imageModel = candidate.imageModel;
+    if (
+      imageModel !== undefined &&
+      !['sensenova-u1.5-lite', 'sensenova-u1.5-fast'].includes(String(imageModel))
+    ) {
+      throw new ApiFault('INVALID_INPUT', '生图模型 ID 不受支持');
+    }
+    if ((enabled || imageModel) && !apiKey)
+      throw new ApiFault('INVALID_INPUT', `${label} 启用前必须配置 API Key`);
     if (candidate.type === 'gemini') {
+      if (imageModel)
+        throw new ApiFault('INVALID_INPUT', 'U1.5 生图模型只能配置在商汤日日新 Provider');
       return {
         id,
         label,
@@ -201,6 +214,10 @@ export const validateAdminModelPolicy = (
       !['none', 'low', 'high', 'max'].includes(String(reasoningEffort))
     )
       throw new ApiFault('INVALID_INPUT', '推理强度不受支持');
+    const baseUrl = cleanBaseUrl(candidate.baseUrl, hosts);
+    if (imageModel && id !== 'sensenova' && !baseUrl.includes('sensenova.cn')) {
+      throw new ApiFault('INVALID_INPUT', 'U1.5 生图模型只能配置在商汤日日新 Provider');
+    }
     return {
       id,
       label,
@@ -208,10 +225,11 @@ export const validateAdminModelPolicy = (
       enabled,
       model,
       timeoutMs,
-      baseUrl: cleanBaseUrl(candidate.baseUrl, hosts),
+      baseUrl,
       responseFormat: responseFormat as OpenAiResponseFormat,
       wireApi: wireApi as OpenAiWireApi,
       ...(reasoningEffort ? { reasoningEffort: reasoningEffort as ModelReasoningEffort } : {}),
+      ...(imageModel ? { imageModel: imageModel as SenseNovaImageModel } : {}),
       ...(apiKey ? { apiKey } : {}),
     };
   });

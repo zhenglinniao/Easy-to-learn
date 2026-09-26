@@ -55,9 +55,19 @@ export const deepseekDirectModels: readonly AdminModelOption[] = [
   },
 ] as const;
 
-export const sensenovaImageModels = [
-  { id: 'sensenova-u1.5-lite', label: 'SenseNova U1.5 Lite' },
-  { id: 'sensenova-u1.5-fast', label: 'SenseNova U1.5 Fast' },
+export const sensenovaImageModels: readonly AdminModelOption[] = [
+  {
+    id: 'sensenova-u1.5-lite',
+    label: 'SenseNova U1.5 Lite',
+    family: '日日新生图模型',
+    description: '生成与编辑一体，支持参考图与灵活修改，适合高质量教学插画。',
+  },
+  {
+    id: 'sensenova-u1.5-fast',
+    label: 'SenseNova U1.5 Fast',
+    family: '日日新生图模型',
+    description: 'U1.5 加速版，适合需要更快返回的手绘步骤插画。',
+  },
 ] as const;
 
 export const modelOptionsFor = (
@@ -76,3 +86,21 @@ export const modelOptionsFor = (
 
 export const selectedModelDescription = (provider: AdminProviderView): string | null =>
   modelOptionsFor(provider)?.find(({ id }) => id === provider.model)?.description ?? null;
+
+export const modelSelectionPatch = (
+  provider: AdminProviderView,
+  model: string,
+): Pick<AdminProviderView, 'model' | 'label'> => {
+  const option = modelOptionsFor(provider)?.find(({ id }) => id === model);
+  return { model, label: option?.label ?? provider.label };
+};
+
+export const imageModelOptionsFor = (
+  provider: AdminProviderView,
+): readonly AdminModelOption[] | null => {
+  if (provider.type !== 'openai-compatible') return null;
+  const baseUrl = provider.baseUrl?.toLowerCase() ?? '';
+  return provider.id === 'sensenova' || baseUrl.includes('sensenova.cn')
+    ? sensenovaImageModels
+    : null;
+};
