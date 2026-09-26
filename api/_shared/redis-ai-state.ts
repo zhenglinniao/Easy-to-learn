@@ -4,9 +4,9 @@ import type { QuotaStatus, TutorResponse } from '@easy-to-learn/domain';
 import type { Redis } from '@upstash/redis';
 
 import {
-  AI_MIN_INTERVAL_MS,
   AI_PERIOD_MS,
   IDEMPOTENCY_TTL_MS,
+  minIntervalForActor,
   quotaLimitsForActor,
   shanghaiDayWindow,
   type AiStateStore,
@@ -22,13 +22,16 @@ local periodUsed = tonumber(redis.call('GET', KEYS[2]) or '0')
 if existing then return {2, dailyUsed, periodUsed, redis.call('PTTL', KEYS[3])} end
 if dailyUsed >= tonumber(ARGV[1]) then return {-1, dailyUsed, periodUsed, 0} end
 if periodUsed >= tonumber(ARGV[2]) then return {-2, dailyUsed, periodUsed, 0} end
-local rate = redis.call('GET', KEYS[3])
-if rate then return {0, dailyUsed, periodUsed, redis.call('PTTL', KEYS[3])} end
+local interval = tonumber(ARGV[6])
+if interval > 0 then
+  local rate = redis.call('GET', KEYS[3])
+  if rate then return {0, dailyUsed, periodUsed, redis.call('PTTL', KEYS[3])} end
+end
 dailyUsed = redis.call('INCR', KEYS[1])
 if dailyUsed == 1 then redis.call('EXPIRE', KEYS[1], tonumber(ARGV[3])) end
 periodUsed = redis.call('INCR', KEYS[2])
 if periodUsed == 1 then redis.call('PEXPIRE', KEYS[2], tonumber(ARGV[4])) end
-redis.call('SET', KEYS[3], ARGV[5], 'PX', ARGV[6])
+if interval > 0 then redis.call('SET', KEYS[3], ARGV[5], 'PX', interval) end
 redis.call('SET', KEYS[4], '1', 'PX', ARGV[7])
 return {1, dailyUsed, periodUsed, tonumber(ARGV[6])}
 `;
@@ -128,7 +131,10 @@ export class RedisAiStateStore implements AiStateStore {
     const actionPeriodRemaining = Math.max(0, limits.actionPeriod - Number(actionPeriodRaw ?? 0));
     const imageDailyRemaining = Math.max(0, limits.imageDaily - Number(imageDailyRaw ?? 0));
     const imagePeriodRemaining = Math.max(0, limits.imagePeriod - Number(imagePeriodRaw ?? 0));
-    const nextAllowedAt = retryMs > 0 ? new Date(now.getTime() + retryMs).toISOString() : null;
+    const nextAllowedAt =
+      minIntervalForActor(actorKey) > 0 && retryMs > 0
+        ? new Date(now.getTime() + retryMs).toISOString()
+        : null;
     return {
       dailyLimit: limits.actionDaily,
       remaining: actionDailyRemaining,
@@ -168,7 +174,7 @@ export class RedisAiStateStore implements AiStateStore {
         day.ttlSeconds,
         AI_PERIOD_MS,
         requestId,
-        AI_MIN_INTERVAL_MS,
+        minIntervalForActor(actorKey),
         IDEMPOTENCY_TTL_MS,
       ],
     );
@@ -184,7 +190,7 @@ export class RedisAiStateStore implements AiStateStore {
       });
     }
     if (status === 0) {
-      throw new ApiFault('RATE_LIMITED', '每 5 分钟只能发起一次 AI 请求', {
+      throw new ApiFault('RATE_LIMITED', '游客每 5 分钟只能发起一次 AI 请求', {
         retryAfterSeconds: Math.max(1, Math.ceil((retryMs ?? 0) / 1_000)),
         nextAllowedAt: new Date(now.getTime() + Math.max(0, retryMs ?? 0)).toISOString(),
       });

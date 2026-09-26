@@ -28,6 +28,6 @@ describe('LegalPage', () => {
       screen.getByRole('heading', { name: '使用 Easy to learn 前请了解' }),
     ).toBeInTheDocument();
     expect(screen.getByText(/不应作为医疗、法律、财务/)).toBeInTheDocument();
-    expect(screen.getByText(/每天各有 3 次有效 AI 请求/)).toBeInTheDocument();
+    expect(screen.getByText(/登录用户每天有 10 次有效 AI 请求，无请求间隔限制/)).toBeInTheDocument();
   });
 });
