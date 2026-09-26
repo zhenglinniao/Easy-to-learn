@@ -4,7 +4,7 @@ import { ApiFault } from './fault.js';
 
 export const GUEST_AI_DAILY_LIMIT = 3;
 export const AUTHENTICATED_AI_DAILY_LIMIT = 10;
-export const AI_MIN_INTERVAL_MS = 5 * 60 * 1_000;
+export const GUEST_AI_MIN_INTERVAL_MS = 5 * 60 * 1_000;
 export const AI_PERIOD_MS = 30 * 24 * 60 * 60 * 1_000;
 export const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1_000;
 
@@ -29,6 +29,9 @@ export const quotaLimitsForActor = (actorKey: string): QuotaLimits =>
         imageDaily: 1,
         imagePeriod: 3,
       };
+
+export const minIntervalForActor = (actorKey: string): number =>
+  actorKey.startsWith('user:') ? 0 : GUEST_AI_MIN_INTERVAL_MS;
 
 export interface QuotaGrant {
   quota: QuotaStatus;
@@ -96,12 +99,14 @@ const periodResetAt = (startedAt: number | null): string | null =>
 const quotaStatus = (actorKey: string, state: ActorState, now: Date): QuotaStatus => {
   const limits = quotaLimitsForActor(actorKey);
   const day = shanghaiDayWindow(now);
-  const retryAt = (state.lastAcceptedAt ?? 0) + AI_MIN_INTERVAL_MS;
+  const minIntervalMs = minIntervalForActor(actorKey);
+  const retryAt = (state.lastAcceptedAt ?? 0) + minIntervalMs;
   const actionDailyRemaining = Math.max(0, limits.actionDaily - state.actionDailyUsed);
   const actionPeriodRemaining = Math.max(0, limits.actionPeriod - state.actionPeriodUsed);
   const imageDailyRemaining = Math.max(0, limits.imageDaily - state.imageDailyUsed);
   const imagePeriodRemaining = Math.max(0, limits.imagePeriod - state.imagePeriodUsed);
-  const nextAllowedAt = retryAt > now.getTime() ? new Date(retryAt).toISOString() : null;
+  const nextAllowedAt =
+    minIntervalMs > 0 && retryAt > now.getTime() ? new Date(retryAt).toISOString() : null;
 
   return {
     dailyLimit: limits.actionDaily,
@@ -149,6 +154,7 @@ export class MemoryAiStateStore implements AiStateStore {
   async reserve(actorKey: string, requestId: string, now: Date): Promise<QuotaGrant> {
     const state = this.ensureState(actorKey, now);
     const limits = quotaLimitsForActor(actorKey);
+    const minIntervalMs = minIntervalForActor(actorKey);
     if (state.reservations.has(requestId)) {
       return { quota: quotaStatus(actorKey, state, now), duplicateInFlight: true };
     }
@@ -164,10 +170,11 @@ export class MemoryAiStateStore implements AiStateStore {
     }
     if (
       state.lastAcceptedAt !== null &&
-      now.getTime() - state.lastAcceptedAt < AI_MIN_INTERVAL_MS
+      minIntervalMs > 0 &&
+      now.getTime() - state.lastAcceptedAt < minIntervalMs
     ) {
-      const retryAt = state.lastAcceptedAt + AI_MIN_INTERVAL_MS;
-      throw new ApiFault('RATE_LIMITED', '每 5 分钟只能发起一次 AI 请求', {
+      const retryAt = state.lastAcceptedAt + minIntervalMs;
+      throw new ApiFault('RATE_LIMITED', '游客每 5 分钟只能发起一次 AI 请求', {
         retryAfterSeconds: Math.ceil((retryAt - now.getTime()) / 1_000),
         nextAllowedAt: new Date(retryAt).toISOString(),
       });

@@ -89,21 +89,33 @@ describe('AI quota state', () => {
     const startedAt = new Date('2026-09-26T00:00:00.000Z');
 
     for (let index = 0; index < 10; index += 1) {
-      const now = new Date(startedAt.getTime() + index * 5 * 60 * 1_000);
-      await expect(state.reserve(actor, `daily-${index}`, now)).resolves.toMatchObject({
+      await expect(state.reserve(actor, `daily-${index}`, startedAt)).resolves.toMatchObject({
         duplicateInFlight: false,
+        quota: { action: { nextAllowedAt: null } },
       });
     }
 
-    const afterTenthCooldown = new Date(startedAt.getTime() + 10 * 5 * 60 * 1_000);
-    await expect(state.status(actor, afterTenthCooldown)).resolves.toMatchObject({
+    await expect(state.status(actor, startedAt)).resolves.toMatchObject({
       dailyLimit: 10,
       remaining: 0,
-      action: { dailyLimit: 10, dailyRemaining: 0 },
+      nextAllowedAt: null,
+      action: { dailyLimit: 10, dailyRemaining: 0, nextAllowedAt: null },
     });
-    await expect(state.reserve(actor, 'daily-over-limit', afterTenthCooldown)).rejects.toMatchObject({
+    await expect(state.reserve(actor, 'daily-over-limit', startedAt)).rejects.toMatchObject({
       code: 'DAILY_QUOTA_EXHAUSTED',
       details: { dailyLimit: 10 },
+    });
+  });
+
+  it('游客仍需等待 5 分钟才能发起下一次请求', async () => {
+    const state = new MemoryAiStateStore();
+    const actor = 'anonymous:guest-1';
+    const now = new Date('2026-09-26T00:00:00.000Z');
+
+    await state.reserve(actor, 'guest-first', now);
+    await expect(state.reserve(actor, 'guest-too-soon', now)).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+      details: { retryAfterSeconds: 300 },
     });
   });
 });
