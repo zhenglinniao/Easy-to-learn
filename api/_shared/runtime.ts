@@ -36,6 +36,32 @@ const required = (name: string): string => {
   return value;
 };
 
+const bearerToken = (request: HttpRequest): string | undefined => {
+  const authorization = header(request, 'authorization');
+  if (!authorization) return undefined;
+  const match = /^Bearer[\t ]+(\S+)$/i.exec(authorization);
+  if (!match?.[1]) throw new ApiFault('AUTH_REQUIRED', '登录凭据无效');
+  return match[1];
+};
+
+const authenticatedAtFromJwt = (accessToken: string): Date => {
+  try {
+    const parts = accessToken.split('.');
+    if (parts.length !== 3 || !parts[1]) throw new Error('invalid JWT');
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as {
+      auth_time?: unknown;
+      iat?: unknown;
+    };
+    const timestamp = payload.auth_time ?? payload.iat;
+    if (typeof timestamp !== 'number' || !Number.isFinite(timestamp) || timestamp <= 0) {
+      throw new Error('missing authentication timestamp');
+    }
+    return new Date(timestamp * 1_000);
+  } catch {
+    throw new ApiFault('AUTH_REQUIRED', '登录凭据无效');
+  }
+};
+
 export const sessionKeysFromEnvironment = (): SessionKey[] =>
   required('ANON_SESSION_KEYS')
     .split(',')
@@ -76,12 +102,8 @@ export const createUploadTicketService = (): UploadTicketService =>
 export const resolveActor = async (
   request: HttpRequest,
 ): Promise<{ actor: TutorActor; accessToken?: string }> => {
-  const authorization = header(request, 'authorization');
-  if (authorization) {
-    if (!authorization.startsWith('Bearer ')) {
-      throw new ApiFault('AUTH_REQUIRED', '登录凭据无效');
-    }
-    const accessToken = authorization.slice(7);
+  const accessToken = bearerToken(request);
+  if (accessToken) {
     const supabase = createClient(required('SUPABASE_URL'), required('SUPABASE_ANON_KEY'), {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -188,19 +210,14 @@ export const createIllustrationService = async (
 export const resolveAuthenticatedAccount = async (
   request: HttpRequest,
 ): Promise<AuthenticatedAccount> => {
-  const authorization = header(request, 'authorization');
-  if (!authorization?.startsWith('Bearer ')) throw new ApiFault('AUTH_REQUIRED', '请先登录');
-  const accessToken = authorization.slice(7);
+  const accessToken = bearerToken(request);
+  if (!accessToken) throw new ApiFault('AUTH_REQUIRED', '请先登录');
   const supabase = createClient(required('SUPABASE_URL'), required('SUPABASE_ANON_KEY'), {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data, error } = await supabase.auth.getUser(accessToken);
   if (error || !data.user) throw new ApiFault('AUTH_REQUIRED', '登录已失效，请重新登录');
-  const payload = JSON.parse(
-    Buffer.from(accessToken.split('.')[1] ?? '', 'base64url').toString('utf8'),
-  ) as { auth_time?: number; iat?: number };
-  const authenticatedAt = new Date((payload.auth_time ?? payload.iat ?? 0) * 1_000);
-  return { userId: data.user.id, authenticatedAt };
+  return { userId: data.user.id, authenticatedAt: authenticatedAtFromJwt(accessToken) };
 };
 
 export const createAccountDeletionService = (): AccountDeletionService =>
