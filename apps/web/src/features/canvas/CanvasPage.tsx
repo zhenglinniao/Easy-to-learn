@@ -39,6 +39,7 @@ import { useAuth } from '../auth';
 import { TutorApiClient, tutorErrorMessage } from '../ai-tutor';
 import { GuestBoardMigrationService, RemoteBoardRepository, SupabaseBoardGateway } from '../boards';
 import { downloadJson } from '../account';
+import { ModalFocusBoundary } from '../../components/ModalFocusBoundary';
 import { ThemeToggle, useTheme } from '../theme';
 
 import '@excalidraw/excalidraw/index.css';
@@ -1353,11 +1354,10 @@ export default function CanvasPage() {
 
       {showLocalData ? (
         <div className={styles.dialogBackdrop} role="presentation">
-          <section
+          <ModalFocusBoundary
             className={styles.dataDialog}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="local-data-title"
+            ariaLabelledby="local-data-title"
+            onDismiss={() => setShowLocalData(false)}
           >
             <div className={styles.dialogHeading}>
               <div>
@@ -1409,17 +1409,21 @@ export default function CanvasPage() {
                 清空本地数据
               </button>
             </div>
-          </section>
+          </ModalFocusBoundary>
         </div>
       ) : null}
 
       {pendingLocalDelete || confirmClearLocal ? (
         <div className={styles.dialogBackdrop} role="presentation">
-          <section
+          <ModalFocusBoundary
             className={styles.confirmDialog}
             role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="local-delete-title"
+            ariaLabelledby="local-delete-title"
+            onDismiss={() => {
+              setPendingLocalDelete(null);
+              setConfirmClearLocal(false);
+              setShowLocalData(true);
+            }}
           >
             <h2 id="local-delete-title">
               {confirmClearLocal ? '清空所有本地数据？' : '删除这块本地画板？'}
@@ -1452,7 +1456,7 @@ export default function CanvasPage() {
                 确认删除
               </button>
             </div>
-          </section>
+          </ModalFocusBoundary>
         </div>
       ) : null}
     </main>

@@ -1,3 +1,4 @@
+import { ModalFocusBoundary } from '../../components/ModalFocusBoundary';
 import styles from './CanvasPage.module.css';
 
 export interface ConflictResolutionDialogProps {
@@ -17,11 +18,10 @@ export function ConflictResolutionDialog({
 }: ConflictResolutionDialogProps) {
   return (
     <div className={styles.dialogBackdrop} role="presentation">
-      <section
+      <ModalFocusBoundary
         className={styles.conflictDialog}
         role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="conflict-title"
+        ariaLabelledby="conflict-title"
       >
         <p className={styles.conflictEyebrow}>已保护你的本地内容</p>
         <h2 id="conflict-title">云端画板在其他位置发生了修改</h2>
@@ -55,7 +55,7 @@ export function ConflictResolutionDialog({
         <p className={styles.conflictFootnote}>
           Easy to learn 不提供“强制覆盖云端”，避免不可恢复的数据丢失。
         </p>
-      </section>
+      </ModalFocusBoundary>
     </div>
   );
 }

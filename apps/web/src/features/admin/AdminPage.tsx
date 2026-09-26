@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 
+import { ModalFocusBoundary } from '../../components/ModalFocusBoundary';
 import { useAuth } from '../auth';
 import { SiteHeader } from '../../pages/SiteHeader';
 import {
@@ -667,11 +668,13 @@ export default function AdminPage() {
 
       {confirmAccount && (
         <div className={styles.dialogBackdrop} role="presentation">
-          <div
+          <ModalFocusBoundary
             className={styles.dialog}
             role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="account-action-title"
+            ariaLabelledby="account-action-title"
+            onDismiss={() => {
+              if (!busy) setConfirmAccount(null);
+            }}
           >
             <h2 id="account-action-title">
               {confirmAccount.suspended ? '恢复账户？' : '暂停账户？'}
@@ -695,7 +698,7 @@ export default function AdminPage() {
                 {confirmAccount.suspended ? '确认恢复' : '确认暂停'}
               </button>
             </div>
-          </div>
+          </ModalFocusBoundary>
         </div>
       )}
     </main>

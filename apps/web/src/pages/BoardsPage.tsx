@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { AccountService } from '../features/account';
+import { ModalFocusBoundary } from '../components/ModalFocusBoundary';
 import { useAuth } from '../features/auth';
 import { RemoteBoardRepository, toBoardMessage, type BoardSummary } from '../features/boards';
 import { SiteHeader } from './SiteHeader';
@@ -190,11 +191,13 @@ export default function BoardsPage() {
       </section>
       {confirmDelete && (
         <div className={styles.dialogBackdrop} role="presentation">
-          <div
+          <ModalFocusBoundary
             className={styles.dialog}
             role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="delete-title"
+            ariaLabelledby="delete-title"
+            onDismiss={() => {
+              if (!busy) setConfirmDelete(null);
+            }}
           >
             <h2 id="delete-title">永久删除“{confirmDelete.title}”？</h2>
             <p>数据库记录会立即删除，关联图片将在 24 小时内清理。此操作没有回收站。</p>
@@ -211,39 +214,44 @@ export default function BoardsPage() {
                 确认删除
               </button>
             </div>
-          </div>
+          </ModalFocusBoundary>
         </div>
       )}
       {renameBoard && (
         <div className={styles.dialogBackdrop} role="presentation">
-          <form
+          <ModalFocusBoundary
             className={styles.dialog}
-            aria-labelledby="rename-title"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void rename();
+            ariaLabelledby="rename-title"
+            onDismiss={() => {
+              if (!busy) setRenameBoard(null);
             }}
           >
-            <h2 id="rename-title">重命名画板</h2>
-            <label>
-              画板名称
-              <input
-                autoFocus
-                maxLength={120}
-                required
-                value={renameTitle}
-                onChange={(event) => setRenameTitle(event.target.value)}
-              />
-            </label>
-            <div>
-              <button type="button" onClick={() => setRenameBoard(null)}>
-                取消
-              </button>
-              <button type="submit" disabled={busy || !renameTitle.trim()}>
-                保存名称
-              </button>
-            </div>
-          </form>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void rename();
+              }}
+            >
+              <h2 id="rename-title">重命名画板</h2>
+              <label>
+                画板名称
+                <input
+                  maxLength={120}
+                  required
+                  value={renameTitle}
+                  onChange={(event) => setRenameTitle(event.target.value)}
+                />
+              </label>
+              <div>
+                <button type="button" onClick={() => setRenameBoard(null)}>
+                  取消
+                </button>
+                <button type="submit" disabled={busy || !renameTitle.trim()}>
+                  保存名称
+                </button>
+              </div>
+            </form>
+          </ModalFocusBoundary>
         </div>
       )}
     </main>

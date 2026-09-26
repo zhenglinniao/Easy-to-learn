@@ -1443,7 +1443,8 @@
   color: var(--muted);
   line-height: 1.6;
 }
-.dialog > div {
+.dialog > div,
+.dialog form > div {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
