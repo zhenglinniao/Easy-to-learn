@@ -54,6 +54,11 @@ import { ConflictResolutionDialog } from './ConflictResolutionDialog';
 import { DebouncedLatestTask } from './debouncedLatestTask';
 import { HANDWRITING_FONT_FAMILY, migrateElementsToHandwriting } from './handwriting';
 import { addStepIllustrationFile, blobToDataUrl } from './illustrationAsset';
+import {
+  illustrationStatusLabel,
+  updateMatchingIllustrationStatus,
+  type IllustrationProgressStatus,
+} from './illustrationProgress';
 import { mapWithConcurrency } from './mapWithConcurrency';
 import { syncStateAfterNetworkChange } from './syncResume';
 import { useOnlineStatus } from './useOnlineStatus';
@@ -67,22 +72,13 @@ interface OpenMenu {
 }
 
 interface PreparedSummary {
+  requestId: string;
   action: RadialMenuAction;
   elementCount: number;
   textLength: number;
   hasImage: boolean;
-  illustrationStatus?:
-    'generating' | 'generated' | 'not_applicable' | 'unavailable' | 'quota_exhausted';
+  illustrationStatus?: IllustrationProgressStatus;
 }
-
-const illustrationStatusLabel = (status: PreparedSummary['illustrationStatus']): string => {
-  if (status === 'generating') return ' · 正在生成教学插画';
-  if (status === 'generated') return ' · 插画已放入画布';
-  if (status === 'not_applicable') return ' · 本题使用精确文字与矢量图解';
-  if (status === 'unavailable') return ' · 生图模型尚未配置';
-  if (status === 'quota_exhausted') return ' · 今日插画额度已用完';
-  return '';
-};
 
 const taskActionLabel = (action: CanvasAiTask['action']): string => {
   if (action === 'solve') return '解题';
@@ -946,6 +942,7 @@ export default function CanvasPage() {
       requestInputs.current.set(id, base);
       commitTutorBoards((current) => [...current, next]);
       setPrepared({
+        requestId,
         action,
         elementCount: input.elementIds.length,
         textLength: input.text?.length ?? 0,
@@ -954,7 +951,7 @@ export default function CanvasPage() {
       if (action === 'solve') {
         updateAiTask(requestId, { stage: 'illustrating' });
         setPrepared((current) =>
-          current ? { ...current, illustrationStatus: 'generating' } : current,
+          updateMatchingIllustrationStatus(current, requestId, 'generating'),
         );
         try {
           const illustration = await client.generateIllustration(
@@ -983,10 +980,17 @@ export default function CanvasPage() {
             );
           }
           setPrepared((current) =>
-            current ? { ...current, illustrationStatus: illustration.status } : current,
+            updateMatchingIllustrationStatus(current, requestId, illustration.status),
           );
         } catch (error) {
-          if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            setPrepared((current) =>
+              updateMatchingIllustrationStatus(current, requestId, 'cancelled'),
+            );
+          } else {
+            setPrepared((current) =>
+              updateMatchingIllustrationStatus(current, requestId, 'failed'),
+            );
             setPreparationError(
               tutorErrorMessage(error, '插画生成暂时不可用，文字与矢量图解已保留。'),
             );
