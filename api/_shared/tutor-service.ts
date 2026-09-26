@@ -25,6 +25,20 @@ export interface BoardAuthorizer {
 export class ProviderTimeoutError extends Error {}
 export class ProviderUnavailableError extends Error {}
 
+const providerFailureDetails = (error: unknown): Record<string, string> => {
+  const details: Record<string, string> = {};
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
+    details[`cause${depth}Name`] = current.name.slice(0, 80);
+    const code = (current as Error & { code?: unknown }).code;
+    if (typeof code === 'string' || typeof code === 'number') {
+      details[`cause${depth}Code`] = String(code).slice(0, 80);
+    }
+    current = current.cause;
+  }
+  return details;
+};
+
 const correctionFromIssues = (issues: Array<{ path: PropertyKey[]; message: string }>): string => {
   const details = issues
     .slice(0, 8)
@@ -301,6 +315,7 @@ export class TutorService {
             event: 'ai_provider_unavailable',
             requestId: request.requestId,
             detail: error.message.slice(0, 160),
+            ...providerFailureDetails(error),
           }),
         );
         throw new ApiFault('AI_PROVIDER_ERROR', 'AI 服务暂时不可用，请稍后重试');
