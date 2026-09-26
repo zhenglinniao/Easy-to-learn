@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { requireAllowedOrigin, type HttpRequest } from './http.js';
 
-const request = (
-  method: string,
-  headers: HttpRequest['headers'],
-): HttpRequest => ({ method, headers });
+const request = (method: string, headers: HttpRequest['headers']): HttpRequest => ({
+  method,
+  headers,
+});
 
 afterEach(() => {
   delete process.env.APP_ORIGINS;
@@ -22,9 +22,7 @@ describe('requireAllowedOrigin', () => {
   it('允许同源 GET 在没有 Origin 时通过 Referer 校验', () => {
     process.env.APP_ORIGINS = 'https://easy.example.com';
     expect(() =>
-      requireAllowedOrigin(
-        request('GET', { referer: 'https://easy.example.com/admin?page=1' }),
-      ),
+      requireAllowedOrigin(request('GET', { referer: 'https://easy.example.com/admin?page=1' })),
     ).not.toThrow();
   });
 

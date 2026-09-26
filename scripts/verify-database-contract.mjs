@@ -100,10 +100,7 @@ assert(
     migration.includes("updated_at < pg_catalog.now() - interval '30 days'"),
   '运行数据保留期与已确认方案不一致',
 );
-assert(
-  migration.includes('where day < current_date - 90'),
-  '匿名访客摘要没有按 90 天保留期清理',
-);
+assert(migration.includes('where day < current_date - 90'), '匿名访客摘要没有按 90 天保留期清理');
 assert(
   migration.includes("'orphaned_upload', v_now + interval '24 hours'"),
   '取消引用的画板资产没有进入 24 小时延迟清理队列',
