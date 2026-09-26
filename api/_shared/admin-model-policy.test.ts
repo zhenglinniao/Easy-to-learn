@@ -31,12 +31,17 @@ describe('admin model policy', () => {
       expect.objectContaining({
         id: 'deepseek',
         hasApiKey: true,
-        responseFormat: 'json_object',
+        responseFormat: 'json_schema',
+        wireApi: 'responses',
       }),
     );
     expect(JSON.stringify(toAdminModelPolicyView(policy))).not.toContain('secret-primary');
     expect(applyAdminModelPolicy(policy)[0]).toEqual(
-      expect.objectContaining({ apiKey: 'secret-primary', responseFormat: 'json_object' }),
+      expect.objectContaining({
+        apiKey: 'secret-primary',
+        responseFormat: 'json_schema',
+        wireApi: 'responses',
+      }),
     );
   });
 
