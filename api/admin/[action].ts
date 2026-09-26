@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { AdminService, requireAdmin, resolveAdminAccess } from '../_shared/admin.js';
 import { ApiFault } from '../_shared/fault.js';
 import {
@@ -21,7 +23,9 @@ const requireJson = (request: HttpRequest): void => {
 };
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
+  const requestId = randomUUID();
   disableResponseCaching(response);
+  response.setHeader('X-Request-Id', requestId);
   try {
     requireAllowedOrigin(request);
     const action = actionFrom(request);
@@ -66,6 +70,6 @@ export default async function handler(request: HttpRequest, response: HttpRespon
 
     throw new ApiFault('INVALID_INPUT', '管理员接口不存在');
   } catch (error) {
-    sendError(response, error);
+    sendError(response, error, requestId);
   }
 }

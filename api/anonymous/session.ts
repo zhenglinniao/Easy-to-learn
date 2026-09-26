@@ -17,7 +17,9 @@ import {
 } from '../_shared/session.js';
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
+  const requestId = randomUUID();
   disableResponseCaching(response);
+  response.setHeader('X-Request-Id', requestId);
   try {
     if (request.method !== 'POST') throw new ApiFault('INVALID_INPUT', '仅支持 POST 请求');
     requireAllowedOrigin(request);
@@ -37,9 +39,8 @@ export default async function handler(request: HttpRequest, response: HttpRespon
       response.setHeader('Set-Cookie', serializeAnonymousCookie(issued.cookieValue));
     }
     const quota = await createAiStateStore().status(`anonymous:${session.id}`, new Date());
-    response.setHeader('X-Request-Id', randomUUID());
     response.status(200).json({ data: { expiresAt: session.expiresAt, quota } });
   } catch (error) {
-    sendError(response, error);
+    sendError(response, error, requestId);
   }
 }

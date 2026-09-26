@@ -56,6 +56,7 @@ describe('analytics API', () => {
 
     expect(result().statusCode).toBe(204);
     expect(result().ended).toBe(true);
+    expect(result().headers.get('X-Request-Id')).toMatch(/^[0-9a-f-]{36}$/);
     expect(result().headers.get('Set-Cookie')).toContain('HttpOnly; Secure; SameSite=Lax');
     expect(rpc).toHaveBeenCalledWith(
       'record_analytics_visit',
@@ -71,6 +72,9 @@ describe('analytics API', () => {
 
     expect(result().statusCode).toBe(403);
     expect(result().body).toMatchObject({ code: 'FORBIDDEN' });
+    expect(result().headers.get('X-Request-Id')).toBe(
+      (result().body as { requestId: string }).requestId,
+    );
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -100,6 +104,7 @@ describe('analytics API', () => {
 
     expect(result().statusCode).toBe(200);
     expect(result().headers.get('Cache-Control')).toContain('s-maxage=300');
+    expect(result().headers.get('X-Request-Id')).toMatch(/^[0-9a-f-]{36}$/);
     expect(result().body).toMatchObject({
       data: { totalVisits: 12, visitors30d: 8, registeredUsers: 4, cloudBoards: 6 },
     });
@@ -114,6 +119,9 @@ describe('analytics API', () => {
 
     expect(result().statusCode).toBe(503);
     expect(result().body).toMatchObject({ code: 'DEPENDENCY_UNAVAILABLE', retryable: true });
+    expect(result().headers.get('X-Request-Id')).toBe(
+      (result().body as { requestId: string }).requestId,
+    );
     expect(JSON.stringify(result().body)).not.toContain('private database detail');
   });
 });

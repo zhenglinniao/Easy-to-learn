@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { createClient } from '@supabase/supabase-js';
 
 import {
@@ -17,6 +19,8 @@ import {
 } from '../_shared/http.js';
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
+  const requestId = randomUUID();
+  response.setHeader('X-Request-Id', requestId);
   try {
     if (request.method !== 'POST') throw new ApiFault('INVALID_INPUT', '仅支持 POST 请求');
     requireAllowedOrigin(request);
@@ -51,6 +55,6 @@ export default async function handler(request: HttpRequest, response: HttpRespon
     response.setHeader('Cache-Control', 'no-store');
     response.status(204).end();
   } catch (error) {
-    sendError(response, error);
+    sendError(response, error, requestId);
   }
 }
