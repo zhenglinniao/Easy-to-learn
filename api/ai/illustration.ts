@@ -12,7 +12,13 @@ import {
 import { createIllustrationService, resolveActor } from '../_shared/runtime.js';
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
-  const requestId = randomUUID();
+  const requestId =
+    request.body &&
+    typeof request.body === 'object' &&
+    'requestId' in request.body &&
+    typeof request.body.requestId === 'string'
+      ? request.body.requestId
+      : randomUUID();
   disableResponseCaching(response);
   try {
     if (request.method !== 'POST') throw new ApiFault('INVALID_INPUT', '仅支持 POST 请求');
