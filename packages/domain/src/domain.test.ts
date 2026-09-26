@@ -483,6 +483,20 @@ describe('AI API 契约', () => {
     expect(quotaStatusSchema.safeParse(quota).success).toBe(true);
     expect(quotaStatusSchema.safeParse({ ...quota, remaining: 4 }).success).toBe(false);
     expect(
+      quotaStatusSchema.safeParse({
+        ...quota,
+        dailyLimit: 10,
+        remaining: 9,
+        action: {
+          ...quota.action,
+          dailyLimit: 10,
+          dailyRemaining: 9,
+          periodLimit: 45,
+          periodRemaining: 44,
+        },
+      }).success,
+    ).toBe(true);
+    expect(
       apiErrorResponseSchema.safeParse({
         requestId: 'request-1',
         code: 'RATE_LIMITED',

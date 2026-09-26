@@ -59,15 +59,24 @@ export const apiErrorResponseSchema = z
 export const createDataResponseSchema = <T extends z.ZodType>(dataSchema: T) =>
   z.strictObject({ data: dataSchema });
 
-const actionQuotaSchema = z.strictObject({
-  dailyLimit: z.literal(3),
-  dailyRemaining: nonNegativeIntegerSchema.max(3),
-  periodLimit: z.union([z.literal(15), z.literal(45)]),
-  periodRemaining: nonNegativeIntegerSchema.max(45),
-  nextAllowedAt: isoDateTimeSchema.nullable(),
-  dailyResetsAt: isoDateTimeSchema,
-  periodResetsAt: isoDateTimeSchema.nullable(),
-});
+const actionQuotaSchema = z
+  .strictObject({
+    dailyLimit: z.union([z.literal(3), z.literal(10)]),
+    dailyRemaining: nonNegativeIntegerSchema.max(10),
+    periodLimit: z.union([z.literal(15), z.literal(45)]),
+    periodRemaining: nonNegativeIntegerSchema.max(45),
+    nextAllowedAt: isoDateTimeSchema.nullable(),
+    dailyResetsAt: isoDateTimeSchema,
+    periodResetsAt: isoDateTimeSchema.nullable(),
+  })
+  .refine(({ dailyLimit, dailyRemaining }) => dailyRemaining <= dailyLimit, {
+    message: '每日剩余额度不能超过每日上限',
+    path: ['dailyRemaining'],
+  })
+  .refine(({ periodLimit, periodRemaining }) => periodRemaining <= periodLimit, {
+    message: '周期剩余额度不能超过周期上限',
+    path: ['periodRemaining'],
+  });
 
 const imageQuotaSchema = z.strictObject({
   dailyLimit: z.union([z.literal(1), z.literal(2)]),
@@ -77,15 +86,20 @@ const imageQuotaSchema = z.strictObject({
   periodResetsAt: isoDateTimeSchema.nullable(),
 });
 
-export const quotaStatusSchema = z.strictObject({
-  // 兼容已发布客户端；新客户端读取 action/image。
-  dailyLimit: z.literal(3),
-  remaining: nonNegativeIntegerSchema.max(3),
-  nextAllowedAt: isoDateTimeSchema.nullable(),
-  action: actionQuotaSchema,
-  image: imageQuotaSchema,
-  mode: z.enum(['full', 'vector_only', 'paused']),
-});
+export const quotaStatusSchema = z
+  .strictObject({
+    // 兼容已发布客户端；新客户端读取 action/image。
+    dailyLimit: z.union([z.literal(3), z.literal(10)]),
+    remaining: nonNegativeIntegerSchema.max(10),
+    nextAllowedAt: isoDateTimeSchema.nullable(),
+    action: actionQuotaSchema,
+    image: imageQuotaSchema,
+    mode: z.enum(['full', 'vector_only', 'paused']),
+  })
+  .refine(({ dailyLimit, remaining }) => remaining <= dailyLimit, {
+    message: '每日剩余额度不能超过每日上限',
+    path: ['remaining'],
+  });
 
 const base64Schema = z
   .string()

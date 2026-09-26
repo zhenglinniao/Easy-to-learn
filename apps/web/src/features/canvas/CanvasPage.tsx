@@ -66,7 +66,8 @@ const canSubmitFeedback = (board: PersistedTutorBoardV2): boolean =>
 
 const quotaBlockReason = (quota: QuotaStatus | null, now: number): string | null => {
   if (!quota) return null;
-  if (quota.action.dailyRemaining === 0) return '今天的 3 次 AI 额度已用完，明天再来吧。';
+  if (quota.action.dailyRemaining === 0)
+    return `今天的 ${quota.action.dailyLimit} 次 AI 额度已用完，明天再来吧。`;
   if (quota.action.periodRemaining === 0) return '近 30 天 AI 额度已用完，请在额度恢复后再试。';
   const nextAllowed = quota.action.nextAllowedAt
     ? Date.parse(quota.action.nextAllowedAt)
