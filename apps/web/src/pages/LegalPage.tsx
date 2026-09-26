@@ -11,7 +11,7 @@ export default function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
       <article className={styles.legalPage}>
         <p className={styles.eyebrow}>{privacy ? '隐私说明' : '使用条款'}</p>
         <h1>{privacy ? '我们怎样处理你的学习数据' : '使用 Easy to learn 前请了解'}</h1>
-        <p className={styles.legalUpdated}>更新日期：2026 年 9 月 23 日</p>
+        <p className={styles.legalUpdated}>更新日期：2026 年 9 月 26 日</p>
         {privacy ? <PrivacyContent /> : <TermsContent />}
         <p>
           <Link to="/">返回首页</Link>
@@ -35,12 +35,17 @@ function PrivacyContent() {
         Supabase、Vercel、Upstash Redis 与部署时选定的 AI
         模型供应商；具体供应商可能随服务配置调整。我们不出售个人数据，也不建立包含用户题图的人工审核队列。
       </p>
+      <p>
+        官网访问统计使用服务端签发的随机标识生成不可逆摘要，只统计访问会话和匿名聚合数量；不保存
+        IP、完整 User-Agent、页面查询参数、题目或画布内容。浏览器启用“请勿追踪”时不会发送访问事件。
+      </p>
       <h2>保留期限</h2>
       <ul>
         <li>活跃画板和图片保留至你删除画板或账户；已删画板的关联图片在 24 小时内清理。</li>
         <li>账户删除有 7 天冷静期；期满后主数据在 24 小时内删除，灾难恢复备份最长保留 30 天。</li>
         <li>AI 运行元数据保留 90 天，安全与权限审计日志保留 180 天。</li>
         <li>匿名限流标识在最后活动 48 小时后清理，幂等响应最长保留 24 小时。</li>
+        <li>访问统计的匿名访客摘要保留 90 天；无法关联个人的每日聚合计数长期保留。</li>
       </ul>
       <h2>你的选择</h2>
       <p>

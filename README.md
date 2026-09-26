@@ -4,7 +4,7 @@ Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无�
 
 在线演示：[https://easy-to-learn-steel.vercel.app](https://easy-to-learn-steel.vercel.app)
 
-当前仓库已完成可运行的本地 MVP 代码、单元测试和 Vercel 部署。线上演示已配置 Supabase 公共连接、Upstash Redis 和 DeepSeek，游客文字拆解已经过真实端到端验收；Supabase service role、OAuth、Sentry 和自定义域名尚未配置，因此大图临时上传、账户删除和相关管理任务仍不能视为完整生产上线。
+当前仓库已完成可运行的本地 MVP 代码、单元测试和 Vercel 部署。外部资源是否可用于生产以对应平台的当前配置和验收结果为准，仓库不会把缺失的密钥或未执行的迁移伪装为可用能力。
 
 ## 功能
 
@@ -26,6 +26,7 @@ Easy to learn 是一个中文 AI 学习画布：用户可以在 Excalidraw 无�
 - 游客与登录用户每天各 3 次有效 AI 请求，同一身份每 5 分钟最多 1 次。
 - 官网使用原创吉祥物“小易”演示题目到分步辅导的过程，并完整支持 reduced motion。
 - 官网以动态图文微界面展示题图提示、图形推理和跨设备复习三类实际使用场景。
+- 官网展示真实的累计访问、近 30 天匿名访客、注册学习者和云端画板数量；统计失败时明确降级，不展示虚构数据。
 
 ## 技术栈
 
@@ -107,6 +108,7 @@ Copy-Item .env.example .env.local
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 配额、限流、票据和幂等缓存                       |
 | `ANON_SESSION_KEYS`                                   | `v2:至少32字符密钥,v1:旧密钥`，第一项用于签发    |
 | `ACTOR_HASH_SECRET`                                   | actor 不可逆摘要和上传路径隔离                   |
+| `ANALYTICS_HASH_SECRET`                               | 第一方匿名访问统计摘要；未配置时兼容 actor 密钥  |
 | `AI_CACHE_ENCRYPTION_KEY`                             | 32 字节随机值的 Base64，保护 24 小时幂等响应     |
 | `CRON_SECRET`                                         | Vercel Cron 调用保留任务的 Bearer 密钥           |
 | `APP_ORIGINS`                                         | 逗号分隔的完整允许 origin                        |
@@ -152,6 +154,12 @@ pnpm dlx vercel@latest dev
 
 ```powershell
 Invoke-RestMethod http://localhost:3000/api/health
+```
+
+读取首页公开聚合指标：
+
+```powershell
+Invoke-RestMethod http://localhost:3000/api/analytics/metrics
 ```
 
 建立游客会话：
@@ -204,7 +212,7 @@ pnpm audit:dependencies
 pnpm check
 ```
 
-当前本地结果：26 个测试文件通过、1 个真实供应商测试文件按环境开关跳过；120 个测试用例通过、5 个真实供应商用例跳过。数据库静态契约覆盖 6 张表和 43 项 pgTAP 断言，生产构建与高危依赖审计通过。详细范围见 [单元测试报告](docs/04-单元测试报告.md)。
+当前本地结果：32 个测试文件通过、1 个真实供应商测试文件按环境开关跳过；139 个测试用例通过、5 个真实供应商用例跳过。数据库静态契约覆盖 8 张表和 60 项 pgTAP 断言，生产构建通过。详细范围见 [单元测试报告](docs/04-单元测试报告.md)。
 
 ## Vercel 部署
 
@@ -236,6 +244,7 @@ pnpm check
 - 已删除账户的灾难恢复备份：最长 30 天。
 - AI 运行元数据：90 天；安全与权限审计日志：180 天。
 - 匿名限流标识：最后活动后 48 小时；幂等响应：最长 24 小时。
+- 匿名访问去重摘要：90 天；只含计数的访问日聚合：长期保留。
 
 详细说明见应用内 `/privacy` 与 [需求决策记录](docs/01-需求评审与决策记录.md)。
 
