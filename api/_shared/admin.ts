@@ -1,6 +1,5 @@
 import { createHmac, randomUUID } from 'node:crypto';
 
-import type { User } from '@supabase/auth-js';
 import { createClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
 
@@ -51,7 +50,16 @@ const maskEmail = (email?: string): string => {
   return `${visible}${'*'.repeat(Math.max(2, Math.min(6, name.length - visible.length)))}@${domain}`;
 };
 
-const isSuspended = (user: User): boolean =>
+interface AdminAuthUser {
+  id: string;
+  email?: string;
+  created_at: string;
+  last_sign_in_at?: string;
+  email_confirmed_at?: string;
+  banned_until?: string;
+}
+
+const isSuspended = (user: AdminAuthUser): boolean =>
   Boolean(user.banned_until && Date.parse(user.banned_until) > Date.now());
 
 export interface AdminAccountSummary {
@@ -87,10 +95,17 @@ export class AdminService {
     pageSuspended: number;
   }> {
     const perPage = 50;
-    const { data, error } = await this.supabase.auth.admin.listUsers({ page, perPage });
-    if (error) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '无法读取账户列表');
+    const listResult = await this.supabase.auth.admin.listUsers({ page, perPage });
+    if (listResult.error) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '无法读取账户列表');
+    // Supabase 将成功响应与空数组错误响应建模为联合类型。Vercel 会逐个编译
+    // Serverless 函数，无法稳定地通过上方错误判断收窄，因此在服务边界统一类型。
+    const listedUsers = listResult.data.users as AdminAuthUser[];
+    const total =
+      'total' in listResult.data && typeof listResult.data.total === 'number'
+        ? listResult.data.total
+        : listedUsers.length;
     const needle = search.trim().toLowerCase();
-    const users = data.users.filter(
+    const users = listedUsers.filter(
       (user) =>
         !needle ||
         user.id.toLowerCase().includes(needle) ||
@@ -122,7 +137,7 @@ export class AdminService {
     const policy = await this.policyStore.read(configs);
     return {
       accounts,
-      pagination: { page, perPage, total: data.total ?? accounts.length },
+      pagination: { page, perPage, total },
       models: toAdminModelPolicyView(policy).providers,
       policyUpdatedAt: policy.updatedAt,
       pageSuspended: accounts.filter(({ suspended }) => suspended).length,
