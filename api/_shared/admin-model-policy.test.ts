@@ -237,4 +237,33 @@ describe('admin model policy', () => {
     expect(stored).not.toContain('secret-primary');
     expect(stored).not.toContain('deepseek-flash');
   });
+
+  it('仅在配置键确实不存在时使用环境默认值', async () => {
+    const redis = {
+      get: async () => null,
+    } as unknown as Redis;
+    const store = new AdminModelPolicyStore(redis, key);
+
+    await expect(store.read(configs)).resolves.toEqual(defaultAdminModelPolicy(configs));
+  });
+
+  it('不会把 Redis 故障或密文损坏伪装成配置被重置', async () => {
+    const unavailable = new AdminModelPolicyStore(
+      { get: async () => Promise.reject(new Error('redis offline')) } as unknown as Redis,
+      key,
+    );
+    await expect(unavailable.read(configs)).rejects.toMatchObject({
+      code: 'DEPENDENCY_UNAVAILABLE',
+      message: '模型配置存储暂时不可用',
+    });
+
+    const corrupted = new AdminModelPolicyStore(
+      { get: async () => 'not-an-encrypted-policy' } as unknown as Redis,
+      key,
+    );
+    await expect(corrupted.read(configs)).rejects.toMatchObject({
+      code: 'DEPENDENCY_UNAVAILABLE',
+      message: '已保存的模型配置无法读取',
+    });
+  });
 });

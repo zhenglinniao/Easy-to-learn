@@ -347,13 +347,17 @@ export class AdminModelPolicyStore {
     private readonly encryptionKey: string,
   ) {}
   async read(configs: readonly AiProviderConfig[]): Promise<AdminModelPolicy> {
+    let encrypted: string | null;
     try {
-      const encrypted = await this.redis.get<string>(ADMIN_MODEL_POLICY_KEY);
-      return encrypted
-        ? validateAdminModelPolicy(decrypt(encrypted, this.encryptionKey), configs)
-        : defaultAdminModelPolicy(configs);
+      encrypted = await this.redis.get<string>(ADMIN_MODEL_POLICY_KEY);
     } catch {
-      return defaultAdminModelPolicy(configs);
+      throw new ApiFault('DEPENDENCY_UNAVAILABLE', '模型配置存储暂时不可用');
+    }
+    if (!encrypted) return defaultAdminModelPolicy(configs);
+    try {
+      return validateAdminModelPolicy(decrypt(encrypted, this.encryptionKey), configs);
+    } catch {
+      throw new ApiFault('DEPENDENCY_UNAVAILABLE', '已保存的模型配置无法读取');
     }
   }
   async write(
