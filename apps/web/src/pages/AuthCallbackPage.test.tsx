@@ -11,7 +11,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../features/auth', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../features/auth')>()),
-  getOptionalSupabaseClient: () => mocks.client,
+  getOptionalSupabaseClient: async () => mocks.client,
+  isSupabaseConfigured: () => true,
   completeAuthCallback: mocks.completeAuthCallback,
 }));
 

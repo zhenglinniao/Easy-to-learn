@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { AccountService } from '../features/account';
-import { getOptionalSupabaseClient, useAuth } from '../features/auth';
+import { useAuth } from '../features/auth';
 import { RemoteBoardRepository, toBoardMessage, type BoardSummary } from '../features/boards';
 import { SiteHeader } from './SiteHeader';
 import styles from './pages.module.css';
 
 export default function BoardsPage() {
-  const { user, loading } = useAuth();
+  const { client, user, loading } = useAuth();
   const navigate = useNavigate();
-  const client = getOptionalSupabaseClient();
   const repository = useMemo(() => (client ? new RemoteBoardRepository(client) : null), [client]);
   const account = useMemo(() => (client ? new AccountService(client) : null), [client]);
   const [boards, setBoards] = useState<BoardSummary[]>([]);

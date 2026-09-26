@@ -1,10 +1,25 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AuthProvider } from './AuthProvider';
 import { useAuth } from './context';
+
+const supabaseModule = vi.hoisted(() => ({
+  configured: false,
+  getOptionalClient: vi.fn(),
+}));
+
+vi.mock('./supabase', () => ({
+  getOptionalSupabaseClient: supabaseModule.getOptionalClient,
+  isSupabaseConfigured: () => supabaseModule.configured,
+}));
+
+afterEach(() => {
+  supabaseModule.configured = false;
+  supabaseModule.getOptionalClient.mockReset();
+});
 
 function Probe() {
   const auth = useAuth();
@@ -41,6 +56,32 @@ function Probe() {
 }
 
 describe('AuthProvider', () => {
+  it('按需加载浏览器客户端后再恢复 Session', async () => {
+    supabaseModule.configured = true;
+    const client = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: { session: { user: { email: 'lazy@example.com' } } },
+          error: null,
+        }),
+        onAuthStateChange: vi.fn().mockReturnValue({
+          data: { subscription: { unsubscribe: vi.fn() } },
+        }),
+      },
+    } as unknown as SupabaseClient;
+    supabaseModule.getOptionalClient.mockResolvedValue(client);
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(screen.getByText('加载中')).toBeInTheDocument();
+    expect(await screen.findByText('lazy@example.com')).toBeInTheDocument();
+    expect(supabaseModule.getOptionalClient).toHaveBeenCalledOnce();
+  });
+
   it('未配置 Supabase 时立即提供游客状态', () => {
     render(
       <AuthProvider client={null}>

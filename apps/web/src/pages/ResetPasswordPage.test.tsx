@@ -7,6 +7,7 @@ import { AuthContext, type AuthContextValue } from '../features/auth';
 import ResetPasswordPage from './ResetPasswordPage';
 
 const value = (overrides: Partial<AuthContextValue> = {}): AuthContextValue => ({
+  client: null,
   loading: false,
   initializationError: null,
   user: { id: 'user-1', email: 'learner@example.com' } as AuthContextValue['user'],

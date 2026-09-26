@@ -1,8 +1,9 @@
-import type { Session, User } from '@supabase/supabase-js';
+import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 import { createContext, useContext } from 'react';
 
 export interface AuthContextValue {
   loading: boolean;
+  client: SupabaseClient | null;
   initializationError: string | null;
   user: User | null;
   session: Session | null;

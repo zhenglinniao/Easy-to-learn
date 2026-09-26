@@ -23,6 +23,7 @@ const actions = {
 };
 
 const authValue = (): AuthContextValue => ({
+  client: null,
   loading: false,
   initializationError: null,
   user: null,

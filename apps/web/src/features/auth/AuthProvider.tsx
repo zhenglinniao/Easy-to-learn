@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 import { AuthContext, type AuthContextValue } from './context';
 import { toAuthMessage } from './errors';
 import { parseSafeRedirect } from './redirect';
-import { getOptionalSupabaseClient } from './supabase';
+import { getOptionalSupabaseClient, isSupabaseConfigured } from './supabase';
 
 const normalizedEmail = (email: string): string => email.trim().toLowerCase();
 
@@ -17,15 +17,34 @@ const callbackUrl = (redirect: string, flow?: 'recovery'): string => {
 
 export function AuthProvider({
   children,
-  client = getOptionalSupabaseClient(),
+  client: providedClient,
 }: PropsWithChildren<{ client?: SupabaseClient | null }>) {
+  const [client, setClient] = useState<SupabaseClient | null>(providedClient ?? null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(Boolean(client));
+  const [loading, setLoading] = useState(
+    providedClient === undefined ? isSupabaseConfigured() : Boolean(providedClient),
+  );
   const [initializationError, setInitializationError] = useState<string | null>(null);
   useEffect(() => {
-    if (!client) {
-      return;
-    }
+    if (providedClient !== undefined || !isSupabaseConfigured()) return;
+    let active = true;
+    void getOptionalSupabaseClient()
+      .then((loadedClient) => {
+        if (!active) return;
+        setClient(loadedClient);
+        if (!loadedClient) setLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setInitializationError('登录模块暂时无法加载，请刷新页面后重试。');
+        setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [providedClient]);
+  useEffect(() => {
+    if (!client) return;
     let active = true;
     void client.auth
       .getSession()
@@ -56,6 +75,7 @@ export function AuthProvider({
   }, [client]);
   const value = useMemo<AuthContextValue>(
     () => ({
+      client,
       loading,
       initializationError,
       session,

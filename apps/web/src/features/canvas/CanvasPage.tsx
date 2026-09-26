@@ -35,7 +35,7 @@ import { RadialMenu, TutorBoard, type RadialMenuAction } from '@easy-to-learn/ui
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
-import { getOptionalSupabaseClient, useAuth } from '../auth';
+import { useAuth } from '../auth';
 import { TutorApiClient, tutorErrorMessage } from '../ai-tutor';
 import { GuestBoardMigrationService, RemoteBoardRepository, SupabaseBoardGateway } from '../boards';
 import { downloadJson } from '../account';
@@ -256,7 +256,7 @@ const persistBoard = async (
 };
 
 export default function CanvasPage() {
-  const { user, session, signOut } = useAuth();
+  const { client, loading: authLoading, user, session, signOut } = useAuth();
   const theme = useTheme();
   const { boardId: routeBoardId } = useParams();
   const navigate = useNavigate();
@@ -362,6 +362,7 @@ export default function CanvasPage() {
   }, [quota?.action.nextAllowedAt]);
 
   useEffect(() => {
+    if (authLoading) return;
     if (routeBoardId) {
       if (!routeBoardId.startsWith('local_') && !user) {
         navigate(`/login?redirect=${encodeURIComponent(`/canvas/${routeBoardId}`)}`, {
@@ -372,10 +373,10 @@ export default function CanvasPage() {
     }
     if (user) navigate('/boards', { replace: true });
     else navigate(`/canvas/${generatedBoardId}`, { replace: true });
-  }, [generatedBoardId, navigate, routeBoardId, user]);
+  }, [authLoading, generatedBoardId, navigate, routeBoardId, user]);
 
   useEffect(() => {
-    if (!api || hydratedBoard.current === boardId) return;
+    if (!api || authLoading || hydratedBoard.current === boardId) return;
     let active = true;
     let closeDatabase: (() => void) | undefined;
     void openLocalDatabase()
@@ -414,7 +415,6 @@ export default function CanvasPage() {
         );
         await repository.cleanupExpiredGuestMigrations();
         let stored = await repository.getBoard(boardId);
-        const client = getOptionalSupabaseClient();
         const isCloudBoard = Boolean(user && client && !boardId.startsWith('local_'));
         if (isCloudBoard && user && client) {
           syncEngineRef.current = new BoardSyncEngine(
@@ -522,7 +522,7 @@ export default function CanvasPage() {
         closeDatabase?.();
       }
     };
-  }, [api, boardId, navigate, user]);
+  }, [api, authLoading, boardId, client, navigate, user]);
 
   useEffect(() => {
     const flushPendingSave = () => void saveQueueRef.current?.flush().catch(() => undefined);
@@ -810,7 +810,6 @@ export default function CanvasPage() {
   };
 
   const openRemoteVersion = async () => {
-    const client = getOptionalSupabaseClient();
     if (!client || !repositoryRef.current || !api) return;
     setConflictBusy(true);
     setConflictError(null);
@@ -868,7 +867,6 @@ export default function CanvasPage() {
   };
 
   const saveConflictAsNewBoard = async () => {
-    const client = getOptionalSupabaseClient();
     if (!client || !repositoryRef.current || !user) return;
     setConflictBusy(true);
     setConflictError(null);

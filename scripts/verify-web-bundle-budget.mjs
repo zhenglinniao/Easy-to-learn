@@ -6,9 +6,9 @@ const distDirectory = join(process.cwd(), 'apps', 'web', 'dist');
 const htmlPath = join(distDirectory, 'index.html');
 
 const budgets = {
-  entryScriptGzipBytes: 155 * 1024,
+  entryScriptGzipBytes: 100 * 1024,
   entryStyleGzipBytes: 8 * 1024,
-  initialAssetsGzipBytes: 170 * 1024,
+  initialAssetsGzipBytes: 115 * 1024,
 };
 
 const formatKiB = (bytes) => `${(bytes / 1024).toFixed(1)} KiB`;

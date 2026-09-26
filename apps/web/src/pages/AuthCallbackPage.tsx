@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   completeAuthCallback,
   getOptionalSupabaseClient,
+  isSupabaseConfigured,
   parseSafeRedirect,
 } from '../features/auth';
 import styles from './pages.module.css';
@@ -13,22 +14,33 @@ export default function AuthCallbackPage() {
   const started = useRef(false);
   const code = params.get('code');
   const providerError = params.get('error');
-  const invalidCallback = !getOptionalSupabaseClient() || !code || Boolean(providerError);
+  const invalidCallback = !isSupabaseConfigured() || !code || Boolean(providerError);
   const [error, setError] = useState<string | null>(
     invalidCallback ? '认证请求已取消、失效或不完整，请重新登录。' : null,
   );
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    const client = getOptionalSupabaseClient();
     const target =
       params.get('flow') === 'recovery'
         ? '/reset-password'
         : parseSafeRedirect(params.get('redirect'));
-    if (!client || !code || providerError) return;
-    void completeAuthCallback(client, code)
-      .then(() => navigate(target, { replace: true }))
-      .catch(() => setError('登录链接已过期或已使用，请重新登录。'));
+    if (!code || providerError || !isSupabaseConfigured()) return;
+    let active = true;
+    void getOptionalSupabaseClient()
+      .then((client) => {
+        if (!client) throw new Error('Supabase 尚未配置');
+        return completeAuthCallback(client, code);
+      })
+      .then(() => {
+        if (active) navigate(target, { replace: true });
+      })
+      .catch(() => {
+        if (active) setError('登录链接已过期或已使用，请重新登录。');
+      });
+    return () => {
+      active = false;
+    };
   }, [code, navigate, params, providerError]);
   return (
     <main className={styles.centerPage}>
