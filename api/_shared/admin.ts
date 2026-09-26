@@ -60,6 +60,9 @@ interface AdminAuthUser {
 const isSuspended = (user: AdminAuthUser): boolean =>
   Boolean(user.banned_until && Date.parse(user.banned_until) > Date.now());
 
+const USER_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export interface AdminAccountSummary {
   id: string;
   email: string;
@@ -155,14 +158,14 @@ export class AdminService {
   ): Promise<{ userId: string; suspended: boolean }> {
     if (!body || typeof body !== 'object') throw new ApiFault('INVALID_INPUT', '账户操作格式错误');
     const { userId, action } = body as { userId?: unknown; action?: unknown };
-    if (typeof userId !== 'string' || !/^[0-9a-f-]{36}$/i.test(userId)) {
+    if (typeof userId !== 'string' || !USER_ID_PATTERN.test(userId)) {
       throw new ApiFault('INVALID_INPUT', '用户 ID 格式错误');
     }
     if (action !== 'suspend' && action !== 'restore') {
       throw new ApiFault('INVALID_INPUT', '账户操作不受支持');
     }
-    if (userId === adminUserId && action === 'suspend') {
-      throw new ApiFault('FORBIDDEN', '不能暂停当前管理员账户');
+    if (action === 'suspend' && adminIds().has(userId)) {
+      throw new ApiFault('FORBIDDEN', '不能暂停管理员账户，请先从管理员名单中移除该账户');
     }
     const suspended = action === 'suspend';
     const { error } = await this.supabase.auth.admin.updateUserById(userId, {
