@@ -37,12 +37,14 @@ const query = (result: QueryResult): FluentQuery => {
 const from = vi.hoisted(() => vi.fn());
 const rpc = vi.hoisted(() => vi.fn());
 const remove = vi.hoisted(() => vi.fn());
+const storageFrom = vi.hoisted(() => vi.fn(() => ({ remove })));
+const deleteUser = vi.hoisted(() => vi.fn());
 const createClient = vi.hoisted(() =>
   vi.fn(() => ({
     from,
     rpc,
-    storage: { from: vi.fn(() => ({ remove })) },
-    auth: { admin: { deleteUser: vi.fn() } },
+    storage: { from: storageFrom },
+    auth: { admin: { deleteUser } },
   })),
 );
 
@@ -83,6 +85,8 @@ beforeEach(() => {
   from.mockReset();
   rpc.mockReset().mockResolvedValue({ data: null, error: null });
   remove.mockReset();
+  storageFrom.mockClear();
+  deleteUser.mockReset().mockResolvedValue({ data: null, error: null });
   createClient.mockClear();
 });
 
@@ -150,6 +154,106 @@ describe('retention job', () => {
     expect(output.body()).toEqual({
       data: { accountsDeleted: 0, accountFailures: 0, assetsDeleted: 0, assetFailures: 1 },
     });
+  });
+
+  it('deletes a due account and records its audit event', async () => {
+    const auditQuery = query({ data: null, error: null });
+    from
+      .mockReturnValueOnce(query({ data: [{ user_id: 'user-1' }], error: null }))
+      .mockReturnValueOnce(query({ data: { user_id: 'user-1' }, error: null }))
+      .mockReturnValueOnce(query({ data: [], error: null }))
+      .mockReturnValueOnce(auditQuery)
+      .mockReturnValueOnce(query({ data: [], error: null }));
+    const output = response();
+
+    await handler(
+      { method: 'GET', headers: { authorization: 'Bearer cron-secret' } },
+      output.value,
+    );
+
+    expect(deleteUser).toHaveBeenCalledWith('user-1');
+    expect(auditQuery.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ event_type: 'account_deleted', outcome: 'success' }),
+    );
+    expect(output.statusCode()).toBe(200);
+    expect(output.body()).toMatchObject({ data: { accountsDeleted: 1, accountFailures: 0 } });
+  });
+
+  it('marks a claimed account deletion as failed and continues cleanup', async () => {
+    const failedUpdate = query({ data: null, error: null });
+    from
+      .mockReturnValueOnce(query({ data: [{ user_id: 'user-2' }], error: null }))
+      .mockReturnValueOnce(query({ data: { user_id: 'user-2' }, error: null }))
+      .mockReturnValueOnce(query({ data: [], error: null }))
+      .mockReturnValueOnce(failedUpdate)
+      .mockReturnValueOnce(query({ data: [], error: null }));
+    deleteUser.mockResolvedValueOnce({ data: null, error: new Error('auth unavailable') });
+    const output = response();
+
+    await handler(
+      { method: 'GET', headers: { authorization: 'Bearer cron-secret' } },
+      output.value,
+    );
+
+    expect(failedUpdate.update).toHaveBeenCalledWith({ status: 'failed' });
+    expect(output.statusCode()).toBe(207);
+    expect(output.body()).toMatchObject({ data: { accountsDeleted: 0, accountFailures: 1 } });
+    expect(rpc).toHaveBeenCalledWith('purge_expired_operational_records');
+  });
+
+  it('completes successful temporary asset cleanup in the isolated bucket', async () => {
+    const completedUpdate = query({ data: null, error: null });
+    from
+      .mockReturnValueOnce(query({ data: [], error: null }))
+      .mockReturnValueOnce(
+        query({
+          data: [
+            { id: 9, object_path: 'request/generated.png', reason: 'temp_expired', attempts: 0 },
+          ],
+          error: null,
+        }),
+      )
+      .mockReturnValueOnce(completedUpdate);
+    remove.mockResolvedValue({ data: null, error: null });
+    const output = response();
+
+    await handler(
+      { method: 'GET', headers: { authorization: 'Bearer cron-secret' } },
+      output.value,
+    );
+
+    expect(storageFrom).toHaveBeenCalledWith('ai-temp');
+    expect(remove).toHaveBeenCalledWith(['request/generated.png']);
+    expect(completedUpdate.update).toHaveBeenCalledWith({ status: 'completed' });
+    expect(output.statusCode()).toBe(200);
+    expect(output.body()).toMatchObject({ data: { assetsDeleted: 1, assetFailures: 0 } });
+  });
+
+  it('stops retrying an asset after the tenth failed deletion attempt', async () => {
+    const failedUpdate = query({ data: null, error: null });
+    from
+      .mockReturnValueOnce(query({ data: [], error: null }))
+      .mockReturnValueOnce(
+        query({
+          data: [{ id: 10, object_path: 'owner/board/hash', reason: 'board_deleted', attempts: 9 }],
+          error: null,
+        }),
+      )
+      .mockReturnValueOnce(failedUpdate);
+    remove.mockResolvedValue({ data: null, error: new Error('storage unavailable') });
+    const output = response();
+
+    await handler(
+      { method: 'GET', headers: { authorization: 'Bearer cron-secret' } },
+      output.value,
+    );
+
+    expect(failedUpdate.update).toHaveBeenCalledWith({
+      attempts: 10,
+      status: 'failed',
+      last_error_code: 'STORAGE_DELETE_FAILED',
+    });
+    expect(output.statusCode()).toBe(207);
   });
 
   it('does not report success when a cleanup queue read fails', async () => {
