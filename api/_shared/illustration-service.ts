@@ -234,7 +234,16 @@ export class IllustrationArtifactStore implements IllustrationArtifactRepository
   }
 }
 
-const VISUAL_CONTENT_KINDS = new Set(['food_dish', 'produce', 'object', 'process', 'mixed']);
+const VISUAL_CONTENT_KINDS = new Set([
+  'exercise',
+  'question',
+  'food_dish',
+  'produce',
+  'object',
+  'process',
+  'diagram',
+  'mixed',
+]);
 const VISUAL_GOALS = new Set([
   'explain',
   'recipe',

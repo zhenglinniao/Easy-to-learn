@@ -56,7 +56,18 @@ interface PreparedSummary {
   elementCount: number;
   textLength: number;
   hasImage: boolean;
+  illustrationStatus?:
+    'generating' | 'generated' | 'not_applicable' | 'unavailable' | 'quota_exhausted';
 }
+
+const illustrationStatusLabel = (status: PreparedSummary['illustrationStatus']): string => {
+  if (status === 'generating') return ' · 正在生成教学插画';
+  if (status === 'generated') return ' · 插画已放入画布';
+  if (status === 'not_applicable') return ' · 本题使用精确文字与矢量图解';
+  if (status === 'unavailable') return ' · 生图模型尚未配置';
+  if (status === 'quota_exhausted') return ' · 今日插画额度已用完';
+  return '';
+};
 
 type FeedbackState = 'idle' | 'sending' | 'sent' | 'error';
 const AI_FEEDBACK_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -887,6 +898,9 @@ export default function CanvasPage() {
       });
       setMenu(null);
       if (action === 'solve') {
+        setPrepared((current) =>
+          current ? { ...current, illustrationStatus: 'generating' } : current,
+        );
         try {
           const illustration = await client.generateIllustration(
             { requestId, boardId },
@@ -901,6 +915,9 @@ export default function CanvasPage() {
               requestAbort.current.signal,
             );
           }
+          setPrepared((current) =>
+            current ? { ...current, illustrationStatus: illustration.status } : current,
+          );
         } catch (error) {
           if (!(error instanceof DOMException && error.name === 'AbortError')) {
             setPreparationError(
@@ -1190,7 +1207,7 @@ export default function CanvasPage() {
           {migrationMessage ??
             preparationError ??
             (prepared
-              ? `已准备 ${prepared.elementCount} 个元素的${prepared.action === 'solve' ? '解题' : '提示'}输入${prepared.textLength > 0 ? ` · ${prepared.textLength} 个文字` : ''}${prepared.hasImage ? ' · 1 张选区图片' : ''}`
+              ? `已准备 ${prepared.elementCount} 个元素的${prepared.action === 'solve' ? '解题' : '提示'}输入${prepared.textLength > 0 ? ` · ${prepared.textLength} 个文字` : ''}${prepared.hasImage ? ' · 1 张选区图片' : ''}${illustrationStatusLabel(prepared.illustrationStatus)}`
               : '')}
         </div>
       ) : null}
