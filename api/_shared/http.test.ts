@@ -3,9 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   disableResponseCaching,
   requireAllowedOrigin,
+  sendError,
   type HttpRequest,
   type HttpResponse,
 } from './http.js';
+import { ApiFault } from './fault.js';
 
 const request = (method: string, headers: HttpRequest['headers']): HttpRequest => ({
   method,
@@ -56,5 +58,25 @@ describe('disableResponseCaching', () => {
 
     expect(setHeader).toHaveBeenCalledWith('Cache-Control', 'private, no-store, max-age=0');
     expect(setHeader).toHaveBeenCalledWith('Pragma', 'no-cache');
+  });
+});
+
+describe('sendError', () => {
+  it('replaces an unsafe caller-provided request id before writing response headers', () => {
+    const setHeader = vi.fn();
+    const json = vi.fn();
+    const response = {
+      setHeader,
+      status: vi.fn().mockReturnThis(),
+      json,
+    } as unknown as HttpResponse;
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    expect(() =>
+      sendError(response, new ApiFault('INVALID_INPUT', 'bad request'), 'bad\r\nheader'),
+    ).not.toThrow();
+    const traceHeader = setHeader.mock.calls.find(([name]) => name === 'X-Request-Id')?.[1];
+    expect(traceHeader).toMatch(/^[0-9a-f-]{36}$/);
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ requestId: traceHeader }));
   });
 });

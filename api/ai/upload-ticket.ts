@@ -2,6 +2,7 @@ import {
   MAX_ASSET_BYTES,
   MAX_IMAGE_EDGE,
   MAX_IMAGE_PIXELS,
+  requestIdSchema,
   sha256Schema,
 } from '@easy-to-learn/domain';
 import { z } from 'zod';
@@ -19,7 +20,7 @@ import { createUploadTicketService, resolveActor } from '../_shared/runtime.js';
 
 const inputSchema = z
   .strictObject({
-    requestId: z.string().min(1).max(200),
+    requestId: requestIdSchema,
     contentHash: sha256Schema,
     mimeType: z.enum(['image/png', 'image/jpeg']),
     byteSize: z.number().int().positive().max(MAX_ASSET_BYTES),

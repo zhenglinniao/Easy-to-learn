@@ -43,6 +43,12 @@ export const apiErrorCodeSchema = z.enum(
 
 const errorDetailValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
+export const requestIdSchema = z
+  .string()
+  .min(1)
+  .max(200)
+  .regex(/^[A-Za-z0-9._:-]+$/, '请求 ID 只能包含安全的 ASCII 标识符字符');
+
 export const apiErrorResponseSchema = z
   .strictObject({
     requestId: nonEmptyStringSchema,
@@ -134,7 +140,7 @@ const tutorParentContextSchema = z.strictObject({
 
 export const tutorRequestSchema = z
   .strictObject({
-    requestId: nonEmptyStringSchema,
+    requestId: requestIdSchema,
     schemaVersion: z.literal(TUTOR_SCHEMA_VERSION),
     boardId: nonEmptyStringSchema,
     mode: z.enum(['solve', 'hint', 'explain_step']),

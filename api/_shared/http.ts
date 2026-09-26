@@ -64,7 +64,10 @@ export const requireAllowedOrigin = (request: HttpRequest): void => {
 
 export const sendError = (response: HttpResponse, error: unknown, requestId?: string): void => {
   const fault = asApiFault(error);
-  const id = requestId || randomUUID();
+  const id =
+    requestId && requestId.length <= 200 && /^[A-Za-z0-9._:-]+$/.test(requestId)
+      ? requestId
+      : randomUUID();
   logApiError(fault, id);
   disableResponseCaching(response);
   response.setHeader('X-Request-Id', id);
