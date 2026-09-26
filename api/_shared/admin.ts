@@ -1,6 +1,7 @@
 import { createHmac, randomUUID } from 'node:crypto';
 
-import { createClient, type User } from '@supabase/supabase-js';
+import type { User } from '@supabase/auth-js';
+import { createClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
 
 import { loadAiProviderConfigs } from './ai-provider-config.js';
