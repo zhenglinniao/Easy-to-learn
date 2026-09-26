@@ -32,6 +32,24 @@ export interface AdminOverview {
   pageSuspended: number;
 }
 
+export class AdminApiError extends Error {
+  readonly code: string;
+  readonly requestId: string | null;
+  readonly status: number;
+
+  constructor(
+    message: string,
+    options: { code: string; requestId: string | null; status: number },
+  ) {
+    const trace = options.requestId ? `（追踪号：${options.requestId}）` : '';
+    super(`${message}${trace}`);
+    this.name = 'AdminApiError';
+    this.code = options.code;
+    this.requestId = options.requestId;
+    this.status = options.status;
+  }
+}
+
 export class AdminApiClient {
   constructor(
     private readonly getAccessToken: () => Promise<string | null>,
@@ -84,10 +102,23 @@ export class AdminApiClient {
       data?: T;
       message?: string;
       code?: string;
+      requestId?: string;
     } | null;
-    if (!response.ok)
-      throw new Error(body?.message ?? `管理请求失败（${body?.code ?? response.status}）`);
-    if (!body?.data) throw new Error('管理服务返回了无效数据');
+    const requestId = body?.requestId ?? response.headers.get('X-Request-Id');
+    if (!response.ok) {
+      throw new AdminApiError(body?.message ?? '管理请求失败', {
+        code: body?.code ?? `HTTP_${response.status}`,
+        requestId,
+        status: response.status,
+      });
+    }
+    if (!body?.data) {
+      throw new AdminApiError('管理服务返回了无效数据', {
+        code: 'INVALID_RESPONSE',
+        requestId,
+        status: response.status,
+      });
+    }
     return body.data;
   }
 }

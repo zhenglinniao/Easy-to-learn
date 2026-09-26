@@ -361,6 +361,11 @@
   width: 230px;
   padding: 8px 11px;
 }
+.searchHint {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
 .pagination {
   display: flex;
   align-items: center;

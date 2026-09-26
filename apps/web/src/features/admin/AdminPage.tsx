@@ -604,9 +604,9 @@ export default function AdminPage() {
             }}
           >
             <label>
-              <span className={styles.srOnly}>搜索邮箱或用户 ID</span>
+              <span className={styles.srOnly}>筛选当前页邮箱或用户 ID</span>
               <input
-                placeholder="搜索邮箱或用户 ID"
+                placeholder="筛选当前页邮箱或用户 ID"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
@@ -614,6 +614,12 @@ export default function AdminPage() {
             <button type="submit">搜索</button>
           </form>
         </div>
+        {query && (
+          <p className={styles.searchHint}>
+            当前仅筛选第 {page} 页已加载账户，共匹配 {overview?.accounts.length ?? 0}{' '}
+            个；清空关键词可恢复本页。
+          </p>
+        )}
         <div className={styles.accountTable} role="table" aria-label="账户列表">
           <div className={styles.accountHeader} role="row">
             <span>账户</span>

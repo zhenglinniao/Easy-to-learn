@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { AdminApiClient } from './client';
+import { AdminApiClient, AdminApiError } from './client';
 
 const overview = {
   accounts: [],
@@ -88,5 +88,44 @@ describe('AdminApiClient', () => {
     const client = new AdminApiClient(async () => null, fetcher);
     await expect(client.overview()).rejects.toThrow('请先登录管理员账户');
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('保留服务端错误码和请求追踪号用于诊断', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: 'DEPENDENCY_UNAVAILABLE',
+          message: '模型配置存储暂时不可用',
+          requestId: 'request-admin-123',
+        }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const client = new AdminApiClient(async () => 'admin-token', fetcher);
+
+    const error = await client.overview().catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(AdminApiError);
+    expect(error).toMatchObject({
+      code: 'DEPENDENCY_UNAVAILABLE',
+      requestId: 'request-admin-123',
+      status: 503,
+    });
+    expect((error as Error).message).toContain('追踪号：request-admin-123');
+  });
+
+  it('JSON 响应无数据时也保留响应头追踪号', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'X-Request-Id': 'header-trace-1' },
+      }),
+    );
+    const client = new AdminApiClient(async () => 'admin-token', fetcher);
+
+    await expect(client.overview()).rejects.toMatchObject({
+      code: 'INVALID_RESPONSE',
+      requestId: 'header-trace-1',
+      status: 200,
+    });
   });
 });
