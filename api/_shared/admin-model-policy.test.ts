@@ -28,11 +28,15 @@ describe('admin model policy', () => {
   it('对前端隐藏密钥，同时运行时仍保留密钥', () => {
     const policy = defaultAdminModelPolicy(configs);
     expect(toAdminModelPolicyView(policy).providers[0]).toEqual(
-      expect.objectContaining({ id: 'deepseek', hasApiKey: true }),
+      expect.objectContaining({
+        id: 'deepseek',
+        hasApiKey: true,
+        responseFormat: 'json_object',
+      }),
     );
     expect(JSON.stringify(toAdminModelPolicyView(policy))).not.toContain('secret-primary');
     expect(applyAdminModelPolicy(policy)[0]).toEqual(
-      expect.objectContaining({ apiKey: 'secret-primary' }),
+      expect.objectContaining({ apiKey: 'secret-primary', responseFormat: 'json_object' }),
     );
   });
 

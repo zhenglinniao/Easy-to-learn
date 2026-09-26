@@ -43,7 +43,7 @@ const providerPresets: Record<'sensenova' | 'deepseek', AdminProviderView> = {
     baseUrl: 'https://api.deepseek.com',
     model: 'deepseek-flash',
     timeoutMs: 12_000,
-    responseFormat: 'json_schema',
+    responseFormat: 'json_object',
     wireApi: 'responses',
     reasoningEffort: 'none',
     hasApiKey: false,
