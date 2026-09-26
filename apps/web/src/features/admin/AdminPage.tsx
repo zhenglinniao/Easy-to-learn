@@ -9,6 +9,11 @@ import {
   type AdminOverview,
   type AdminProviderView,
 } from './client';
+import {
+  modelOptionsFor,
+  selectedModelDescription,
+  sensenovaImageModels,
+} from './modelCatalog';
 import styles from './AdminPage.module.css';
 
 const dateLabel = (value: string | null): string =>
@@ -309,14 +314,40 @@ export default function AdminPage() {
                     />
                   </label>
                 )}
-                <label>
-                  Model ID
-                  <input
-                    value={provider.model}
-                    maxLength={160}
-                    onChange={(event) => updateModel(provider.id, { model: event.target.value })}
-                  />
-                </label>
+                {modelOptionsFor(provider) ? (
+                  <label className={styles.modelPicker}>
+                    Model ID
+                    <select
+                      aria-label="Model ID"
+                      value={provider.model}
+                      onChange={(event) =>
+                        updateModel(provider.id, { model: event.target.value })
+                      }
+                    >
+                      {!modelOptionsFor(provider)?.some(({ id }) => id === provider.model) && (
+                        <option value={provider.model}>当前配置 · {provider.model}</option>
+                      )}
+                      {modelOptionsFor(provider)?.map((option) => (
+                        <option value={option.id} key={option.id}>
+                          {option.family} · {option.label} · {option.id}
+                        </option>
+                      ))}
+                    </select>
+                    <small>
+                      {selectedModelDescription(provider) ??
+                        '这是已有的自定义模型配置；切换后将使用平台已知模型。'}
+                    </small>
+                  </label>
+                ) : (
+                  <label>
+                    Model ID
+                    <input
+                      value={provider.model}
+                      maxLength={160}
+                      onChange={(event) => updateModel(provider.id, { model: event.target.value })}
+                    />
+                  </label>
+                )}
                 {provider.type === 'openai-compatible' && (
                   <>
                     <label>
@@ -402,6 +433,13 @@ export default function AdminPage() {
         {overview?.policyUpdatedAt && (
           <small>上次更新：{dateLabel(overview.policyUpdatedAt)}</small>
         )}
+        <aside className={styles.imageModelNote}>
+          <strong>独立生图模型</strong>
+          <span>
+            {sensenovaImageModels.map(({ label, id }) => `${label}（${id}）`).join('、')} 不使用本页的
+            Chat Completions 链路，将在独立异步生图配置中接入。
+          </span>
+        </aside>
       </section>
 
       <section className={styles.panel} aria-labelledby="accounts-title">
