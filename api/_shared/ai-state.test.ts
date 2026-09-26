@@ -13,7 +13,7 @@ describe('AI quota state', () => {
       mode: 'full',
     });
     await expect(state.status('user:user-1', now)).resolves.toMatchObject({
-      action: { dailyLimit: 3, periodLimit: 45, periodRemaining: 45 },
+      action: { dailyLimit: 10, dailyRemaining: 10, periodLimit: 45, periodRemaining: 45 },
       image: { dailyLimit: 2, periodLimit: 20, periodRemaining: 20 },
       mode: 'full',
     });
@@ -79,7 +79,31 @@ describe('AI quota state', () => {
     await state.refund(actor, 'failed-request', now);
 
     await expect(state.status(actor, now)).resolves.toMatchObject({
-      action: { dailyRemaining: 3, periodRemaining: 45, periodResetsAt: null },
+      action: { dailyRemaining: 10, periodRemaining: 45, periodResetsAt: null },
+    });
+  });
+
+  it('登录用户每天可使用 10 次，第 11 次被拒绝', async () => {
+    const state = new MemoryAiStateStore();
+    const actor = 'user:user-1';
+    const startedAt = new Date('2026-09-26T00:00:00.000Z');
+
+    for (let index = 0; index < 10; index += 1) {
+      const now = new Date(startedAt.getTime() + index * 5 * 60 * 1_000);
+      await expect(state.reserve(actor, `daily-${index}`, now)).resolves.toMatchObject({
+        duplicateInFlight: false,
+      });
+    }
+
+    const afterTenthCooldown = new Date(startedAt.getTime() + 10 * 5 * 60 * 1_000);
+    await expect(state.status(actor, afterTenthCooldown)).resolves.toMatchObject({
+      dailyLimit: 10,
+      remaining: 0,
+      action: { dailyLimit: 10, dailyRemaining: 0 },
+    });
+    await expect(state.reserve(actor, 'daily-over-limit', afterTenthCooldown)).rejects.toMatchObject({
+      code: 'DAILY_QUOTA_EXHAUSTED',
+      details: { dailyLimit: 10 },
     });
   });
 });

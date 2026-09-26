@@ -43,7 +43,15 @@ describe('TutorApiClient', () => {
 
     const userQuota = {
       ...quota,
-      action: { ...quota.action, periodLimit: 45 as const, periodRemaining: 44 },
+      dailyLimit: 10 as const,
+      remaining: 9,
+      action: {
+        ...quota.action,
+        dailyLimit: 10 as const,
+        dailyRemaining: 9,
+        periodLimit: 45 as const,
+        periodRemaining: 44,
+      },
       image: {
         ...quota.image,
         dailyLimit: 2 as const,
