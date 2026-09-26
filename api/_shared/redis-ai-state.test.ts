@@ -116,7 +116,9 @@ describe('RedisAiStateStore', () => {
     redis.eval.mockResolvedValue([-1, 1, 3]);
     const store = new RedisAiStateStore(redis as never, 'actor-secret', encryptionKey);
 
-    await expect(store.reserveImages('anonymous:guest-1', 'image-2', 1, now)).resolves.toMatchObject({
+    await expect(
+      store.reserveImages('anonymous:guest-1', 'image-2', 1, now),
+    ).resolves.toMatchObject({
       granted: false,
       duplicate: false,
       quota: { image: { dailyRemaining: 1 } },

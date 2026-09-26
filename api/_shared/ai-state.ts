@@ -63,11 +63,7 @@ export interface AiStateStore {
     scope: 'action' | 'image',
     now: Date,
   ): Promise<boolean>;
-  refundUnmetered?(
-    actorKey: string,
-    requestId: string,
-    scope: 'action' | 'image',
-  ): Promise<void>;
+  refundUnmetered?(actorKey: string, requestId: string, scope: 'action' | 'image'): Promise<void>;
 }
 
 const unlimitedQuotaStatus = (now: Date): QuotaStatus => {

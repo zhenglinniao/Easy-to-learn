@@ -126,9 +126,9 @@ describe('UploadTicketService', () => {
       error: null,
     });
 
-    await expect(
-      service.resolve(actor, 'request-1', issued.uploadPath, 'image/png'),
-    ).resolves.toBe(bytes.toString('base64'));
+    await expect(service.resolve(actor, 'request-1', issued.uploadPath, 'image/png')).resolves.toBe(
+      bytes.toString('base64'),
+    );
     await expect(
       service.resolve({ kind: 'user', id: 'user-2' }, 'request-1', issued.uploadPath, 'image/png'),
     ).rejects.toMatchObject({ code: 'INVALID_INPUT' });

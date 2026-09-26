@@ -38,15 +38,16 @@ afterEach(() => {
 });
 
 describe('AdminService account controls', () => {
-  it.each(['------------------------------------', '22222222-2222-2222-2222-222222222222', learner.slice(1)])(
-    'rejects non-UUID account id %s',
-    async (userId) => {
-      await expect(
-        new AdminService().updateAccount(currentAdmin, { userId, action: 'suspend' }),
-      ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
-      expect(updateUserById).not.toHaveBeenCalled();
-    },
-  );
+  it.each([
+    '------------------------------------',
+    '22222222-2222-2222-2222-222222222222',
+    learner.slice(1),
+  ])('rejects non-UUID account id %s', async (userId) => {
+    await expect(
+      new AdminService().updateAccount(currentAdmin, { userId, action: 'suspend' }),
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    expect(updateUserById).not.toHaveBeenCalled();
+  });
 
   it('prevents one administrator from suspending another administrator', async () => {
     await expect(

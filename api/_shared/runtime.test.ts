@@ -44,8 +44,9 @@ describe('runtime authentication', () => {
     const keys = sessionKeysFromEnvironment();
     const issued = issueAnonymousSession(keys[1]!);
 
-    await expect(resolveActor(request(undefined, `other=x; etl_anon=${issued.cookieValue}`))).resolves
-      .toEqual({ actor: { kind: 'anonymous', id: issued.session.id } });
+    await expect(
+      resolveActor(request(undefined, `other=x; etl_anon=${issued.cookieValue}`)),
+    ).resolves.toEqual({ actor: { kind: 'anonymous', id: issued.session.id } });
   });
 
   it('rejects malformed anonymous key configuration', () => {
