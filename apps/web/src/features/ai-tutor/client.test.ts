@@ -327,6 +327,30 @@ describe('TutorApiClient', () => {
     );
   });
 
+  it('插画响应传输中断时使用同一 requestId 自动重试', async () => {
+    const input = {
+      requestId: '00000000-0000-4000-8000-000000000010',
+      boardId: '00000000-0000-4000-8000-000000000001',
+    };
+    const success = Response.json({
+      data: {
+        status: 'not_applicable',
+        quota: guestQuota('2026-09-23T00:05:00.000Z'),
+      },
+    });
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(success);
+
+    await expect(
+      new TutorApiClient(async () => 'jwt', fetcher).generateIllustration(input),
+    ).resolves.toMatchObject({ status: 'not_applicable' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[0]?.[1]?.body).toBe(fetcher.mock.calls[1]?.[1]?.body);
+    expect(fetcher.mock.calls[1]?.[1]?.body).toContain(input.requestId);
+  });
+
   it('优先显示结构化 API 错误并拒绝非法模型响应', async () => {
     const request = {
       requestId: 'request-1',
