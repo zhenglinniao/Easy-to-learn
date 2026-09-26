@@ -10,10 +10,15 @@ const BoardsPage = lazy(() => import('../pages/BoardsPage'));
 const AuthCallbackPage = lazy(() => import('../pages/AuthCallbackPage'));
 const ResetPasswordPage = lazy(() => import('../pages/ResetPasswordPage'));
 const LegalPage = lazy(() => import('../pages/LegalPage'));
-const CanvasSpikePage = lazy(() => import('../spikes/CanvasSpikePage'));
 const CanvasPage = lazy(() => import('../features/canvas/CanvasPage'));
-const TutorBoardSpikePage = lazy(() => import('../spikes/TutorBoardSpikePage'));
 const AdminPage = lazy(() => import('../features/admin/AdminPage'));
+// Compatibility spikes are developer diagnostics, not product routes. Keeping
+// the imports behind Vite's compile-time DEV flag lets production builds remove
+// their Mermaid/Cytoscape dependency graph entirely.
+const CanvasSpikePage = import.meta.env.DEV ? lazy(() => import('../spikes/CanvasSpikePage')) : null;
+const TutorBoardSpikePage = import.meta.env.DEV
+  ? lazy(() => import('../spikes/TutorBoardSpikePage'))
+  : null;
 
 export function App() {
   return (
@@ -33,8 +38,12 @@ export function App() {
               <Route path="/canvas" element={<CanvasPage />} />
               <Route path="/canvas/:boardId" element={<CanvasPage />} />
               <Route path="/admin" element={<AdminPage />} />
-              <Route path="/spikes/excalidraw" element={<CanvasSpikePage />} />
-              <Route path="/spikes/tutor-board" element={<TutorBoardSpikePage />} />
+              {CanvasSpikePage ? (
+                <Route path="/spikes/excalidraw" element={<CanvasSpikePage />} />
+              ) : null}
+              {TutorBoardSpikePage ? (
+                <Route path="/spikes/tutor-board" element={<TutorBoardSpikePage />} />
+              ) : null}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>

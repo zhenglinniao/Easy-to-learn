@@ -150,9 +150,6 @@ importers:
       '@supabase/supabase-js':
         specifier: 2.117.2
         version: 2.117.2
-      '@tanstack/react-query':
-        specifier: 5.103.2
-        version: 5.103.2(react@19.3.0)
       idb:
         specifier: 8.0.3
         version: 8.0.3
@@ -1158,14 +1155,6 @@ packages:
     peerDependenciesMeta:
       '@opentelemetry/api':
         optional: true
-
-  '@tanstack/query-core@5.103.2':
-    resolution: {integrity: sha512-I8DkFXls5jXLqtm8+QpOhEmG07hIblhSZFzafg9wHsMSEvMzULy9hK17wU1T/ahfhMbtITJhbxutwwCoihkR7A==}
-
-  '@tanstack/react-query@5.103.2':
-    resolution: {integrity: sha512-B+fWiYZBc+0uUD5zDZAeLw9dKj7XEsdnuu6zRZ+no6LNKpeE3P3bJ+N6HINjcIlWR6fW3vUoTneEaGa2V6ehqw==}
-    peerDependencies:
-      react: ^18 || ^19
 
   '@testing-library/dom@10.4.2':
     resolution: {integrity: sha512-yzr2S9HyAIdhz2/6qHgbs665Q7PKVcDF05vsOlHPxG1mo36gKVesdYVeDLnXgfjJ03CrKRk08knc6+E/9m8v2Q==}
@@ -3949,13 +3938,6 @@ snapshots:
       '@supabase/postgrest-js': 2.117.2
       '@supabase/realtime-js': 2.117.2
       '@supabase/storage-js': 2.117.2
-
-  '@tanstack/query-core@5.103.2': {}
-
-  '@tanstack/react-query@5.103.2(react@19.3.0)':
-    dependencies:
-      '@tanstack/query-core': 5.103.2
-      react: 19.3.0
 
   '@testing-library/dom@10.4.2':
     dependencies:

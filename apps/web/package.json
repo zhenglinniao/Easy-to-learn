@@ -19,7 +19,6 @@
     "@excalidraw/mermaid-to-excalidraw": "2.2.2",
     "@sentry/react": "10.75.2",
     "@supabase/supabase-js": "2.117.2",
-    "@tanstack/react-query": "5.103.2",
     "idb": "8.0.3",
     "katex": "0.18.9",
     "react": "catalog:",
