@@ -17,7 +17,6 @@ describe('ProductMetrics', () => {
             totalVisits: 1280,
             visitors30d: 430,
             registeredUsers: 86,
-            cloudBoards: 214,
             generatedAt: '2026-09-26T00:00:00.000Z',
           },
         }),
@@ -29,14 +28,14 @@ describe('ProductMetrics', () => {
     expect(await screen.findByText('1,280')).toBeInTheDocument();
     expect(screen.getByText('430')).toBeInTheDocument();
     expect(screen.getByText('86')).toBeInTheDocument();
-    expect(screen.getByText('214')).toBeInTheDocument();
+    expect(screen.queryByText('云端画板')).not.toBeInTheDocument();
   });
 
   it('接口不可用时明确显示未连接而不是伪造零值', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     render(<ProductMetrics />);
 
-    await waitFor(() => expect(screen.getAllByText('暂未连接')).toHaveLength(4));
+    await waitFor(() => expect(screen.getAllByText('暂未连接')).toHaveLength(3));
   });
 
   it('大数使用中文紧凑格式', () => {

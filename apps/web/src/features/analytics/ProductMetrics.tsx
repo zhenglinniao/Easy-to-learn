@@ -7,7 +7,6 @@ interface ProductMetricsData {
   totalVisits: number;
   visitors30d: number;
   registeredUsers: number;
-  cloudBoards: number;
   generatedAt: string;
 }
 
@@ -15,8 +14,11 @@ const metricItems = [
   ['totalVisits', '累计访问', '按 30 分钟会话合并'],
   ['visitors30d', '近 30 天访客', '匿名去重浏览器'],
   ['registeredUsers', '注册学习者', '当前有效账户'],
-  ['cloudBoards', '云端画板', '当前保存的画板'],
 ] as const;
+
+const metricsEndpoint = import.meta.env.DEV
+  ? 'https://easy-to-learn-steel.vercel.app/api/analytics/metrics'
+  : '/api/analytics/metrics';
 
 export function ProductMetrics() {
   const [metrics, setMetrics] = useState<ProductMetricsData | null>(null);
@@ -25,7 +27,7 @@ export function ProductMetrics() {
   useEffect(() => {
     if (typeof fetch !== 'function') return undefined;
     const controller = new AbortController();
-    void fetch('/api/analytics/metrics', { signal: controller.signal })
+    void fetch(metricsEndpoint, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error('metrics unavailable');
         const result = (await response.json()) as { data: ProductMetricsData };

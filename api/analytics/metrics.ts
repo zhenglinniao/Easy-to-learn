@@ -11,6 +11,9 @@ const required = (name: string): string => {
 };
 
 export default async function handler(request: HttpRequest, response: HttpResponse): Promise<void> {
+  // 这是不含个人信息的公开聚合读接口；允许本地 Vite 页面跨域读取正式数据。
+  // 写入接口仍要求 APP_ORIGINS，并且本地开发不会写入生产访问量。
+  response.setHeader('Access-Control-Allow-Origin', '*');
   try {
     if (request.method !== 'GET') throw new ApiFault('INVALID_INPUT', '仅支持 GET 请求');
     const client = createClient(required('SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
