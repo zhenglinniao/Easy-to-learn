@@ -59,7 +59,7 @@ describe('SenseNova image generation', () => {
       0x02, 0x11, 0x00, 0x03, 0x11, 0x00,
     ]);
     const fetcher = vi
-      .fn<typeof fetch>()
+      .fn()
       .mockResolvedValue(Response.json({ data: [{ b64_json: jpeg.toString('base64') }] }));
     const generator = new SenseNovaImageGenerator(
       {
@@ -77,7 +77,7 @@ describe('SenseNova image generation', () => {
     });
     expect(fetcher).toHaveBeenCalledWith(
       'https://token.sensenova.cn/v1/images/generations',
-      expect.objectContaining({ method: 'POST' }),
+      expect.objectContaining({ method: 'POST', dispatcher: expect.anything() }),
     );
     const body = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)) as Record<string, unknown>;
     expect(body).toMatchObject({
@@ -97,7 +97,7 @@ describe('SenseNova image generation', () => {
       0x02, 0x11, 0x00, 0x03, 0x11, 0x00,
     ]);
     const retryingFetch = vi
-      .fn<typeof fetch>()
+      .fn()
       .mockRejectedValueOnce(new TypeError('fetch failed'))
       .mockResolvedValueOnce(Response.json({ data: [{ b64_json: jpeg.toString('base64') }] }));
     const retryingGenerator = new SenseNovaImageGenerator(
@@ -116,7 +116,7 @@ describe('SenseNova image generation', () => {
     expect(retryingFetch).toHaveBeenCalledTimes(2);
 
     const thirdAttemptFetch = vi
-      .fn<typeof fetch>()
+      .fn()
       .mockRejectedValueOnce(new TypeError('fetch failed'))
       .mockRejectedValueOnce(new TypeError('fetch failed'))
       .mockResolvedValueOnce(Response.json({ data: [{ b64_json: jpeg.toString('base64') }] }));
@@ -135,9 +135,7 @@ describe('SenseNova image generation', () => {
     });
     expect(thirdAttemptFetch).toHaveBeenCalledTimes(3);
 
-    const rejectedFetch = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(new Response(null, { status: 400 }));
+    const rejectedFetch = vi.fn().mockResolvedValue(new Response(null, { status: 400 }));
     const rejectedGenerator = new SenseNovaImageGenerator(
       {
         baseUrl: 'https://token.sensenova.cn/v1',

@@ -16,6 +16,8 @@ import {
   type BoardAuthorizer,
   type TutorActor,
 } from './tutor-service.js';
+import { senseNovaDispatcher, senseNovaFetch } from './sensenova-http.js';
+import type { Dispatcher } from 'undici';
 
 const IMAGE_TTL_SECONDS = 24 * 60 * 60;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -40,6 +42,23 @@ export interface GeneratedImage {
 export interface ImageGenerator {
   generate(prompt: string): Promise<GeneratedImage>;
 }
+
+interface ImageFetchResponse {
+  ok: boolean;
+  status: number;
+  json(): Promise<unknown>;
+}
+
+type ImageFetch = (
+  input: string | URL,
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+    signal?: AbortSignal;
+    dispatcher?: Dispatcher;
+  },
+) => Promise<ImageFetchResponse>;
 
 class NonRetryableImageProviderError extends ProviderUnavailableError {}
 
@@ -100,7 +119,7 @@ const readJpegSize = (bytes: Buffer): { width: number; height: number } | null =
 export class SenseNovaImageGenerator implements ImageGenerator {
   constructor(
     private readonly config: SenseNovaImageConfig,
-    private readonly fetchImpl: typeof fetch = fetch,
+    private readonly fetchImpl: ImageFetch = senseNovaFetch as unknown as ImageFetch,
   ) {}
 
   async generate(prompt: string): Promise<GeneratedImage> {
@@ -138,28 +157,28 @@ export class SenseNovaImageGenerator implements ImageGenerator {
   }
 
   private async generateOnce(prompt: string, signal: AbortSignal): Promise<GeneratedImage> {
-    const response = await this.fetchImpl(
-      `${this.config.baseUrl.replace(/\/$/, '')}/images/generations`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.config.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          prompt,
-          n: 1,
-          size: '1024x1024',
-          output_format: 'jpeg',
-          response_format: 'b64_json',
-          // 教学插画必须忠实于已验证的目标步骤，关闭自动扩写，避免模型自行拼贴整份答案。
-          prompt_extend: false,
-          watermark: true,
-        }),
-        signal,
+    const requestUrl = `${this.config.baseUrl.replace(/\/$/, '')}/images/generations`;
+    const timeoutMs = this.config.timeoutMs ?? 45_000;
+    const response = await this.fetchImpl(requestUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.config.apiKey}`,
+        'Content-Type': 'application/json',
       },
-    );
+      body: JSON.stringify({
+        model: this.config.model,
+        prompt,
+        n: 1,
+        size: '1024x1024',
+        output_format: 'jpeg',
+        response_format: 'b64_json',
+        // 教学插画必须忠实于已验证的目标步骤，关闭自动扩写，避免模型自行拼贴整份答案。
+        prompt_extend: false,
+        watermark: true,
+      }),
+      signal,
+      dispatcher: senseNovaDispatcher(requestUrl, timeoutMs),
+    });
     if (!response.ok) {
       const message = `sensenova image request failed with status ${response.status}`;
       if (response.status !== 429 && response.status < 500) {
