@@ -1,11 +1,13 @@
 import {
   aiFeedbackInputSchema,
+  apiErrorResponseSchema,
   anonymousSessionResponseSchema,
   illustrationRequestSchema,
   illustrationResponseSchema,
   quotaResponseSchema,
   tutorResponseSchema,
   type AiFeedbackInput,
+  type ApiErrorCode,
   type IllustrationRequest,
   type IllustrationResponse,
   type QuotaStatus,
@@ -25,6 +27,29 @@ const uploadTicketResponseSchema = z.strictObject({
 const digest = async (blob: Blob): Promise<string> => {
   const hash = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
   return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
+};
+
+export class TutorApiError extends Error {
+  override readonly name = 'TutorApiError';
+
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: ApiErrorCode | null,
+    readonly requestId: string | null,
+    readonly retryable: boolean,
+    readonly details?: Record<string, string | number | boolean>,
+  ) {
+    super(message);
+  }
+}
+
+export const tutorErrorMessage = (error: unknown, fallback: string): string => {
+  if (!(error instanceof Error)) return fallback;
+  if (error instanceof TutorApiError && error.requestId) {
+    return `${error.message}（请求编号：${error.requestId}）`;
+  }
+  return error.message;
 };
 
 export class TutorApiClient {
@@ -176,11 +201,38 @@ export class TutorApiClient {
     throw new Error('AI 响应连接中断，请检查网络后重试。');
   }
 
-  private async error(response: Response): Promise<Error> {
-    const body = (await response.json().catch(() => null)) as {
-      message?: string;
-      code?: string;
-    } | null;
-    return new Error(body?.message ?? `AI 请求失败（${body?.code ?? response.status}）`);
+  private async error(response: Response): Promise<TutorApiError> {
+    const body: unknown = await response.json().catch(() => null);
+    const parsed = apiErrorResponseSchema.safeParse(body);
+    if (parsed.success) {
+      return new TutorApiError(
+        parsed.data.message,
+        response.status,
+        parsed.data.code,
+        parsed.data.requestId,
+        parsed.data.retryable,
+        parsed.data.details,
+      );
+    }
+
+    const legacy =
+      body && typeof body === 'object'
+        ? (body as { code?: unknown; message?: unknown; requestId?: unknown })
+        : null;
+    const message =
+      typeof legacy?.message === 'string'
+        ? legacy.message
+        : `AI 请求失败（${typeof legacy?.code === 'string' ? legacy.code : response.status}）`;
+    const requestId =
+      typeof legacy?.requestId === 'string'
+        ? legacy.requestId
+        : response.headers.get('X-Request-Id');
+    return new TutorApiError(
+      message,
+      response.status,
+      null,
+      requestId,
+      response.status === 429 || response.status >= 500,
+    );
   }
 }

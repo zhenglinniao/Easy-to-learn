@@ -36,7 +36,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { getOptionalSupabaseClient, useAuth } from '../auth';
-import { TutorApiClient } from '../ai-tutor';
+import { TutorApiClient, tutorErrorMessage } from '../ai-tutor';
 import { GuestBoardMigrationService, RemoteBoardRepository, SupabaseBoardGateway } from '../boards';
 import { downloadJson } from '../account';
 import { ThemeToggle, useTheme } from '../theme';
@@ -1026,16 +1026,14 @@ export default function CanvasPage() {
         } catch (error) {
           if (!(error instanceof DOMException && error.name === 'AbortError')) {
             setPreparationError(
-              error instanceof Error ? error.message : '插画生成暂时不可用，文字与矢量图解已保留。',
+              tutorErrorMessage(error, '插画生成暂时不可用，文字与矢量图解已保留。'),
             );
           }
         }
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
-      setPreparationError(
-        error instanceof Error ? error.message : '无法处理当前选区，请重新选择后再试。',
-      );
+      setPreparationError(tutorErrorMessage(error, '无法处理当前选区，请重新选择后再试。'));
       void refreshQuota();
     } finally {
       aiTaskRegistry.current.finish(requestId);
@@ -1137,7 +1135,7 @@ export default function CanvasPage() {
       commitTutorBoards((current) => [...current, child]);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
-      setPreparationError(error instanceof Error ? error.message : '无法解释当前步骤。');
+      setPreparationError(tutorErrorMessage(error, '无法解释当前步骤。'));
       void refreshQuota();
     } finally {
       aiTaskRegistry.current.finish(requestId);

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { TutorApiClient } from './client';
+import { TutorApiClient, TutorApiError, tutorErrorMessage } from './client';
 
 const guestQuota = (nextAllowedAt: string) => ({
   dailyLimit: 3 as const,
@@ -342,18 +342,69 @@ describe('TutorApiClient', () => {
       },
     };
     const limited = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(JSON.stringify({ code: 'RATE_LIMITED', message: '请稍后再试' }), {
-        status: 429,
-      }),
+      new Response(
+        JSON.stringify({
+          requestId: 'request-limit-1',
+          code: 'RATE_LIMITED',
+          message: '请稍后再试',
+          retryable: true,
+        }),
+        { status: 429 },
+      ),
     );
-    await expect(new TutorApiClient(async () => 'jwt', limited).execute(request)).rejects.toThrow(
-      '请稍后再试',
-    );
+    const rejection = new TutorApiClient(async () => 'jwt', limited).execute(request);
+    await expect(rejection).rejects.toMatchObject({
+      name: 'TutorApiError',
+      message: '请稍后再试',
+      status: 429,
+      code: 'RATE_LIMITED',
+      requestId: 'request-limit-1',
+      retryable: true,
+    });
 
     const invalid = vi
       .fn<typeof fetch>()
       .mockResolvedValue(Response.json({ data: { html: '<b>x</b>' } }));
     await expect(new TutorApiClient(async () => 'jwt', invalid).execute(request)).rejects.toThrow();
+  });
+
+  it('兼容非 JSON 错误并为结构化错误提供可追踪提示', async () => {
+    const response = new Response('<html>gateway error</html>', {
+      status: 502,
+      headers: { 'X-Request-Id': 'gateway-request-1' },
+    });
+    const client = new TutorApiClient(
+      async () => 'jwt',
+      vi.fn<typeof fetch>().mockResolvedValue(response),
+    );
+    const request = {
+      requestId: 'request-1',
+      schemaVersion: 1 as const,
+      boardId: 'local_board-1',
+      mode: 'solve' as const,
+      text: '题目',
+      locale: 'zh-CN' as const,
+      source: {
+        elementIds: ['element-1'],
+        selectionBounds: { x: 0, y: 0, width: 20, height: 20 },
+        contentHash: 'hash',
+      },
+    };
+
+    let error: unknown;
+    try {
+      await client.execute(request);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(TutorApiError);
+    expect(error).toMatchObject({
+      status: 502,
+      code: null,
+      requestId: 'gateway-request-1',
+      retryable: true,
+    });
+    expect(tutorErrorMessage(error, '请求失败')).toContain('gateway-request-1');
   });
 
   it('提交结构化 AI 反馈并携带登录凭据', async () => {
