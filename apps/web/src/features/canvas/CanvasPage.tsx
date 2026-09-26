@@ -54,6 +54,7 @@ import { ConflictResolutionDialog } from './ConflictResolutionDialog';
 import { DebouncedLatestTask } from './debouncedLatestTask';
 import { HANDWRITING_FONT_FAMILY, migrateElementsToHandwriting } from './handwriting';
 import { addStepIllustrationFile, blobToDataUrl } from './illustrationAsset';
+import { useOnlineStatus } from './useOnlineStatus';
 
 interface OpenMenu {
   x: number;
@@ -206,6 +207,7 @@ export default function CanvasPage() {
   const theme = useTheme();
   const { boardId: routeBoardId } = useParams();
   const navigate = useNavigate();
+  const online = useOnlineStatus();
   const [generatedBoardId] = useState(() => `local_${crypto.randomUUID()}`);
   const boardId = routeBoardId ?? generatedBoardId;
   const stageRef = useRef<HTMLDivElement>(null);
@@ -847,6 +849,10 @@ export default function CanvasPage() {
 
   const handleAction = async (action: RadialMenuAction) => {
     if (!api) return;
+    if (!online) {
+      setPreparationError('设备当前离线。你的画板仍会保存在本机，联网后再使用 AI。');
+      return;
+    }
     const quotaError = quotaBlockReason(quota, Date.now());
     if (quotaError) {
       setPreparationError(quotaError);
@@ -992,6 +998,10 @@ export default function CanvasPage() {
   };
 
   const explainStep = async (parentId: string, targetStepId: string) => {
+    if (!online) {
+      setPreparationError('设备当前离线。联网后再请求进一步解释。');
+      return;
+    }
     const quotaError = quotaBlockReason(quota, Date.now());
     if (quotaError) {
       setPreparationError(quotaError);
@@ -1184,6 +1194,11 @@ export default function CanvasPage() {
         </div>
         <div className={styles.userBar}>
           <ThemeToggle />
+          {!online ? (
+            <span className={styles.networkOffline} role="status">
+              离线 · 画板可继续编辑
+            </span>
+          ) : null}
           <span className={styles.mobileQuota} aria-label={compactQuota}>
             {compactQuota}
           </span>

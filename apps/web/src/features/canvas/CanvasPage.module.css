@@ -117,7 +117,8 @@
 .userBar a,
 .userBar button,
 .saveState,
-.mobileQuota {
+.mobileQuota,
+.networkOffline {
   flex: 0 0 auto;
   justify-self: end;
   padding: 7px 10px;
@@ -127,6 +128,12 @@
   background: #fffdf9;
   font-size: 11px;
   font-weight: 680;
+}
+
+.networkOffline {
+  border-color: rgba(190, 125, 37, 0.28);
+  color: #8c4b1f;
+  background: #fff4dc;
 }
 
 .mobileQuota {
@@ -688,6 +695,7 @@
 :global(html[data-theme='dark']) .userBar button,
 :global(html[data-theme='dark']) .saveState,
 :global(html[data-theme='dark']) .mobileQuota,
+:global(html[data-theme='dark']) .networkOffline,
 :global(html[data-theme='dark']) .guide p {
   color: #aaa197;
 }
@@ -708,6 +716,12 @@
 :global(html[data-theme='dark']) .quotaSummary[data-mode='vector_only'] {
   border-color: rgba(235, 181, 92, 0.28);
   background: #352e21;
+}
+
+:global(html[data-theme='dark']) .networkOffline {
+  border-color: rgba(241, 178, 103, 0.3);
+  color: #f2bd82;
+  background: rgba(115, 66, 28, 0.34);
 }
 
 :global(html[data-theme='dark']) .mode,
