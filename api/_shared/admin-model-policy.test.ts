@@ -1,97 +1,130 @@
+import type { Redis } from '@upstash/redis';
 import { describe, expect, it } from 'vitest';
 
 import type { AiProviderConfig } from './ai-provider-config.js';
 import {
+  AdminModelPolicyStore,
   applyAdminModelPolicy,
   defaultAdminModelPolicy,
+  toAdminModelPolicyView,
   validateAdminModelPolicy,
 } from './admin-model-policy.js';
 
 const configs: AiProviderConfig[] = [
   {
-    id: 'primary',
+    id: 'deepseek',
     type: 'openai-compatible',
-    baseUrl: 'https://example.com/v1',
+    baseUrl: 'https://api.deepseek.com',
     apiKey: 'secret-primary',
-    model: 'model-a',
+    model: 'deepseek-flash',
     timeoutMs: 12_000,
     responseFormat: 'json_schema',
-    wireApi: 'chat_completions',
-  },
-  {
-    id: 'backup',
-    type: 'gemini',
-    apiKey: 'secret-backup',
-    model: 'model-b',
-    timeoutMs: 12_000,
+    wireApi: 'responses',
   },
 ];
+const key = Buffer.alloc(32, 7).toString('base64');
 
 describe('admin model policy', () => {
-  it('默认启用环境中已经配置的全部 Provider，且不暴露密钥', () => {
+  it('对前端隐藏密钥，同时运行时仍保留密钥', () => {
     const policy = defaultAdminModelPolicy(configs);
-    expect(policy.providers).toEqual([
-      { id: 'primary', enabled: true, model: 'model-a', timeoutMs: 12_000 },
-      { id: 'backup', enabled: true, model: 'model-b', timeoutMs: 12_000 },
-    ]);
-    expect(JSON.stringify(policy)).not.toContain('secret');
+    expect(toAdminModelPolicyView(policy).providers[0]).toEqual(
+      expect.objectContaining({ id: 'deepseek', hasApiKey: true }),
+    );
+    expect(JSON.stringify(toAdminModelPolicyView(policy))).not.toContain('secret-primary');
+    expect(applyAdminModelPolicy(policy)[0]).toEqual(
+      expect.objectContaining({ apiKey: 'secret-primary' }),
+    );
   });
 
-  it('支持动态排序、停用与模型覆盖，同时保留服务端密钥和地址', () => {
+  it('支持新增 SenseNova，并在留空时保留既有密钥', () => {
+    const current = defaultAdminModelPolicy(configs);
     const policy = validateAdminModelPolicy(
       {
         providers: [
-          { id: 'backup', enabled: true, model: 'model-b-fast', timeoutMs: 8_000 },
-          { id: 'primary', enabled: false, model: 'model-a', timeoutMs: 12_000 },
+          {
+            id: 'deepseek',
+            label: 'DeepSeek Flash',
+            type: 'openai-compatible',
+            enabled: true,
+            baseUrl: 'https://api.deepseek.com',
+            model: 'deepseek-flash',
+            timeoutMs: 10_000,
+            responseFormat: 'json_schema',
+            wireApi: 'responses',
+          },
+          {
+            id: 'sensenova',
+            label: 'SenseNova 6.8 Flash Lite',
+            type: 'openai-compatible',
+            enabled: true,
+            baseUrl: 'https://token.sensenova.cn/v1',
+            model: 'sensenova-6.8-flash-lite',
+            timeoutMs: 10_000,
+            responseFormat: 'prompt',
+            wireApi: 'chat_completions',
+            apiKey: 'secret-sensenova',
+          },
         ],
       },
       configs,
+      current,
     );
-    expect(applyAdminModelPolicy(configs, policy)).toEqual([
-      expect.objectContaining({
-        id: 'backup',
-        model: 'model-b-fast',
-        timeoutMs: 8_000,
-        apiKey: 'secret-backup',
-      }),
-    ]);
+    expect(policy.providers[0]?.apiKey).toBe('secret-primary');
+    expect(policy.providers[1]?.apiKey).toBe('secret-sensenova');
   });
 
-  it('拒绝关闭全部模型、未知 Provider 和超过总超时预算', () => {
+  it('拒绝内网/未知域名、无密钥启用和超过总超时预算', () => {
+    const base = {
+      id: 'new_model',
+      label: '新模型',
+      type: 'openai-compatible',
+      enabled: true,
+      model: 'model',
+      timeoutMs: 10_000,
+      responseFormat: 'prompt',
+      wireApi: 'chat_completions',
+      apiKey: 'secret',
+    };
+    expect(() =>
+      validateAdminModelPolicy({ providers: [{ ...base, baseUrl: 'http://127.0.0.1' }] }, configs),
+    ).toThrow('HTTPS URL');
     expect(() =>
       validateAdminModelPolicy(
-        {
-          providers: configs.map(({ id, model, timeoutMs }) => ({
-            id,
-            model,
-            timeoutMs,
-            enabled: false,
-          })),
-        },
+        { providers: [{ ...base, baseUrl: 'https://evil.example' }] },
         configs,
       ),
-    ).toThrow('至少需要启用一个');
+    ).toThrow('允许列表');
+    expect(() =>
+      validateAdminModelPolicy(
+        { providers: [{ ...base, baseUrl: 'https://api.deepseek.com', apiKey: undefined }] },
+        configs,
+      ),
+    ).toThrow('必须配置 API Key');
     expect(() =>
       validateAdminModelPolicy(
         {
           providers: [
-            { id: 'unknown', enabled: true, model: 'x', timeoutMs: 1_000 },
-            { id: 'backup', enabled: true, model: 'model-b', timeoutMs: 1_000 },
-          ],
-        },
-        configs,
-      ),
-    ).toThrow('未知或重复');
-    expect(() =>
-      validateAdminModelPolicy(
-        {
-          providers: [
-            { id: 'primary', enabled: true, model: 'model-a', timeoutMs: 13_000 },
-            { id: 'backup', enabled: true, model: 'model-b', timeoutMs: 13_000 },
+            { ...base, id: 'a', baseUrl: 'https://api.deepseek.com', timeoutMs: 13_000 },
+            { ...base, id: 'b', baseUrl: 'https://api.deepseek.com', timeoutMs: 13_000 },
           ],
         },
         configs,
       ),
     ).toThrow('累计超时');
+  });
+
+  it('写入 Redis 的配置整体加密，不包含明文密钥', async () => {
+    let stored = '';
+    const redis = {
+      get: async () => null,
+      set: async (_key: string, value: string) => {
+        stored = value;
+        return 'OK';
+      },
+    } as unknown as Redis;
+    const store = new AdminModelPolicyStore(redis, key);
+    await store.write(configs, defaultAdminModelPolicy(configs), 'admin-id');
+    expect(stored).not.toContain('secret-primary');
+    expect(stored).not.toContain('deepseek-flash');
   });
 });

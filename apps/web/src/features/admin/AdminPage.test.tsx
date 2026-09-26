@@ -32,10 +32,15 @@ const overview = {
   models: [
     {
       id: 'primary',
+      label: 'Primary',
       type: 'openai-compatible',
       enabled: true,
       model: 'model-a',
       timeoutMs: 12_000,
+      hasApiKey: true,
+      baseUrl: 'https://api.deepseek.com',
+      responseFormat: 'json_schema',
+      wireApi: 'responses',
     },
   ],
   policyUpdatedAt: null,

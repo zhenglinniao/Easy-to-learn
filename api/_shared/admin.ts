@@ -4,7 +4,11 @@ import { createClient, type User } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
 
 import { loadAiProviderConfigs } from './ai-provider-config.js';
-import { AdminModelPolicyStore, type AdminModelPolicy } from './admin-model-policy.js';
+import {
+  AdminModelPolicyStore,
+  toAdminModelPolicyView,
+  type AdminModelPolicyView,
+} from './admin-model-policy.js';
 import { ApiFault } from './fault.js';
 import type { HttpRequest } from './http.js';
 import { resolveActor } from './runtime.js';
@@ -57,7 +61,10 @@ export class AdminService {
     required('SUPABASE_SERVICE_ROLE_KEY'),
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
-  private readonly policyStore = new AdminModelPolicyStore(Redis.fromEnv());
+  private readonly policyStore = new AdminModelPolicyStore(
+    Redis.fromEnv(),
+    required('AI_CACHE_ENCRYPTION_KEY'),
+  );
   private readonly actorHashSecret = required('ACTOR_HASH_SECRET');
 
   async overview(
@@ -66,7 +73,7 @@ export class AdminService {
   ): Promise<{
     accounts: AdminAccountSummary[];
     pagination: { page: number; perPage: number; total: number };
-    models: Array<{ id: string; type: string; enabled: boolean; model: string; timeoutMs: number }>;
+    models: AdminModelPolicyView['providers'];
     policyUpdatedAt: string | null;
     pageSuspended: number;
   }> {
@@ -107,23 +114,17 @@ export class AdminService {
     return {
       accounts,
       pagination: { page, perPage, total: data.total ?? accounts.length },
-      models: policy.providers.map((provider) => ({
-        id: provider.id,
-        type: configs.find(({ id }) => id === provider.id)?.type ?? 'unknown',
-        enabled: provider.enabled,
-        model: provider.model,
-        timeoutMs: provider.timeoutMs,
-      })),
+      models: toAdminModelPolicyView(policy).providers,
       policyUpdatedAt: policy.updatedAt,
       pageSuspended: accounts.filter(({ suspended }) => suspended).length,
     };
   }
 
-  async updateModels(adminUserId: string, body: unknown): Promise<AdminModelPolicy> {
+  async updateModels(adminUserId: string, body: unknown): Promise<AdminModelPolicyView> {
     const configs = loadAiProviderConfigs(process.env);
     const policy = await this.policyStore.write(configs, body, adminUserId);
     await this.audit(adminUserId, 'admin_model_policy_updated', 'success');
-    return policy;
+    return toAdminModelPolicyView(policy);
   }
 
   async updateAccount(
