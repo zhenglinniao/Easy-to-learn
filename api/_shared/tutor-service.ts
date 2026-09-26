@@ -376,9 +376,9 @@ export class TutorService {
       return { data };
     } catch (error) {
       if (error instanceof ApiFault) {
-        if (error.code !== 'INVALID_MODEL_OUTPUT') {
-          await this.state.refund(actorKey, request.requestId, this.now());
-        }
+        // 用户只有在收到可展示的教学结果时才消耗额度。模型结构错误属于服务失败，
+        // 与超时、供应商故障一样释放 requestId 预留，允许安全重试。
+        await this.state.refund(actorKey, request.requestId, this.now());
         throw error;
       }
       await this.state.refund(actorKey, request.requestId, this.now());

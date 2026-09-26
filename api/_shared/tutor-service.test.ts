@@ -97,9 +97,15 @@ describe('TutorService', () => {
     expect(generate).toHaveBeenNthCalledWith(2, request, expect.stringContaining('Tutor DSL'));
     expect(generate).toHaveBeenNthCalledWith(2, request, expect.stringContaining('schemaVersion'));
 
+    const invalidState = new MemoryAiStateStore();
+    const invalidGenerate = vi
+      .fn()
+      .mockResolvedValueOnce({ rawHtml: '<b>unsafe</b>' })
+      .mockResolvedValueOnce({ rawHtml: '<b>still unsafe</b>' })
+      .mockResolvedValue(result);
     const invalid = new TutorService(
-      new MemoryAiStateStore(),
-      { generate: vi.fn().mockResolvedValue({ rawHtml: '<b>unsafe</b>' }) },
+      invalidState,
+      { generate: invalidGenerate },
       boards,
       () => new Date('2026-09-22T00:00:00.000Z'),
     );
@@ -107,6 +113,10 @@ describe('TutorService', () => {
       code: 'INVALID_MODEL_OUTPUT',
       retryable: true,
     });
+    await expect(invalid.execute(actor, request)).resolves.toMatchObject({
+      data: { quota: { remaining: 2 } },
+    });
+    expect(invalidGenerate).toHaveBeenCalledTimes(3);
   });
 
   it('拒绝 Explain step 复述原步骤并要求拆成新增信息的微步骤', async () => {
