@@ -20,6 +20,8 @@ import {
 const IMAGE_TTL_SECONDS = 24 * 60 * 60;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_ENCODED_IMAGE_LENGTH = Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 4;
+const MAX_IMAGE_PROVIDER_ATTEMPTS = 3;
+const IMAGE_RETRY_DELAYS_MS = [300, 900] as const;
 
 export interface SenseNovaImageConfig {
   baseUrl: string;
@@ -40,6 +42,20 @@ export interface ImageGenerator {
 }
 
 class NonRetryableImageProviderError extends ProviderUnavailableError {}
+
+const providerFailureDetails = (error: unknown): Record<string, string | number> => {
+  const details: Record<string, string | number> = {};
+  let current: unknown = error;
+  for (let depth = 0; depth < 3 && current instanceof Error; depth += 1) {
+    details[`cause${depth}Name`] = current.name.slice(0, 80);
+    const code = (current as Error & { code?: unknown }).code;
+    if (typeof code === 'string' || typeof code === 'number') {
+      details[`cause${depth}Code`] = String(code).slice(0, 80);
+    }
+    current = current.cause;
+  }
+  return details;
+};
 
 interface StoredIllustration {
   fileId: string;
@@ -92,7 +108,7 @@ export class SenseNovaImageGenerator implements ImageGenerator {
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs ?? 45_000);
     try {
       let lastError: unknown;
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      for (let attempt = 0; attempt < MAX_IMAGE_PROVIDER_ATTEMPTS; attempt += 1) {
         try {
           return await this.generateOnce(prompt, controller.signal);
         } catch (error) {
@@ -101,8 +117,9 @@ export class SenseNovaImageGenerator implements ImageGenerator {
           }
           if (error instanceof NonRetryableImageProviderError) throw error;
           lastError = error;
-          if (attempt === 0) {
-            await new Promise((resolve) => setTimeout(resolve, 250));
+          const retryDelay = IMAGE_RETRY_DELAYS_MS[attempt];
+          if (retryDelay !== undefined) {
+            await new Promise((resolve) => setTimeout(resolve, retryDelay));
           }
         }
       }
@@ -378,6 +395,7 @@ export class IllustrationService {
             event: 'image_provider_unavailable',
             requestId,
             detail: error.message.slice(0, 160),
+            ...providerFailureDetails(error),
           }),
         );
       }

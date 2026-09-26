@@ -91,7 +91,7 @@ describe('SenseNova image generation', () => {
     });
   });
 
-  it('瞬时网络失败时重试一次，明确 4xx 时不重试', async () => {
+  it('瞬时网络失败时最多重试两次，明确 4xx 时不重试', async () => {
     const jpeg = Buffer.from([
       0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x02, 0x00, 0x03, 0x03, 0x01, 0x11, 0x00,
       0x02, 0x11, 0x00, 0x03, 0x11, 0x00,
@@ -114,6 +114,26 @@ describe('SenseNova image generation', () => {
       height: 2,
     });
     expect(retryingFetch).toHaveBeenCalledTimes(2);
+
+    const thirdAttemptFetch = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValueOnce(Response.json({ data: [{ b64_json: jpeg.toString('base64') }] }));
+    const thirdAttemptGenerator = new SenseNovaImageGenerator(
+      {
+        baseUrl: 'https://token.sensenova.cn/v1',
+        model: 'sensenova-u1.5-fast',
+        apiKey: 'secret',
+      },
+      thirdAttemptFetch,
+    );
+
+    await expect(thirdAttemptGenerator.generate('教学插画')).resolves.toMatchObject({
+      width: 3,
+      height: 2,
+    });
+    expect(thirdAttemptFetch).toHaveBeenCalledTimes(3);
 
     const rejectedFetch = vi
       .fn<typeof fetch>()
