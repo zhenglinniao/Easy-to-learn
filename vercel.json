@@ -15,7 +15,7 @@
       "destination": "/index.html"
     }
   ],
-  "crons": [{ "path": "/api/jobs/retention", "schedule": "0 * * * *" }],
+  "crons": [{ "path": "/api/jobs/retention", "schedule": "0 19 * * *" }],
   "headers": [
     {
       "source": "/(.*)",

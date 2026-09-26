@@ -224,7 +224,7 @@ pnpm check
 - 已完成游客文字题端到端验收：建立匿名会话、调用 DeepSeek、解析 Tutor DSL 和扣减每日配额均成功。
 - 尚未配置 `SUPABASE_SERVICE_ROLE_KEY`，因此超过内联上限的题图上传、账户删除及相关管理任务保持不可用；补齐凭据后仍需单独验收。
 
-当前项目位于 Vercel Hobby 计划。仓库要求的保留任务每小时执行一次，而 Hobby Cron 仅允许每日调度，因此本次线上演示没有注册该 Cron；仓库中的小时级生产配置仍被保留。正式上线前必须升级到支持小时级 Cron 的计划，或接入可携带 `CRON_SECRET` 的外部小时级调度器，不应擅自把数据保留要求降为每日执行。
+当前项目位于 Vercel Hobby 计划。保留任务按每天一次调度，Cron 表达式 `0 19 * * *` 使用 UTC，对应北京时间次日凌晨 3 点。该频率满足已确认的“期满后 24 小时内清理”要求；`CRON_SECRET` 必须保留，用于验证调度请求。
 
 1. 创建独立的 Preview 与 Production Supabase/Redis 资源，不允许 Preview 连接生产数据。
 2. 在 Supabase 应用迁移并执行 RLS/Storage 测试。
@@ -234,7 +234,7 @@ pnpm check
 6. 检查 CSP、HSTS、Referrer-Policy、Permissions-Policy、`nosniff` 和静态资源缓存头。
 7. 完成数据库备份恢复、应用回滚、migration 回滚兼容和账户删除演练后，再逐步放量。
 
-仓库的 `vercel.json` 提供 SPA deep link、函数时限、小时级保留任务、安全响应头和静态资源缓存。该配置依据 Vercel 官方 Vite SPA 与项目配置格式编写；配置外部依赖后的完整生产发布仍需先在实际 Preview 域名验收。
+仓库的 `vercel.json` 提供 SPA deep link、函数时限、每日保留任务、安全响应头和静态资源缓存。该配置依据 Vercel 官方 Vite SPA 与项目配置格式编写；配置外部依赖后的完整生产发布仍需先在实际 Preview 域名验收。
 
 ## 数据保留摘要
 
