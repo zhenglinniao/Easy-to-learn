@@ -94,6 +94,28 @@ describe('SenseNova image generation', () => {
   it('只为适合视觉拆解的完整解答构造无文字插画提示词', () => {
     expect(shouldGenerateIllustration(result)).toBe(true);
     expect(shouldGenerateIllustration({ ...result, mode: 'hint' })).toBe(false);
+    expect(
+      shouldGenerateIllustration({
+        ...result,
+        contentProfile: {
+          contentKind: 'question',
+          learningGoal: 'explain',
+          goalSource: 'explicit',
+          confidence: 'high',
+        },
+      }),
+    ).toBe(true);
+    expect(
+      shouldGenerateIllustration({
+        ...result,
+        contentProfile: {
+          contentKind: 'exercise',
+          learningGoal: 'solve',
+          goalSource: 'explicit',
+          confidence: 'high',
+        },
+      }),
+    ).toBe(false);
     expect(buildIllustrationPrompt(result)).toContain('不生成文字、数字、公式');
   });
 
