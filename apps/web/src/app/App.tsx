@@ -15,7 +15,9 @@ const AdminPage = lazy(() => import('../features/admin/AdminPage'));
 // Compatibility spikes are developer diagnostics, not product routes. Keeping
 // the imports behind Vite's compile-time DEV flag lets production builds remove
 // their Mermaid/Cytoscape dependency graph entirely.
-const CanvasSpikePage = import.meta.env.DEV ? lazy(() => import('../spikes/CanvasSpikePage')) : null;
+const CanvasSpikePage = import.meta.env.DEV
+  ? lazy(() => import('../spikes/CanvasSpikePage'))
+  : null;
 const TutorBoardSpikePage = import.meta.env.DEV
   ? lazy(() => import('../spikes/TutorBoardSpikePage'))
   : null;
