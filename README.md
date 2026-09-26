@@ -284,6 +284,7 @@ pnpm db:stop
 - [系统方案设计](docs/02-方案设计.md)
 - [单元测试报告](docs/04-单元测试报告.md)
 - [SenseNova 多模态与生图接入设计](docs/07-SenseNova多模态与生图接入设计.md)
+- [AI 使用额度与成本控制设计](docs/08-AI使用额度与成本控制设计.md)
 - [最新开发节点记录](docs/progress/03-23-生产AI与辅导板验收.md)
 
 ## 当前发布边界
