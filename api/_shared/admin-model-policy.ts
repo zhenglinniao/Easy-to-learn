@@ -60,6 +60,14 @@ export interface AdminModelPolicyView {
   updatedBy: string | null;
 }
 
+const compatibleResponseFormat = (
+  provider: Pick<StoredOpenAiProvider, 'id' | 'baseUrl' | 'responseFormat'>,
+): OpenAiResponseFormat =>
+  (provider.id === 'deepseek' || provider.baseUrl.includes('api.deepseek.com')) &&
+  provider.responseFormat === 'json_schema'
+    ? 'json_object'
+    : provider.responseFormat;
+
 const deriveKey = (encodedKey: string): Buffer => {
   const source = Buffer.from(encodedKey, 'base64');
   if (source.length !== 32) throw new Error('AI_CACHE_ENCRYPTION_KEY 必须是 32 字节 Base64');
@@ -218,7 +226,7 @@ export const validateAdminModelPolicy = (
     if (imageModel && id !== 'sensenova' && !baseUrl.includes('sensenova.cn')) {
       throw new ApiFault('INVALID_INPUT', 'U1.5 生图模型只能配置在商汤日日新 Provider');
     }
-    return {
+    const openAiProvider: StoredOpenAiProvider = {
       id,
       label,
       type: 'openai-compatible',
@@ -231,6 +239,10 @@ export const validateAdminModelPolicy = (
       ...(reasoningEffort ? { reasoningEffort: reasoningEffort as ModelReasoningEffort } : {}),
       ...(imageModel ? { imageModel: imageModel as SenseNovaImageModel } : {}),
       ...(apiKey ? { apiKey } : {}),
+    };
+    return {
+      ...openAiProvider,
+      responseFormat: compatibleResponseFormat(openAiProvider),
     };
   });
   const active = providers.filter((provider) => provider.enabled);
@@ -247,6 +259,9 @@ export const validateAdminModelPolicy = (
 export const toAdminModelPolicyView = (policy: AdminModelPolicy): AdminModelPolicyView => ({
   providers: policy.providers.map(({ apiKey, ...provider }) => ({
     ...provider,
+    ...(provider.type === 'openai-compatible'
+      ? { responseFormat: compatibleResponseFormat(provider) }
+      : {}),
     hasApiKey: Boolean(apiKey),
   })),
   updatedAt: policy.updatedAt,
@@ -259,6 +274,9 @@ export const applyAdminModelPolicy = (policy: AdminModelPolicy): AiProviderConfi
       const config = { ...provider } as Partial<StoredAdminProvider> & Record<string, unknown>;
       delete config.enabled;
       delete config.label;
+      if (provider.type === 'openai-compatible') {
+        config.responseFormat = compatibleResponseFormat(provider);
+      }
       return config as unknown as AiProviderConfig;
     });
 
