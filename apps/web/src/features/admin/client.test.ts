@@ -8,10 +8,15 @@ const overview = {
   models: [
     {
       id: 'primary',
-      type: 'openai-compatible',
+      label: 'Primary',
+      type: 'openai-compatible' as const,
       enabled: true,
       model: 'model-a',
       timeoutMs: 12_000,
+      hasApiKey: true,
+      baseUrl: 'https://api.deepseek.com',
+      responseFormat: 'json_schema' as const,
+      wireApi: 'responses' as const,
     },
   ],
   policyUpdatedAt: null,
@@ -19,7 +24,7 @@ const overview = {
 };
 
 describe('AdminApiClient', () => {
-  it('所有管理请求都携带登录令牌且不在请求中发送密钥', async () => {
+  it('所有管理请求都携带登录令牌且概览不包含密钥', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(JSON.stringify({ data: overview }), {
         status: 200,

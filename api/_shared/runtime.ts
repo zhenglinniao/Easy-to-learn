@@ -115,9 +115,12 @@ export const createTutorService = async (
     // 文字题和小型内嵌图片不依赖对象存储。仅在模型实际需要读取上传图片时，
     // 再创建需要 Supabase service role 的票据服务，避免无关配置阻断匿名文字辅导。
     const configs = loadAiProviderConfigs(process.env);
-    const policy = await new AdminModelPolicyStore(Redis.fromEnv()).read(configs);
+    const policy = await new AdminModelPolicyStore(
+      Redis.fromEnv(),
+      required('AI_CACHE_ENCRYPTION_KEY'),
+    ).read(configs);
     model = createTutorModelFromConfigs(
-      applyAdminModelPolicy(configs, policy),
+      applyAdminModelPolicy(policy),
       (...args) => createUploadTicketService().resolve(actor, ...args),
       resolveTutorPromptVersion(process.env.AI_PROMPT_VERSION),
     );

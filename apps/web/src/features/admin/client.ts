@@ -1,9 +1,16 @@
 export interface AdminProviderView {
   id: string;
-  type: string;
+  label: string;
+  type: 'gemini' | 'openai-compatible';
   enabled: boolean;
   model: string;
   timeoutMs: number;
+  hasApiKey: boolean;
+  apiKey?: string;
+  baseUrl?: string;
+  responseFormat?: 'json_schema' | 'json_object' | 'prompt';
+  wireApi?: 'chat_completions' | 'responses';
+  reasoningEffort?: 'none' | 'low' | 'high' | 'max';
 }
 
 export interface AdminAccountView {

@@ -14,6 +14,34 @@ import styles from './AdminPage.module.css';
 const dateLabel = (value: string | null): string =>
   value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '从未登录';
 
+const providerPresets: Record<'sensenova' | 'deepseek', AdminProviderView> = {
+  sensenova: {
+    id: 'sensenova',
+    label: 'SenseNova 6.8 Flash Lite',
+    type: 'openai-compatible',
+    enabled: false,
+    baseUrl: 'https://token.sensenova.cn/v1',
+    model: 'sensenova-6.8-flash-lite',
+    timeoutMs: 12_000,
+    responseFormat: 'prompt',
+    wireApi: 'chat_completions',
+    hasApiKey: false,
+  },
+  deepseek: {
+    id: 'deepseek',
+    label: 'DeepSeek Flash',
+    type: 'openai-compatible',
+    enabled: false,
+    baseUrl: 'https://api.deepseek.com',
+    model: 'deepseek-flash',
+    timeoutMs: 12_000,
+    responseFormat: 'json_schema',
+    wireApi: 'responses',
+    reasoningEffort: 'none',
+    hasApiKey: false,
+  },
+};
+
 export default function AdminPage() {
   const { user, session, loading } = useAuth();
   const client = useMemo(
@@ -68,6 +96,20 @@ export default function AdminPage() {
       const next = [...items];
       [next[index], next[target]] = [next[target]!, next[index]!];
       return next;
+    });
+  };
+  const addPreset = (preset: keyof typeof providerPresets) => {
+    setError(null);
+    setModels((items) => {
+      if (items.some(({ id }) => id === preset)) {
+        setError(`${providerPresets[preset].label} 已在列表中`);
+        return items;
+      }
+      if (items.length >= 5) {
+        setError('最多可配置 5 个 Provider');
+        return items;
+      }
+      return [...items, { ...providerPresets[preset] }];
     });
   };
   const saveModels = async () => {
@@ -146,16 +188,25 @@ export default function AdminPage() {
             <p>模型调用</p>
             <h2 id="models-title">运行策略</h2>
           </div>
-          <button
-            type="button"
-            disabled={busy === 'models' || !overview}
-            onClick={() => void saveModels()}
-          >
-            {busy === 'models' ? '正在保存…' : '保存并生效'}
-          </button>
+          <div className={styles.modelActions}>
+            <button type="button" onClick={() => addPreset('sensenova')}>
+              添加商汤日日新
+            </button>
+            <button type="button" onClick={() => addPreset('deepseek')}>
+              添加 DeepSeek
+            </button>
+            <button
+              type="button"
+              disabled={busy === 'models' || !overview}
+              onClick={() => void saveModels()}
+            >
+              {busy === 'models' ? '正在保存…' : '保存并生效'}
+            </button>
+          </div>
         </div>
         <p className={styles.helper}>
-          顺序代表回退优先级。API Key、服务地址和 Provider 类型只能在 Vercel 环境变量中修改。
+          顺序代表回退优先级。API Key 只写入服务端加密存储，页面不会回显；服务地址仅允许批准的 HTTPS
+          域名。
         </p>
         <div className={styles.modelList}>
           {models.map((provider, index) => (
@@ -183,17 +234,74 @@ export default function AdminPage() {
               </div>
               <div className={styles.modelFields}>
                 <div className={styles.modelTitle}>
-                  <strong>{provider.id}</strong>
+                  <strong>{provider.label}</strong>
                   <span>{provider.type}</span>
                 </div>
                 <label>
-                  模型名称
+                  显示名称
+                  <input
+                    value={provider.label}
+                    maxLength={60}
+                    onChange={(event) => updateModel(provider.id, { label: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Provider ID
+                  <input value={provider.id} disabled />
+                </label>
+                {provider.type === 'openai-compatible' && (
+                  <label>
+                    Base URL
+                    <input
+                      value={provider.baseUrl ?? ''}
+                      onChange={(event) =>
+                        updateModel(provider.id, { baseUrl: event.target.value })
+                      }
+                    />
+                  </label>
+                )}
+                <label>
+                  Model ID
                   <input
                     value={provider.model}
                     maxLength={160}
                     onChange={(event) => updateModel(provider.id, { model: event.target.value })}
                   />
                 </label>
+                {provider.type === 'openai-compatible' && (
+                  <>
+                    <label>
+                      API 模式
+                      <select
+                        value={provider.wireApi ?? 'chat_completions'}
+                        onChange={(event) =>
+                          updateModel(provider.id, {
+                            wireApi: event.target.value as 'chat_completions' | 'responses',
+                          })
+                        }
+                      >
+                        <option value="chat_completions">Chat Completions</option>
+                        <option value="responses">Responses</option>
+                      </select>
+                    </label>
+                    <label>
+                      结构化输出
+                      <select
+                        value={provider.responseFormat ?? 'prompt'}
+                        onChange={(event) =>
+                          updateModel(provider.id, {
+                            responseFormat: event.target.value as
+                              'json_schema' | 'json_object' | 'prompt',
+                          })
+                        }
+                      >
+                        <option value="json_schema">JSON Schema</option>
+                        <option value="json_object">JSON Object</option>
+                        <option value="prompt">仅提示词约束</option>
+                      </select>
+                    </label>
+                  </>
+                )}
                 <label>
                   超时（毫秒）
                   <input
@@ -207,15 +315,37 @@ export default function AdminPage() {
                     }
                   />
                 </label>
+                <label>
+                  API Key
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={provider.apiKey ?? ''}
+                    placeholder={provider.hasApiKey ? '已配置 · 留空保持不变' : '输入后加密保存'}
+                    onChange={(event) => updateModel(provider.id, { apiKey: event.target.value })}
+                  />
+                </label>
               </div>
-              <label className={styles.switch}>
-                <input
-                  type="checkbox"
-                  checked={provider.enabled}
-                  onChange={(event) => updateModel(provider.id, { enabled: event.target.checked })}
-                />
-                <span>{provider.enabled ? '已启用' : '已停用'}</span>
-              </label>
+              <div className={styles.modelControls}>
+                <label className={styles.switch}>
+                  <input
+                    type="checkbox"
+                    checked={provider.enabled}
+                    onChange={(event) =>
+                      updateModel(provider.id, { enabled: event.target.checked })
+                    }
+                  />
+                  <span>{provider.enabled ? '已启用' : '已停用'}</span>
+                </label>
+                <button
+                  type="button"
+                  className={styles.removeButton}
+                  disabled={models.length === 1}
+                  onClick={() => setModels((items) => items.filter(({ id }) => id !== provider.id))}
+                >
+                  移除
+                </button>
+              </div>
             </article>
           ))}
           {!overview && !error && <p className={styles.loading}>正在读取模型策略…</p>}

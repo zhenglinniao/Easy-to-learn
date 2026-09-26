@@ -110,10 +110,11 @@ Copy-Item .env.example .env.local
 | `ACTOR_HASH_SECRET`                                   | actor 不可逆摘要和上传路径隔离                   |
 | `ANALYTICS_HASH_SECRET`                               | 第一方匿名访问统计摘要；未配置时兼容 actor 密钥  |
 | `AI_CACHE_ENCRYPTION_KEY`                             | 32 字节随机值的 Base64，保护 24 小时幂等响应     |
+| `AI_ADMIN_ALLOWED_PROVIDER_HOSTS`                     | 后台可新增的额外 AI Provider 域名，逗号分隔      |
 | `CRON_SECRET`                                         | Vercel Cron 调用保留任务的 Bearer 密钥           |
 | `APP_ORIGINS`                                         | 逗号分隔的完整允许 origin                        |
 
-Provider 按 `AI_PROVIDERS` 的声明顺序尝试。仅当当前 Provider 超时、网络失败或返回供应商错误时才切换；模型成功返回但 DSL 非法时，仍由现有的一次纠错流程处理。`GEMINI_API_KEY`、`AI_MODEL` 和 `AI_TIMEOUT_MS` 仅用于兼容旧部署；声明 `AI_PROVIDERS` 后不再读取它们。
+Provider 首次按 `AI_PROVIDERS` 的声明顺序加载；管理员可在 `/admin` 保存完整运行链，之后以加密的 Redis 配置为准，Redis 不可用或配置损坏时回退环境配置。仅当当前 Provider 超时、网络失败或返回供应商错误时才切换；模型成功返回但 DSL 非法时，仍由现有的一次纠错流程处理。`GEMINI_API_KEY`、`AI_MODEL` 和 `AI_TIMEOUT_MS` 仅用于兼容旧部署；声明 `AI_PROVIDERS` 后不再读取它们。
 
 生产 Prompt 的唯一来源是 `skills/canvas-tutor-planner/references/prompt-registry.json`。`AI_PROMPT_VERSION` 必须指向其中真实存在的版本；未知版本会让健康检查返回 AI `degraded`，Tutor API 返回依赖未配置，避免审计元数据与实际 Prompt 内容不一致。
 
