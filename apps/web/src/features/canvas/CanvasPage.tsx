@@ -61,9 +61,11 @@ import {
 } from './illustrationProgress';
 import { mapWithConcurrency } from './mapWithConcurrency';
 import { syncStateAfterNetworkChange } from './syncResume';
+import { syncStatusLabel } from './syncStatus';
 import { useOnlineStatus } from './useOnlineStatus';
 
 const ASSET_IO_CONCURRENCY = 4;
+const SYNC_FAILURE_RETRY_MS = 5_000;
 
 interface OpenMenu {
   x: number;
@@ -120,17 +122,6 @@ const selectionSignature = (selectedElementIds: AppState['selectedElementIds']):
 const didHitSelection = (pointerDownState: PointerDownState): boolean =>
   pointerDownState.hit.element !== null ||
   pointerDownState.hit.hasHitCommonBoundingBoxOfSelectedElements;
-
-const syncLabel = (state: SyncState, isUser: boolean): string => {
-  if (!isUser) return '游客 · 仅本机';
-  if (state === 'synced' || state === 'clean') return '已保存到云端';
-  if (state === 'local-saving') return '正在本地保存';
-  if (state === 'syncing-assets' || state === 'syncing-snapshot') return '正在同步';
-  if (state === 'conflict') return '版本冲突 · 已保留副本';
-  if (state === 'offline' || state === 'retrying') return '离线 · 等待同步';
-  if (state === 'failed-local') return '本地保存失败';
-  return '已保存本机 · 待同步';
-};
 
 type CanvasElements = Parameters<
   NonNullable<React.ComponentProps<typeof Excalidraw>['onChange']>
@@ -223,6 +214,7 @@ export default function CanvasPage() {
   const [viewportState, setViewportState] = useState<AppState | null>(null);
   const [stageOrigin, setStageOrigin] = useState({ x: 0, y: 0 });
   const [syncState, setSyncState] = useState<SyncState>('clean');
+  const [syncRetryAt, setSyncRetryAt] = useState<number | null>(null);
   const [migrationMessage, setMigrationMessage] = useState<string | null>(null);
   const [showLocalData, setShowLocalData] = useState(false);
   const [localBoards, setLocalBoards] = useState<StoredBoard[]>([]);
@@ -554,18 +546,19 @@ export default function CanvasPage() {
     if (syncState !== 'dirty' || !syncEngineRef.current || !syncCoordinatorRef.current) return;
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
+      syncTimer.current = null;
       void (async () => {
         const lease = await syncCoordinatorRef.current?.acquire(boardId);
         if (!lease) return;
         try {
           setSyncState('syncing-snapshot');
           const result = await syncEngineRef.current?.syncBoard(boardId);
-          if (result) setSyncState(result.state);
           if (result?.retryAt) {
-            syncTimer.current = setTimeout(
-              () => setSyncState('dirty'),
-              Math.max(0, result.retryAt - Date.now()),
-            );
+            setSyncState('retrying');
+            setSyncRetryAt(result.retryAt);
+          } else if (result) {
+            setSyncRetryAt(null);
+            setSyncState(result.state);
           }
           if ((await repositoryRef.current?.getOutbox(boardId))?.length) {
             if (!result?.retryAt) setSyncState('dirty');
@@ -573,12 +566,27 @@ export default function CanvasPage() {
         } finally {
           lease.release();
         }
-      })().catch(() => setSyncState('retrying'));
+      })().catch(() => {
+        setSyncState('retrying');
+        setSyncRetryAt(Date.now() + SYNC_FAILURE_RETRY_MS);
+      });
     }, 3_000);
     return () => {
       if (syncTimer.current) clearTimeout(syncTimer.current);
     };
   }, [boardId, syncState]);
+
+  useEffect(() => {
+    if (syncRetryAt === null || syncState !== 'retrying') return;
+    const timer = window.setTimeout(
+      () => {
+        setSyncRetryAt(null);
+        setSyncState('dirty');
+      },
+      Math.max(0, syncRetryAt - Date.now()),
+    );
+    return () => window.clearTimeout(timer);
+  }, [syncRetryAt, syncState]);
 
   useEffect(() => {
     const resumeSync = () => setSyncState((current) => syncStateAfterNetworkChange(current, true));
@@ -1212,7 +1220,7 @@ export default function CanvasPage() {
           <span className={styles.mobileQuota} aria-label={compactQuota}>
             {compactQuota}
           </span>
-          <span className={styles.saveState}>{syncLabel(syncState, Boolean(user))}</span>
+          <span className={styles.saveState}>{syncStatusLabel(syncState, Boolean(user))}</span>
           <button type="button" onClick={() => void exportBoard('excalidraw')}>
             导出
           </button>
