@@ -2,9 +2,9 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AnalyticsTracker } from '../features/analytics/AnalyticsTracker';
 import { AuthProvider } from '../features/auth';
+import LandingPage from '../pages/LandingPage';
 import { AppErrorBoundary } from './AppErrorBoundary';
 
-const LandingPage = lazy(() => import('../pages/LandingPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
 const BoardsPage = lazy(() => import('../pages/BoardsPage'));
 const AuthCallbackPage = lazy(() => import('../pages/AuthCallbackPage'));

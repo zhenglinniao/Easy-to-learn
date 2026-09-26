@@ -3,6 +3,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'jsdom',
+    // Worker threads retain per-file isolation and browser-compatible globals,
+    // while avoiding the process startup overhead of Vitest's default forks.
+    pool: 'threads',
     globals: true,
     include: ['apps/**/*.test.{ts,tsx}', 'packages/**/*.test.{ts,tsx}', 'api/**/*.test.ts'],
     setupFiles: ['./vitest.setup.ts'],
