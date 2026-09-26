@@ -165,6 +165,10 @@ describe('AdminPage', () => {
     );
 
     const imagePicker = await screen.findByRole('combobox', { name: '生图 Model ID' });
+    expect(screen.getByRole('combobox', { name: 'API 模式' })).toHaveValue('chat_completions');
+    expect(screen.getByRole('combobox', { name: '结构化输出' })).toHaveValue('prompt');
+    expect(screen.getByRole('option', { name: 'Responses' })).toBeDisabled();
+    expect(screen.getByRole('option', { name: 'JSON Schema' })).toBeDisabled();
     expect(screen.getByRole('option', { name: /SenseNova U1\.5 Lite/ })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /SenseNova U1\.5 Fast/ })).toBeInTheDocument();
     fireEvent.change(imagePicker, { target: { value: 'sensenova-u1.5-fast' } });

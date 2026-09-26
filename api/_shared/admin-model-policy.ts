@@ -60,13 +60,30 @@ export interface AdminModelPolicyView {
   updatedBy: string | null;
 }
 
+const isDeepSeekProvider = (
+  provider: Pick<StoredOpenAiProvider, 'id' | 'baseUrl' | 'responseFormat' | 'wireApi'>,
+): boolean => provider.id === 'deepseek' || provider.baseUrl.includes('api.deepseek.com');
+
+const isSenseNovaProvider = (
+  provider: Pick<StoredOpenAiProvider, 'id' | 'baseUrl' | 'responseFormat' | 'wireApi'>,
+): boolean => provider.id === 'sensenova' || provider.baseUrl.includes('sensenova.cn');
+
+const compatibleResponseFormat = (
+  provider: Pick<StoredOpenAiProvider, 'id' | 'baseUrl' | 'responseFormat' | 'wireApi'>,
+): OpenAiResponseFormat =>
+  isSenseNovaProvider(provider) && provider.responseFormat === 'json_schema'
+    ? 'prompt'
+    : provider.responseFormat;
+
 const compatibleWireApi = (
   provider: Pick<StoredOpenAiProvider, 'id' | 'baseUrl' | 'responseFormat' | 'wireApi'>,
 ): OpenAiWireApi =>
-  (provider.id === 'deepseek' || provider.baseUrl.includes('api.deepseek.com')) &&
+  isSenseNovaProvider(provider)
+    ? 'chat_completions'
+    : isDeepSeekProvider(provider) &&
   provider.responseFormat === 'json_schema'
-    ? 'responses'
-    : provider.wireApi;
+      ? 'responses'
+      : provider.wireApi;
 
 const deriveKey = (encodedKey: string): Buffer => {
   const source = Buffer.from(encodedKey, 'base64');
@@ -242,6 +259,7 @@ export const validateAdminModelPolicy = (
     };
     return {
       ...openAiProvider,
+      responseFormat: compatibleResponseFormat(openAiProvider),
       wireApi: compatibleWireApi(openAiProvider),
     };
   });
@@ -259,7 +277,12 @@ export const validateAdminModelPolicy = (
 export const toAdminModelPolicyView = (policy: AdminModelPolicy): AdminModelPolicyView => ({
   providers: policy.providers.map(({ apiKey, ...provider }) => ({
     ...provider,
-    ...(provider.type === 'openai-compatible' ? { wireApi: compatibleWireApi(provider) } : {}),
+    ...(provider.type === 'openai-compatible'
+      ? {
+          responseFormat: compatibleResponseFormat(provider),
+          wireApi: compatibleWireApi(provider),
+        }
+      : {}),
     hasApiKey: Boolean(apiKey),
   })),
   updatedAt: policy.updatedAt,
@@ -273,6 +296,7 @@ export const applyAdminModelPolicy = (policy: AdminModelPolicy): AiProviderConfi
       delete config.enabled;
       delete config.label;
       if (provider.type === 'openai-compatible') {
+        config.responseFormat = compatibleResponseFormat(provider);
         config.wireApi = compatibleWireApi(provider);
       }
       return config as unknown as AiProviderConfig;
