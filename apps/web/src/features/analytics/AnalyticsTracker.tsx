@@ -2,16 +2,22 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 const RECENT_VISIT_KEY = 'easy-to-learn-recent-visit';
+const ANALYTICS_FAILURE_KEY = 'easy-to-learn-analytics-unavailable';
 const DUPLICATE_WINDOW_MS = 2_000;
+
+const privacyControlEnabled = (): boolean =>
+  navigator.doNotTrack === '1' ||
+  (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true;
 
 export function AnalyticsTracker() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    if (navigator.doNotTrack === '1' || typeof fetch !== 'function') return;
+    if (privacyControlEnabled() || typeof fetch !== 'function') return;
 
     const now = Date.now();
     try {
+      if (sessionStorage.getItem(ANALYTICS_FAILURE_KEY) === '1') return;
       const previous = JSON.parse(sessionStorage.getItem(RECENT_VISIT_KEY) || 'null') as {
         pathname?: string;
         timestamp?: number;
@@ -32,7 +38,17 @@ export function AnalyticsTracker() {
       method: 'POST',
       credentials: 'include',
       keepalive: true,
-    }).catch(() => undefined);
+    })
+      .then((response) => {
+        if (!response.ok) sessionStorage.setItem(ANALYTICS_FAILURE_KEY, '1');
+      })
+      .catch(() => {
+        try {
+          sessionStorage.setItem(ANALYTICS_FAILURE_KEY, '1');
+        } catch {
+          // 隐私模式禁用存储时仍保持统计完全不影响页面。
+        }
+      });
   }, [pathname]);
 
   return null;

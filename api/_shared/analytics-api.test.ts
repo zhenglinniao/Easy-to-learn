@@ -74,6 +74,21 @@ describe('analytics API', () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it('统计未配置时安静降级且不签发访客 Cookie', async () => {
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const { response, result } = createResponse();
+
+    await visitHandler(
+      { method: 'POST', headers: { origin: 'https://easy.example.com' } },
+      response,
+    );
+
+    expect(result()).toMatchObject({ statusCode: 204, ended: true });
+    expect(result().headers.get('X-Analytics-Status')).toBe('disabled');
+    expect(result().headers.has('Set-Cookie')).toBe(false);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it('返回公开聚合指标并设置边缘缓存', async () => {
     rpc.mockResolvedValue({
       data: [{ total_visits: 12, visitors_30d: 8, registered_users: 4, cloud_boards: 6 }],

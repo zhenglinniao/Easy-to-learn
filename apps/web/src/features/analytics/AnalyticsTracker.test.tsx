@@ -7,6 +7,7 @@ import { AnalyticsTracker } from './AnalyticsTracker';
 beforeEach(() => {
   sessionStorage.clear();
   Object.defineProperty(navigator, 'doNotTrack', { configurable: true, value: null });
+  Object.defineProperty(navigator, 'globalPrivacyControl', { configurable: true, value: false });
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -42,5 +43,39 @@ describe('AnalyticsTracker', () => {
     );
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('尊重 Global Privacy Control 并在服务失败后停止本会话重试', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false });
+    vi.stubGlobal('fetch', fetchMock);
+    const first = render(
+      <MemoryRouter initialEntries={['/first']}>
+        <AnalyticsTracker />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(sessionStorage.getItem('easy-to-learn-analytics-unavailable')).toBe('1'),
+    );
+    first.unmount();
+
+    render(
+      <MemoryRouter initialEntries={['/second']}>
+        <AnalyticsTracker />
+      </MemoryRouter>,
+    );
+    expect(fetchMock).toHaveBeenCalledOnce();
+
+    Object.defineProperty(navigator, 'globalPrivacyControl', {
+      configurable: true,
+      value: true,
+    });
+    sessionStorage.clear();
+    render(
+      <MemoryRouter initialEntries={['/third']}>
+        <AnalyticsTracker />
+      </MemoryRouter>,
+    );
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 });
