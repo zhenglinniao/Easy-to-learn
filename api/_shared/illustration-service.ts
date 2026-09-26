@@ -325,7 +325,27 @@ export class IllustrationService {
       await this.state.refundImages(actorKey, requestId, this.now());
       if (error instanceof ApiFault) throw error;
       if (error instanceof ProviderTimeoutError) {
+        console.warn(
+          JSON.stringify({
+            timestamp: this.now().toISOString(),
+            level: 'warning',
+            event: 'image_provider_timeout',
+            requestId,
+            detail: error.message.slice(0, 160),
+          }),
+        );
         throw new ApiFault('AI_TIMEOUT', '图片生成超时，文字与矢量图解已保留');
+      }
+      if (error instanceof ProviderUnavailableError) {
+        console.error(
+          JSON.stringify({
+            timestamp: this.now().toISOString(),
+            level: 'error',
+            event: 'image_provider_unavailable',
+            requestId,
+            detail: error.message.slice(0, 160),
+          }),
+        );
       }
       throw new ApiFault('AI_PROVIDER_ERROR', '图片生成暂时不可用，文字与矢量图解已保留');
     }
