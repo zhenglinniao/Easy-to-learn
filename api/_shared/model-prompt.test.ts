@@ -77,4 +77,14 @@ describe('Tutor Skill prompt registry', () => {
     });
     expect(parseModelJson(JSON.stringify('普通文本'))).toBe('普通文本');
   });
+
+  it('提取说明文字或代码块中的单个 JSON 对象', () => {
+    expect(parseModelJson('以下是结果：\n```json\n{"schemaVersion":1}\n```\n完成。')).toEqual({
+      schemaVersion: 1,
+    });
+    expect(parseModelJson('结果： {"title":"含 } 的字符串","schemaVersion":1} 请查收')).toEqual({
+      title: '含 } 的字符串',
+      schemaVersion: 1,
+    });
+  });
 });

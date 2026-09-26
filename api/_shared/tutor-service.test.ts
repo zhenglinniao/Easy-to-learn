@@ -109,6 +109,29 @@ describe('TutorService', () => {
     });
   });
 
+  it('主模型两次内容校验失败后使用下一顺位模型', async () => {
+    const primary: TutorModel = {
+      generate: vi.fn().mockResolvedValue({ title: '缺少 Tutor DSL 字段' }),
+    };
+    const backup: TutorModel = { generate: vi.fn().mockResolvedValue(result) };
+    const model: TutorModel = {
+      generate: vi.fn(),
+      fallbackCandidates: () => [primary, backup],
+    };
+    const service = new TutorService(
+      new MemoryAiStateStore(),
+      model,
+      boards,
+      () => new Date('2026-09-22T00:00:00.000Z'),
+    );
+
+    await expect(service.execute(actor, request)).resolves.toMatchObject({
+      data: { result: { title: '一元一次方程' } },
+    });
+    expect(primary.generate).toHaveBeenCalledTimes(2);
+    expect(backup.generate).toHaveBeenCalledOnce();
+  });
+
   it('修复 part-map takeaway 被模型放到图块外层的已知结构漂移', async () => {
     const model = {
       generate: vi.fn().mockResolvedValue({

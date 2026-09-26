@@ -21,6 +21,10 @@ export class FallbackTutorModel implements TutorModel {
     if (providers.length === 0) throw new AiProviderConfigurationError('至少需要一个 AI Provider');
   }
 
+  fallbackCandidates(): readonly TutorModel[] {
+    return this.providers;
+  }
+
   async generate(request: TutorRequest, correction?: string): Promise<unknown> {
     let lastError: ProviderTimeoutError | ProviderUnavailableError | undefined;
     for (const provider of this.providers) {

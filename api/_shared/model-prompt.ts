@@ -75,12 +75,8 @@ export const buildTutorPrompt = (
 
 export const parseModelJson = (text: string | undefined): unknown => {
   if (!text) throw new ProviderUnavailableError('模型没有返回文本');
-  const cleaned = text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/, '');
-  try {
-    const parsed: unknown = JSON.parse(cleaned);
+  const parseCandidate = (candidate: string): unknown => {
+    const parsed: unknown = JSON.parse(candidate);
     // 部分 OpenAI-compatible Responses 实现会把结构化 JSON 再编码为字符串。
     // 只额外解码一层，既兼容该差异，也避免无限递归或接受任意多层包装。
     if (typeof parsed === 'string') {
@@ -88,7 +84,52 @@ export const parseModelJson = (text: string | undefined): unknown => {
       if (nested.startsWith('{') && nested.endsWith('}')) return JSON.parse(nested);
     }
     return parsed;
+  };
+  const cleaned = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '');
+  try {
+    return parseCandidate(cleaned);
   } catch {
+    // 仅支持提示词约束的模型可能在 JSON 前后加上说明。
+    // 提取后仍必须通过严格 Tutor DSL 校验，不放宽安全边界。
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)?.[1];
+    if (fenced) {
+      try {
+        return parseCandidate(fenced.trim());
+      } catch {
+        // 继续尝试从普通文本中提取对象。
+      }
+    }
+
+    const start = text.indexOf('{');
+    if (start >= 0) {
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      for (let index = start; index < text.length; index += 1) {
+        const character = text[index]!;
+        if (inString) {
+          if (escaped) escaped = false;
+          else if (character === '\\') escaped = true;
+          else if (character === '"') inString = false;
+          continue;
+        }
+        if (character === '"') inString = true;
+        else if (character === '{') depth += 1;
+        else if (character === '}') {
+          depth -= 1;
+          if (depth === 0) {
+            try {
+              return parseCandidate(text.slice(start, index + 1));
+            } catch {
+              break;
+            }
+          }
+        }
+      }
+    }
     return text;
   }
 };
