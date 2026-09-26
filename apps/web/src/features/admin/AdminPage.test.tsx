@@ -172,6 +172,59 @@ describe('AdminPage', () => {
     expect(screen.getByText(/U1\.5 加速版/)).toBeInTheDocument();
   });
 
+  it('DeepSeek 切换到 Chat Completions 时同步使用 JSON Object 并保存所选模式', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === '/api/admin/access') {
+        return new Response(JSON.stringify({ data: { isAdmin: true, userId: 'admin-user' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.startsWith('/api/admin/overview')) {
+        return new Response(JSON.stringify({ data: overview }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ data: { ok: true } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetcher);
+
+    render(
+      <MemoryRouter>
+        <AdminPage />
+      </MemoryRouter>,
+    );
+
+    const apiMode = await screen.findByRole('combobox', { name: 'API 模式' });
+    const responseFormat = screen.getByRole('combobox', { name: '结构化输出' });
+    fireEvent.change(apiMode, { target: { value: 'chat_completions' } });
+
+    expect(apiMode).toHaveValue('chat_completions');
+    expect(responseFormat).toHaveValue('json_object');
+    expect(screen.getByText(/Chat Completions 已同时切换为 JSON Object/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '保存并生效' }));
+    await waitFor(() =>
+      expect(fetcher).toHaveBeenCalledWith(
+        '/api/admin/models',
+        expect.objectContaining({ method: 'PATCH' }),
+      ),
+    );
+    const saveCall = fetcher.mock.calls.find(([input]) => String(input) === '/api/admin/models');
+    const body = JSON.parse(String(saveCall?.[1]?.body)) as {
+      providers: typeof overview.models;
+    };
+    expect(body.providers[0]).toMatchObject({
+      wireApi: 'chat_completions',
+      responseFormat: 'json_object',
+    });
+  });
+
   it('明确提示未保存草稿和启用模型的超时预算错误', async () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
       const url = String(input);
