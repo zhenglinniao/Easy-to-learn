@@ -2,6 +2,7 @@ import {
   tutorRequestSchema,
   tutorResultSchema,
   type TutorRequest,
+  type TutorResultV1,
   type TutorResponse,
 } from '@easy-to-learn/domain';
 
@@ -55,6 +56,93 @@ const safeIssueSummary = (issues: Array<{ path: PropertyKey[]; message: string }
     path: path.map(String).join('.'),
     message,
   }));
+
+type TutorValidationIssue = { path: PropertyKey[]; message: string };
+type TutorCandidateValidation =
+  | { success: true; data: TutorResultV1; issues: [] }
+  | { success: false; issues: TutorValidationIssue[] };
+
+const EDUCATIONAL_TEXT_KEYS = new Set([
+  'title',
+  'text',
+  'latex',
+  'code',
+  'label',
+  'caption',
+  'detail',
+  'takeaway',
+  'items',
+]);
+
+const collectEducationalText = (value: unknown, key = ''): string[] => {
+  if (typeof value === 'string') return EDUCATIONAL_TEXT_KEYS.has(key) ? [value] : [];
+  if (Array.isArray(value)) return value.flatMap((item) => collectEducationalText(item, key));
+  if (value === null || typeof value !== 'object') return [];
+  return Object.entries(value).flatMap(([childKey, child]) =>
+    collectEducationalText(child, childKey),
+  );
+};
+
+const normalizeEducationalText = (value: unknown): string =>
+  collectEducationalText(value)
+    .join('')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\p{P}\p{S}\s]/gu, '');
+
+const requestAwareIssues = (
+  request: TutorRequest,
+  result: TutorResultV1,
+): TutorValidationIssue[] => {
+  const issues: TutorValidationIssue[] = [];
+  if (result.mode !== request.mode) {
+    issues.push({ path: ['mode'], message: `必须与请求模式 ${request.mode} 一致` });
+  }
+  if (request.mode !== 'explain_step' || !request.parentContext || !request.targetStepId) {
+    return issues;
+  }
+
+  if (result.steps.some((step) => step.id === request.targetStepId)) {
+    issues.push({
+      path: ['steps'],
+      message: '深入解释必须使用新的微步骤 ID，不能原样返回目标步骤',
+    });
+  }
+  if (
+    result.steps.every((step) => step.title.trim() === request.parentContext?.step.title.trim())
+  ) {
+    issues.push({
+      path: ['steps'],
+      message: '微步骤标题必须说明新的理解任务，不能全部重复原步骤标题',
+    });
+  }
+
+  const sourceText = normalizeEducationalText(request.parentContext.step);
+  const explanationText = normalizeEducationalText({ title: result.title, steps: result.steps });
+  const minimumExpansion = Math.min(80, Math.max(18, Math.ceil(sourceText.length * 0.2)));
+  if (
+    explanationText === sourceText ||
+    explanationText.length < sourceText.length + minimumExpansion
+  ) {
+    issues.push({
+      path: ['steps'],
+      message: '解释必须加入前置概念、微操作、成立原因、例子或自检，不能只复述原步骤',
+    });
+  }
+  return issues;
+};
+
+const validateTutorCandidate = (
+  request: TutorRequest,
+  candidate: unknown,
+): TutorCandidateValidation => {
+  const parsed = tutorResultSchema.safeParse(normalizeKnownModelDrift(candidate));
+  if (!parsed.success) return { success: false, issues: parsed.error.issues };
+  const issues = requestAwareIssues(request, parsed.data);
+  return issues.length > 0
+    ? { success: false, issues }
+    : { success: true, data: parsed.data, issues: [] };
+};
 
 const COMIC_MOTIFS = new Set([
   'idea',
@@ -225,14 +313,14 @@ export class TutorService {
       for (const [providerIndex, candidateModel] of candidates.entries()) {
         try {
           let candidate = await candidateModel.generate(request);
-          let validated = tutorResultSchema.safeParse(normalizeKnownModelDrift(candidate));
-          const initialIssues = validated.success ? [] : safeIssueSummary(validated.error.issues);
+          let validated = validateTutorCandidate(request, candidate);
+          const initialIssues = validated.success ? [] : safeIssueSummary(validated.issues);
           if (!validated.success) {
             candidate = await candidateModel.generate(
               request,
-              correctionFromIssues(validated.error.issues),
+              correctionFromIssues(validated.issues),
             );
-            validated = tutorResultSchema.safeParse(normalizeKnownModelDrift(candidate));
+            validated = validateTutorCandidate(request, candidate);
           }
           if (validated.success) {
             successfulResult = validated.data;
@@ -254,7 +342,7 @@ export class TutorService {
           invalidAttempts.push({
             providerIndex,
             initialIssues,
-            correctionIssues: safeIssueSummary(validated.error.issues),
+            correctionIssues: safeIssueSummary(validated.issues),
           });
         } catch (error) {
           if (error instanceof ProviderTimeoutError || error instanceof ProviderUnavailableError) {

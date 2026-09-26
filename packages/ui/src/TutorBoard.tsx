@@ -142,11 +142,13 @@ export function TutorBoard({
         </button>
       </header>
       <div className={styles.sourceStatus} data-status={board.source.status}>
-        {board.source.status === 'active'
-          ? '已连接原题'
-          : board.source.status === 'stale'
-            ? '原题已更改'
-            : '原题已删除'}
+        {board.result.mode === 'explain_step'
+          ? '已连接原步骤 · 正在拆成更小理解单元'
+          : board.source.status === 'active'
+            ? '已连接原题'
+            : board.source.status === 'stale'
+              ? '原题已更改'
+              : '原题已删除'}
       </div>
       {board.result.contentProfile ? (
         <p className={styles.routeLabel}>

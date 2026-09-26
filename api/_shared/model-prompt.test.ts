@@ -41,7 +41,7 @@ const request = (mode: TutorRequest['mode']): TutorRequest => ({
 
 describe('Tutor Skill prompt registry', () => {
   it('以项目 Skill 注册表作为生产 Prompt 的唯一来源', () => {
-    const defaultPrompt = tutorPromptRegistry.versions.v5;
+    const defaultPrompt = tutorPromptRegistry.versions.v6;
     expect(DEFAULT_TUTOR_PROMPT_VERSION).toBe(tutorPromptRegistry.defaultVersion);
     expect(TUTOR_SYSTEM_INSTRUCTION).toBe(defaultPrompt.systemInstruction);
 
@@ -68,7 +68,15 @@ describe('Tutor Skill prompt registry', () => {
     expect(resolveTutorPromptVersion('v3')).toBe('v3');
     expect(resolveTutorPromptVersion('v4')).toBe('v4');
     expect(resolveTutorPromptVersion('v5')).toBe('v5');
+    expect(resolveTutorPromptVersion('v6')).toBe('v6');
     expect(() => resolveTutorPromptVersion('v999')).toThrow(/未知 Tutor Prompt 版本/);
+  });
+
+  it('Explain step 明确要求新增教学信息而不是复述原步骤', () => {
+    const prompt = buildTutorPrompt(request('explain_step'));
+    expect(prompt).toContain('拆成 2 至 4 个更小的理解单元');
+    expect(prompt).toContain('不是复述、改写或重画原步骤');
+    expect(prompt).toContain('不得把上述目标步骤原样返回');
   });
 
   it('兼容 Responses API 将结构化 JSON 再编码为字符串', () => {

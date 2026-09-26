@@ -372,12 +372,12 @@ export const tutorResultSchema = z
           message: '答案位置必须与题型一致',
         });
       }
-    } else if (['v3', 'v4', 'v5'].includes(metadata.promptVersion)) {
+    } else if (['v3', 'v4', 'v5', 'v6'].includes(metadata.promptVersion)) {
       if (!contentProfile) {
         context.addIssue({
           code: 'custom',
           path: ['contentProfile'],
-          message: 'Prompt v3/v4/v5 结果必须声明内容与学习目标路由',
+          message: 'Prompt v3+ 结果必须声明内容与学习目标路由',
         });
       }
 
@@ -386,7 +386,7 @@ export const tutorResultSchema = z
           context.addIssue({
             code: 'custom',
             path: ['answerPresentation'],
-            message: 'Prompt v3/v4/v5 的求解型拆解必须声明答案呈现策略',
+            message: 'Prompt v3+ 的求解型拆解必须声明答案呈现策略',
           });
         } else if (
           (answerPresentation.problemType === 'simple' &&
@@ -415,33 +415,36 @@ export const tutorResultSchema = z
       });
     }
 
-    if (!['v3', 'v4', 'v5'].includes(metadata.promptVersion) && contentProfile !== undefined) {
+    if (
+      !['v3', 'v4', 'v5', 'v6'].includes(metadata.promptVersion) &&
+      contentProfile !== undefined
+    ) {
       context.addIssue({
         code: 'custom',
         path: ['contentProfile'],
-        message: '只有 Prompt v3/v4/v5 结果可以声明内容与学习目标路由',
+        message: '只有 Prompt v3+ 结果可以声明内容与学习目标路由',
       });
     }
 
     if (
-      ['v4', 'v5'].includes(metadata.promptVersion) &&
+      ['v4', 'v5', 'v6'].includes(metadata.promptVersion) &&
       steps.some((step) => step.blocks.every((block) => block.type !== 'diagram'))
     ) {
       context.addIssue({
         code: 'custom',
         path: ['steps'],
-        message: 'Prompt v4/v5 的每一步都必须包含至少一个有信息量的图解',
+        message: 'Prompt v4+ 的每一步都必须包含至少一个有信息量的图解',
       });
     }
 
     if (
-      metadata.promptVersion === 'v5' &&
+      ['v5', 'v6'].includes(metadata.promptVersion) &&
       steps.some((step) => step.blocks.every((block) => block.type === 'diagram'))
     ) {
       context.addIssue({
         code: 'custom',
         path: ['steps'],
-        message: 'Prompt v5 的每一步都必须用简短文字、公式或提示框解释图解',
+        message: 'Prompt v5+ 的每一步都必须用简短文字、公式或提示框解释图解',
       });
     }
 
@@ -449,16 +452,16 @@ export const tutorResultSchema = z
     const hasComic = steps.some((step) =>
       step.blocks.some((block) => block.type === 'diagram' && block.diagram.type === 'comic-strip'),
     );
-    if (metadata.promptVersion === 'v5' && hasMath && !hasComic) {
+    if (['v5', 'v6'].includes(metadata.promptVersion) && hasMath && !hasComic) {
       context.addIssue({
         code: 'custom',
         path: ['steps'],
-        message: 'Prompt v5 的数学图文讲解必须至少包含一个 Q 版 comic-strip 推理提示',
+        message: 'Prompt v5+ 的数学图文讲解必须至少包含一个 Q 版 comic-strip 推理提示',
       });
     }
 
     if (
-      metadata.promptVersion === 'v5' &&
+      ['v5', 'v6'].includes(metadata.promptVersion) &&
       contentProfile?.goalSource === 'inferred' &&
       ((contentProfile.contentKind === 'produce' && contentProfile.learningGoal !== 'nutrition') ||
         (contentProfile.contentKind === 'food_dish' && contentProfile.learningGoal !== 'recipe'))
@@ -467,6 +470,21 @@ export const tutorResultSchema = z
         code: 'custom',
         path: ['contentProfile', 'learningGoal'],
         message: '无明确问题时 produce 必须使用 nutrition，food_dish 必须使用 recipe',
+      });
+    }
+
+    if (metadata.promptVersion === 'v6' && mode === 'explain_step' && steps.length < 2) {
+      context.addIssue({
+        code: 'custom',
+        path: ['steps'],
+        message: 'Prompt v6 的 Explain step 必须拆成至少 2 个微步骤',
+      });
+    }
+    if (metadata.promptVersion === 'v6' && mode === 'explain_step' && steps.length > 4) {
+      context.addIssue({
+        code: 'custom',
+        path: ['steps'],
+        message: 'Prompt v6 的 Explain step 最多包含 4 个微步骤',
       });
     }
 

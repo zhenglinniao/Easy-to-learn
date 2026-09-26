@@ -220,7 +220,7 @@ describe('AI Provider 执行', () => {
     expect(body.reasoning_effort).toBe('none');
     expect(body.temperature).toBe(0.2);
     expect(prompt).toContain('SenseNova 紧凑输出契约');
-    expect(prompt).toContain('solve/explain_step 使用 1-5 步');
+    expect(prompt).toContain('explain_step 必须使用 2-4 个新的微步骤');
     expect(prompt).toContain('contentProfile');
     expect(prompt).not.toContain('"additionalProperties"');
   });

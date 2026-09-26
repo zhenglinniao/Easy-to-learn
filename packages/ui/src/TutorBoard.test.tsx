@@ -154,6 +154,27 @@ describe('TutorBoard', () => {
     expect(screen.getByText('识别为：蔬果 · 营养拆解 · 自动选择')).toBeInTheDocument();
   });
 
+  it('把 Explain step 明确展示为原步骤的深入拆解且不允许继续套娃解释', () => {
+    render(
+      <TutorBoard
+        board={{
+          ...board,
+          title: '深入解释：移项',
+          parentTutorBoardId: 'parent-1',
+          targetStepId: 's1',
+          result: { ...board.result, mode: 'explain_step' },
+        }}
+        onChange={vi.fn()}
+        onClose={vi.fn()}
+        onExplainStep={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: '深入解释：移项' })).toBeInTheDocument();
+    expect(screen.getByText('已连接原步骤 · 正在拆成更小理解单元')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '解释这一步' })).not.toBeInTheDocument();
+  });
+
   it('只在关联步骤中嵌入带讲解的教学插画', () => {
     const illustrated = {
       ...board,

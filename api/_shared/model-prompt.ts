@@ -54,7 +54,7 @@ export const SENSENOVA_COMPACT_TUTOR_CONTRACT = [
   'SenseNova 紧凑输出契约（服务器会再次严格校验）：',
   '只返回一个 JSON 对象，不要 Markdown、解释前言、尾注或 metadata（metadata 由服务器写入）。总 JSON 控制在 16KB 内。',
   '顶层字段：schemaVersion=1；mode=solve|hint|explain_step；title；contentProfile={contentKind,learningGoal,goalSource,confidence}；steps；仅在求解型 solve 输出 answerPresentation={problemType,conclusionPosition}；hint 还要输出 hintLevel=3。不得增加其他字段。',
-  'solve/explain_step 使用 1-5 步；hint 恰好 3 步且各 step.hintLevel 依次为 1、2、3。每步仅含 id、title、blocks（及 hintLevel），不要 explanation。',
+  'solve 使用 1-5 步；explain_step 必须使用 2-4 个新的微步骤；hint 恰好 3 步且各 step.hintLevel 依次为 1、2、3。每步仅含 id、title、blocks（及 hintLevel），不要 explanation。',
   '每步 blocks 恰好 2 个：一个 diagram，加一个 paragraph|math|code|list|callout。文字简洁：title<=40 字，paragraph/callout<=180 字，list<=5 项，code<=40 行。数学内容至少有一幅 comic-strip。',
   '颜色只用 neutral|blue|green|amber|red|purple；所有 id 只用字母、数字、下划线或连字符且唯一。',
   '图解 block 必须写成 {type:"diagram",diagram:<下列图解对象>}，不可把 flow、comic-strip 等直接作为 block.type。diagram 只使用以下精确结构之一：',
@@ -83,6 +83,9 @@ export const buildTutorPrompt = (
     request.parentContext ? `父辅导板标题：${request.parentContext.title}` : '',
     request.parentContext
       ? `目标步骤已验证内容：${JSON.stringify(request.parentContext.step)}`
+      : '',
+    request.parentContext
+      ? '解释结果必须新增理解信息，不得把上述目标步骤原样返回、同义改写后返回，或只更换图解样式。'
       : '',
     correction ?? '',
   ]

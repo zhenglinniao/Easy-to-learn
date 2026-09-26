@@ -109,6 +109,125 @@ describe('TutorService', () => {
     });
   });
 
+  it('拒绝 Explain step 复述原步骤并要求拆成新增信息的微步骤', async () => {
+    const explainRequest: TutorRequest = {
+      ...request,
+      requestId: 'explain-request-1',
+      mode: 'explain_step',
+      parentTutorBoardId: 'parent-1',
+      targetStepId: 'step-1',
+      parentContext: {
+        title: '一次方程',
+        step: result.steps[0]!,
+      },
+    };
+    const repeated = {
+      ...result,
+      mode: 'explain_step' as const,
+      metadata: { ...result.metadata, promptVersion: 'v1' },
+    };
+    const expanded = {
+      ...result,
+      mode: 'explain_step' as const,
+      title: '深入解释：移项',
+      contentProfile: {
+        contentKind: 'exercise' as const,
+        learningGoal: 'solve' as const,
+        goalSource: 'explicit' as const,
+        confidence: 'high' as const,
+      },
+      steps: [
+        {
+          id: 'micro-prerequisite',
+          title: '先理解等式平衡',
+          blocks: [
+            { type: 'paragraph' as const, text: '等号两边像天平，必须同时做相同操作。' },
+            {
+              type: 'diagram' as const,
+              diagram: {
+                type: 'flow' as const,
+                direction: 'LR' as const,
+                nodes: [
+                  {
+                    id: 'left',
+                    label: '等号左边',
+                    shape: 'rounded' as const,
+                    color: 'blue' as const,
+                  },
+                  {
+                    id: 'right',
+                    label: '等号右边',
+                    shape: 'rounded' as const,
+                    color: 'green' as const,
+                  },
+                ],
+                edges: [{ id: 'balance', from: 'left', to: 'right', style: 'solid' as const }],
+              },
+            },
+          ],
+        },
+        {
+          id: 'micro-operation',
+          title: '两边同时减去常数',
+          blocks: [
+            {
+              type: 'paragraph' as const,
+              text: '把“移项”还原成两边同时减 3，再检查等式仍然成立。',
+            },
+            {
+              type: 'diagram' as const,
+              diagram: {
+                type: 'flow' as const,
+                direction: 'LR' as const,
+                nodes: [
+                  {
+                    id: 'before',
+                    label: '2x+3=11',
+                    shape: 'rectangle' as const,
+                    color: 'amber' as const,
+                  },
+                  {
+                    id: 'after',
+                    label: '2x=8',
+                    shape: 'rounded' as const,
+                    color: 'green' as const,
+                  },
+                ],
+                edges: [
+                  {
+                    id: 'subtract',
+                    from: 'before',
+                    to: 'after',
+                    label: '两边减3',
+                    style: 'solid' as const,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+      metadata: { ...result.metadata, promptVersion: 'v6' },
+    };
+    const generate = vi.fn().mockResolvedValueOnce(repeated).mockResolvedValueOnce(expanded);
+    const service = new TutorService(
+      new MemoryAiStateStore(),
+      { generate },
+      boards,
+      () => new Date('2026-09-22T00:00:00.000Z'),
+    );
+
+    const response = await service.execute(actor, explainRequest);
+
+    expect(response.data.result.steps).toHaveLength(2);
+    expect(response.data.result.steps.map(({ id }) => id)).not.toContain('step-1');
+    expect(generate).toHaveBeenNthCalledWith(
+      2,
+      explainRequest,
+      expect.stringContaining('不能原样返回目标步骤'),
+    );
+  });
+
   it('主模型两次内容校验失败后使用下一顺位模型', async () => {
     const primary: TutorModel = {
       generate: vi.fn().mockResolvedValue({ title: '缺少 Tutor DSL 字段' }),
