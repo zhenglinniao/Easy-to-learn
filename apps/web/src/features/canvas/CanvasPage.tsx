@@ -49,6 +49,7 @@ import {
   MAX_CONCURRENT_CANVAS_AI_TASKS,
   type CanvasAiTask,
 } from './aiTaskRegistry';
+import { CanvasAssetCache, type CanvasAssetFile } from './canvasAssetCache';
 import { ConflictResolutionDialog } from './ConflictResolutionDialog';
 import { DebouncedLatestTask } from './debouncedLatestTask';
 import { HANDWRITING_FONT_FAMILY, migrateElementsToHandwriting } from './handwriting';
@@ -178,11 +179,6 @@ const addStepIllustrationFile = async (
   ] as never);
 };
 
-const sha256 = async (blob: Blob): Promise<string> => {
-  const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-};
-
 const PERSISTED_ELEMENT_TYPES = new Set([
   'rectangle',
   'diamond',
@@ -206,35 +202,19 @@ const persistBoard = async (
   files: CanvasFiles,
   tutorBoards: PersistedTutorBoardV2[],
   ownerId: string,
+  assetCache: CanvasAssetCache,
 ) => {
-  const manifests = [];
-  const existingAssets = new Map(
-    (await repository.getAssets(boardId)).map((asset) => [asset.fileId, asset]),
+  const assetFiles = Object.values(files) as CanvasAssetFile[];
+  const existingAssets = assetCache.canReuse(assetFiles)
+    ? new Map()
+    : new Map((await repository.getAssets(boardId)).map((asset) => [asset.fileId, asset]));
+  const manifests = await assetCache.prepare(
+    repository,
+    boardId,
+    ownerId,
+    assetFiles,
+    existingAssets,
   );
-  for (const file of Object.values(files)) {
-    const blob = await fetch(file.dataURL).then((response) => response.blob());
-    const contentHash = await sha256(blob);
-    const bitmap = await createImageBitmap(blob);
-    const manifest = {
-      fileId: file.id,
-      objectPath: `${ownerId}/${boardId}/${contentHash}`,
-      contentHash,
-      mimeType: file.mimeType as 'image/png' | 'image/jpeg' | 'image/webp',
-      byteSize: blob.size,
-      width: bitmap.width,
-      height: bitmap.height,
-    };
-    bitmap.close();
-    const existing = existingAssets.get(file.id);
-    if (
-      !existing ||
-      existing.contentHash !== contentHash ||
-      existing.objectPath !== manifest.objectPath
-    ) {
-      await repository.putAsset(manifest, blob);
-    }
-    manifests.push(manifest);
-  }
   await repository.saveDurableChange({
     schemaVersion: 2,
     boardId,
@@ -387,6 +367,7 @@ export default function CanvasPage() {
           return;
         }
         const repository = new LocalBoardRepository(database);
+        const assetCache = new CanvasAssetCache();
         repositoryRef.current = repository;
         saveQueueRef.current = new DebouncedLatestTask(
           (snapshot) =>
@@ -398,6 +379,7 @@ export default function CanvasPage() {
               snapshot.files,
               snapshot.tutorBoards,
               snapshot.ownerId,
+              assetCache,
             ),
           {
             onStart: () => {
@@ -471,6 +453,10 @@ export default function CanvasPage() {
               lastRetrieved: Date.now(),
             })),
           );
+          files.forEach((file, index) => {
+            const asset = assets[index];
+            if (asset) assetCache.seed(file, asset);
+          });
           api.addFiles(files as never);
           setCanvasFiles(api.getFiles());
           if ((await repository.getConflictCopies(boardId)).length > 0) {
