@@ -16,7 +16,6 @@ import {
 import {
   tutorRequestSchema,
   type AiFeedbackCategory,
-  type IllustrationResponse,
   type PersistedTutorBoardV2,
   type QuotaStatus,
   type TutorRequest,
@@ -54,6 +53,7 @@ import { CanvasAssetCache, type CanvasAssetFile } from './canvasAssetCache';
 import { ConflictResolutionDialog } from './ConflictResolutionDialog';
 import { DebouncedLatestTask } from './debouncedLatestTask';
 import { HANDWRITING_FONT_FAMILY, migrateElementsToHandwriting } from './handwriting';
+import { addStepIllustrationFile, blobToDataUrl } from './illustrationAsset';
 
 interface OpenMenu {
   x: number;
@@ -144,41 +144,6 @@ interface CanvasSaveSnapshot {
   tutorBoards: PersistedTutorBoardV2[];
   ownerId: string;
 }
-
-const blobToDataUrl = (blob: Blob): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-
-type GeneratedIllustrationAsset = Extract<
-  IllustrationResponse['data'],
-  { status: 'generated' }
->['asset'];
-
-const addStepIllustrationFile = async (
-  api: ExcalidrawImperativeAPI,
-  asset: GeneratedIllustrationAsset,
-  signal?: AbortSignal,
-): Promise<void> => {
-  const response = await fetch(asset.downloadUrl, signal ? { signal } : undefined);
-  if (!response.ok) throw new Error('生成插画暂时无法下载，文字与矢量图解已保留。');
-  const blob = await response.blob();
-  if (blob.type !== asset.mimeType || blob.size === 0 || blob.size > 10 * 1024 * 1024) {
-    throw new Error('生成插画文件校验失败，文字与矢量图解已保留。');
-  }
-  api.addFiles([
-    {
-      id: asset.fileId,
-      dataURL: await blobToDataUrl(blob),
-      mimeType: asset.mimeType,
-      created: Date.now(),
-      lastRetrieved: Date.now(),
-    },
-  ] as never);
-};
 
 const PERSISTED_ELEMENT_TYPES = new Set([
   'rectangle',
