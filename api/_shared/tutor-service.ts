@@ -165,9 +165,28 @@ export class TutorService {
       }
       await this.state.refund(actorKey, request.requestId, this.now());
       if (error instanceof ProviderTimeoutError) {
+        console.warn(
+          JSON.stringify({
+            timestamp: this.now().toISOString(),
+            level: 'warning',
+            event: 'ai_provider_timeout',
+            requestId: request.requestId,
+            detail: error.message.slice(0, 160),
+          }),
+        );
         throw new ApiFault('AI_TIMEOUT', 'AI 请求超时，请稍后重试');
       }
       if (error instanceof ProviderUnavailableError) {
+        // 只记录 Provider ID 与 HTTP 状态等内部诊断，不记录题目、图片、响应正文或密钥。
+        console.error(
+          JSON.stringify({
+            timestamp: this.now().toISOString(),
+            level: 'error',
+            event: 'ai_provider_unavailable',
+            requestId: request.requestId,
+            detail: error.message.slice(0, 160),
+          }),
+        );
         throw new ApiFault('AI_PROVIDER_ERROR', 'AI 服务暂时不可用，请稍后重试');
       }
       throw new ApiFault('AI_PROVIDER_ERROR', 'AI 服务暂时不可用，请稍后重试');
