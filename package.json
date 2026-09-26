@@ -27,7 +27,8 @@
     "db:verify": "pnpm db:reset && pnpm db:lint && pnpm db:test",
     "check:peers": "pnpm peers check",
     "audit:dependencies": "pnpm audit --audit-level high",
-    "check": "pnpm check:peers && pnpm lint && pnpm typecheck && pnpm test && pnpm db:static && pnpm build && pnpm format:check"
+    "check:bundle": "node scripts/verify-web-bundle-budget.mjs",
+    "check": "pnpm check:peers && pnpm lint && pnpm typecheck && pnpm test && pnpm db:static && pnpm build && pnpm check:bundle && pnpm format:check"
   },
   "dependencies": {
     "undici": "8.11.2"

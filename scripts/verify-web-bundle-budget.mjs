@@ -1,0 +1,72 @@
+import { readFile, stat } from 'node:fs/promises';
+import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
+
+const distDirectory = join(process.cwd(), 'apps', 'web', 'dist');
+const htmlPath = join(distDirectory, 'index.html');
+
+const budgets = {
+  entryScriptGzipBytes: 155 * 1024,
+  entryStyleGzipBytes: 8 * 1024,
+  initialAssetsGzipBytes: 170 * 1024,
+};
+
+const formatKiB = (bytes) => `${(bytes / 1024).toFixed(1)} KiB`;
+
+const html = await readFile(htmlPath, 'utf8').catch((error) => {
+  throw new Error(`找不到 Web 构建产物，请先运行 pnpm build。\n${error.message}`);
+});
+
+const assetPaths = [
+  ...html.matchAll(/<(?:script|link)\b[^>]+(?:src|href)="(\/assets\/[^"]+)"/g),
+].map((match) => match[1]);
+
+if (assetPaths.length === 0) {
+  throw new Error('index.html 没有可检查的首屏资源。');
+}
+
+const assets = await Promise.all(
+  assetPaths.map(async (assetPath) => {
+    const absolutePath = join(distDirectory, assetPath.replace(/^\//, ''));
+    const [contents, metadata] = await Promise.all([readFile(absolutePath), stat(absolutePath)]);
+    return {
+      path: assetPath,
+      rawBytes: metadata.size,
+      gzipBytes: gzipSync(contents).byteLength,
+    };
+  }),
+);
+
+const entryScripts = assets.filter(({ path }) => path.endsWith('.js'));
+const entryStyles = assets.filter(({ path }) => path.endsWith('.css'));
+const sum = (items, field) => items.reduce((total, item) => total + item[field], 0);
+
+const entryScriptGzipBytes = sum(entryScripts, 'gzipBytes');
+const entryStyleGzipBytes = sum(entryStyles, 'gzipBytes');
+const initialAssetsGzipBytes = sum(assets, 'gzipBytes');
+
+const measurements = [
+  ['首屏 JavaScript', entryScriptGzipBytes, budgets.entryScriptGzipBytes],
+  ['首屏 CSS', entryStyleGzipBytes, budgets.entryStyleGzipBytes],
+  ['首屏资源合计', initialAssetsGzipBytes, budgets.initialAssetsGzipBytes],
+];
+
+for (const asset of assets) {
+  console.log(
+    `${asset.path}: ${formatKiB(asset.gzipBytes)} gzip (${formatKiB(asset.rawBytes)} raw)`,
+  );
+}
+
+const exceeded = measurements.filter(([, actual, budget]) => actual > budget);
+for (const [label, actual, budget] of measurements) {
+  console.log(`${label}: ${formatKiB(actual)} / ${formatKiB(budget)}`);
+}
+
+if (exceeded.length > 0) {
+  const details = exceeded
+    .map(([label, actual, budget]) => `${label} 超出 ${formatKiB(actual - budget)}`)
+    .join('；');
+  throw new Error(`Web 体积预算检查失败：${details}`);
+}
+
+console.log('Web 体积预算检查通过。');
