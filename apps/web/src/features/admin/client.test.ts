@@ -26,13 +26,13 @@ const overview = {
 describe('AdminApiClient', () => {
   it('可独立检查管理员权限，不读取账户列表', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(JSON.stringify({ data: { isAdmin: true } }), {
+      new Response(JSON.stringify({ data: { isAdmin: true, userId: 'admin-user' } }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),
     );
     const client = new AdminApiClient(async () => 'admin-token', fetcher);
-    await expect(client.access()).resolves.toEqual({ isAdmin: true });
+    await expect(client.access()).resolves.toEqual({ isAdmin: true, userId: 'admin-user' });
     expect(fetcher).toHaveBeenCalledWith(
       '/api/admin/access',
       expect.objectContaining({ method: 'GET', credentials: 'same-origin' }),

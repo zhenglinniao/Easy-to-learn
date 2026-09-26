@@ -50,9 +50,46 @@ const overview = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('AdminPage', () => {
+  it('管理员 UID 未匹配时显示当前账户 UID 和配置指引', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({ data: { isAdmin: false, userId: 'user-uid-to-configure' } }),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            },
+          ),
+      ),
+    );
+
+    render(
+      <MemoryRouter>
+        <AdminPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: '管理员权限尚未生效' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('user-uid-to-configure')).toBeInTheDocument();
+    expect(screen.getByText(/Value 只填写上面的 UUID/)).toBeInTheDocument();
+  });
+
   it('展示非敏感模型策略和必要账户数据，并要求确认暂停', async () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
       const url = String(input);
+      if (url === '/api/admin/access') {
+        return new Response(
+          JSON.stringify({ data: { isAdmin: true, userId: 'admin-user' } }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        );
+      }
       if (url.startsWith('/api/admin/overview')) {
         return new Response(JSON.stringify({ data: overview }), {
           status: 200,

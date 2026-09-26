@@ -26,8 +26,8 @@ export default async function handler(request: HttpRequest, response: HttpRespon
 
     if (action === 'access') {
       if (request.method !== 'GET') throw new ApiFault('INVALID_INPUT', '仅支持 GET 请求');
-      const { isAdmin } = await resolveAdminAccess(request);
-      response.status(200).json({ data: { isAdmin } });
+      const { isAdmin, userId } = await resolveAdminAccess(request);
+      response.status(200).json({ data: { isAdmin, userId } });
       return;
     }
 
