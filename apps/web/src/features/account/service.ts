@@ -1,6 +1,23 @@
 import { accountDeletionResponseSchema, type AccountDeletionResponse } from '@easy-to-learn/domain';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+export class AccountApiError extends Error {
+  readonly code: string;
+  readonly requestId: string | null;
+  readonly status: number;
+
+  constructor(
+    message: string,
+    options: { code: string; requestId: string | null; status: number },
+  ) {
+    super(`${message}${options.requestId ? `（追踪号：${options.requestId}）` : ''}`);
+    this.name = 'AccountApiError';
+    this.code = options.code;
+    this.requestId = options.requestId;
+    this.status = options.status;
+  }
+}
+
 export class AccountService {
   constructor(
     private readonly client: SupabaseClient,
@@ -41,7 +58,15 @@ export class AccountService {
   }
 
   private async responseError(response: Response): Promise<Error> {
-    const body = (await response.json().catch(() => null)) as { message?: string } | null;
-    return new Error(body?.message ?? '账户操作失败，请稍后重试');
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      code?: string;
+      requestId?: string;
+    } | null;
+    return new AccountApiError(body?.message ?? '账户操作失败，请稍后重试', {
+      code: body?.code ?? `HTTP_${response.status}`,
+      requestId: body?.requestId ?? response.headers.get('X-Request-Id'),
+      status: response.status,
+    });
   }
 }
