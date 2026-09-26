@@ -35,7 +35,10 @@
           "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
         },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" }
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-DNS-Prefetch-Control", "value": "off" },
+        { "key": "X-Permitted-Cross-Domain-Policies", "value": "none" },
+        { "key": "Origin-Agent-Cluster", "value": "?1" }
       ]
     },
     {

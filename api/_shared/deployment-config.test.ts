@@ -25,9 +25,8 @@ describe('Vercel deployment contract', () => {
   });
 
   it('allows configured browser services without weakening the remaining CSP', () => {
-    const csp = configuration.headers
-      .find(({ source }) => source === '/(.*)')
-      ?.headers.find(({ key }) => key === 'Content-Security-Policy')?.value;
+    const globalHeaders = configuration.headers.find(({ source }) => source === '/(.*)')?.headers;
+    const csp = globalHeaders?.find(({ key }) => key === 'Content-Security-Policy')?.value;
 
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain('https://*.supabase.co');
@@ -35,6 +34,13 @@ describe('Vercel deployment contract', () => {
     expect(csp).toContain('https://*.ingest.sentry.io');
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("frame-ancestors 'none'");
+    expect(globalHeaders).toEqual(
+      expect.arrayContaining([
+        { key: 'X-DNS-Prefetch-Control', value: 'off' },
+        { key: 'X-Permitted-Cross-Domain-Policies', value: 'none' },
+        { key: 'Origin-Agent-Cluster', value: '?1' },
+      ]),
+    );
   });
 
   it('runs retention once per day', () => {
