@@ -55,6 +55,7 @@ import { DebouncedLatestTask } from './debouncedLatestTask';
 import { HANDWRITING_FONT_FAMILY, migrateElementsToHandwriting } from './handwriting';
 import { addStepIllustrationFile, blobToDataUrl } from './illustrationAsset';
 import { mapWithConcurrency } from './mapWithConcurrency';
+import { syncStateAfterNetworkChange } from './syncResume';
 import { useOnlineStatus } from './useOnlineStatus';
 
 const ASSET_IO_CONCURRENCY = 4;
@@ -582,6 +583,12 @@ export default function CanvasPage() {
       if (syncTimer.current) clearTimeout(syncTimer.current);
     };
   }, [boardId, syncState]);
+
+  useEffect(() => {
+    const resumeSync = () => setSyncState((current) => syncStateAfterNetworkChange(current, true));
+    window.addEventListener('online', resumeSync);
+    return () => window.removeEventListener('online', resumeSync);
+  }, []);
 
   const handleChange = (
     elements: Parameters<NonNullable<React.ComponentProps<typeof Excalidraw>['onChange']>>[0],
