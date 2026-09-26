@@ -29,6 +29,23 @@ const completed: TutorResponse['data'] = {
     dailyLimit: 3,
     remaining: 2,
     nextAllowedAt: '2026-09-23T00:05:00.000Z',
+    action: {
+      dailyLimit: 3,
+      dailyRemaining: 2,
+      periodLimit: 15,
+      periodRemaining: 14,
+      nextAllowedAt: '2026-09-23T00:05:00.000Z',
+      dailyResetsAt: '2026-09-23T16:00:00.000Z',
+      periodResetsAt: '2026-10-23T00:00:00.000Z',
+    },
+    image: {
+      dailyLimit: 1,
+      dailyRemaining: 1,
+      periodLimit: 3,
+      periodRemaining: 3,
+      periodResetsAt: null,
+    },
+    mode: 'full',
   },
 };
 

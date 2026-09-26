@@ -2,7 +2,71 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TutorApiClient } from './client';
 
+const guestQuota = (nextAllowedAt: string) => ({
+  dailyLimit: 3 as const,
+  remaining: 2,
+  nextAllowedAt,
+  action: {
+    dailyLimit: 3 as const,
+    dailyRemaining: 2,
+    periodLimit: 15 as const,
+    periodRemaining: 14,
+    nextAllowedAt,
+    dailyResetsAt: '2026-09-23T16:00:00.000Z',
+    periodResetsAt: '2026-10-23T00:00:00.000Z',
+  },
+  image: {
+    dailyLimit: 1 as const,
+    dailyRemaining: 1,
+    periodLimit: 3 as const,
+    periodRemaining: 3,
+    periodResetsAt: null,
+  },
+  mode: 'full' as const,
+});
+
 describe('TutorApiClient', () => {
+  it('分别读取游客和登录用户额度', async () => {
+    const quota = guestQuota('2026-09-23T00:05:00.000Z');
+    const guestFetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        data: { expiresAt: '2026-10-23T00:00:00.000Z', quota },
+      }),
+    );
+    await expect(new TutorApiClient(async () => null, guestFetcher).quotaStatus()).resolves.toEqual(
+      quota,
+    );
+    expect(guestFetcher).toHaveBeenCalledWith(
+      '/api/anonymous/session',
+      expect.objectContaining({ method: 'POST', credentials: 'same-origin' }),
+    );
+
+    const userQuota = {
+      ...quota,
+      action: { ...quota.action, periodLimit: 45 as const, periodRemaining: 44 },
+      image: {
+        ...quota.image,
+        dailyLimit: 2 as const,
+        dailyRemaining: 2,
+        periodLimit: 20 as const,
+        periodRemaining: 20,
+      },
+    };
+    const userFetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json({ data: { quota: userQuota } }));
+    await expect(new TutorApiClient(async () => 'jwt', userFetcher).quotaStatus()).resolves.toEqual(
+      userQuota,
+    );
+    expect(userFetcher).toHaveBeenCalledWith(
+      '/api/ai/quota',
+      expect.objectContaining({ method: 'GET', credentials: 'same-origin' }),
+    );
+    expect(new Headers(userFetcher.mock.calls[0]?.[1]?.headers).get('Authorization')).toBe(
+      'Bearer jwt',
+    );
+  });
+
   it('默认 fetch 不会因方法 this 绑定触发 Illegal invocation', async () => {
     const request = {
       requestId: 'request-native-fetch',
@@ -37,11 +101,7 @@ describe('TutorApiClient', () => {
             generatedAt: '2026-09-23T00:00:00.000Z',
           },
         },
-        quota: {
-          dailyLimit: 3,
-          remaining: 2,
-          nextAllowedAt: '2026-09-23T00:05:00.000Z',
-        },
+        quota: guestQuota('2026-09-23T00:05:00.000Z'),
       },
     };
     const nativeLikeFetch = vi.fn(function (this: typeof globalThis, input: RequestInfo | URL) {
@@ -133,11 +193,7 @@ describe('TutorApiClient', () => {
               generatedAt: '2026-09-22T00:00:00.000Z',
             },
           },
-          quota: {
-            dailyLimit: 3,
-            remaining: 2,
-            nextAllowedAt: '2026-09-22T00:05:00.000Z',
-          },
+          quota: guestQuota('2026-09-22T00:05:00.000Z'),
         },
       }),
     );

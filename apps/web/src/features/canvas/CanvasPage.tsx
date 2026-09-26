@@ -16,6 +16,7 @@ import {
   tutorRequestSchema,
   type AiFeedbackCategory,
   type PersistedTutorBoardV2,
+  type QuotaStatus,
   type TutorRequest,
 } from '@easy-to-learn/domain';
 import {
@@ -61,6 +62,20 @@ const AI_FEEDBACK_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const canSubmitFeedback = (board: PersistedTutorBoardV2): boolean =>
   Boolean(board.requestId) && Date.now() <= Date.parse(board.createdAt) + AI_FEEDBACK_WINDOW_MS;
+
+const quotaBlockReason = (quota: QuotaStatus | null, now: number): string | null => {
+  if (!quota) return null;
+  if (quota.action.dailyRemaining === 0) return '今天的 3 次 AI 额度已用完，明天再来吧。';
+  if (quota.action.periodRemaining === 0) return '近 30 天 AI 额度已用完，请在额度恢复后再试。';
+  const nextAllowed = quota.action.nextAllowedAt
+    ? Date.parse(quota.action.nextAllowedAt)
+    : Number.NaN;
+  if (Number.isFinite(nextAllowed) && nextAllowed > now) {
+    const seconds = Math.max(1, Math.ceil((nextAllowed - now) / 1_000));
+    return `AI 正在休息，请等待 ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}。`;
+  }
+  return null;
+};
 
 const selectionSignature = (selectedElementIds: AppState['selectedElementIds']): string =>
   Object.keys(selectedElementIds)
@@ -199,6 +214,9 @@ export default function CanvasPage() {
   const [confirmClearLocal, setConfirmClearLocal] = useState(false);
   const [conflictBusy, setConflictBusy] = useState(false);
   const [conflictError, setConflictError] = useState<string | null>(null);
+  const [quota, setQuota] = useState<QuotaStatus | null>(null);
+  const [quotaUnavailable, setQuotaUnavailable] = useState(false);
+  const [quotaClock, setQuotaClock] = useState(() => Date.now());
   const requestInputs = useRef(
     new Map<
       string,
@@ -216,6 +234,44 @@ export default function CanvasPage() {
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sourceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hydratedBoard = useRef<string | null>(null);
+
+  const refreshQuota = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const next = await new TutorApiClient(
+          async () => session?.access_token ?? null,
+        ).quotaStatus(signal);
+        setQuota(next);
+        setQuotaUnavailable(false);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setQuotaUnavailable(true);
+      }
+    },
+    [session?.access_token],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => void refreshQuota(controller.signal), 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [refreshQuota]);
+
+  useEffect(() => {
+    const nextAllowedAt = quota?.action.nextAllowedAt;
+    if (!nextAllowedAt) return;
+    const target = Date.parse(nextAllowedAt);
+    if (target <= Date.now()) return;
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      setQuotaClock(now);
+      if (now >= target) window.clearInterval(timer);
+    }, 1_000);
+    return () => window.clearInterval(timer);
+  }, [quota?.action.nextAllowedAt]);
 
   useEffect(() => {
     if (routeBoardId) {
@@ -703,6 +759,11 @@ export default function CanvasPage() {
 
   const handleAction = async (action: RadialMenuAction) => {
     if (!api || loadingAction) return;
+    const quotaError = quotaBlockReason(quota, Date.now());
+    if (quotaError) {
+      setPreparationError(quotaError);
+      return;
+    }
     setLoadingAction(action);
     setPreparationError(null);
     try {
@@ -745,6 +806,7 @@ export default function CanvasPage() {
         mode: action,
       });
       const response = await client.execute(request, requestAbort.current.signal);
+      setQuota(response.quota);
       const now = new Date().toISOString();
       const id = crypto.randomUUID();
       const next: PersistedTutorBoardV2 = {
@@ -782,12 +844,18 @@ export default function CanvasPage() {
       setPreparationError(
         error instanceof Error ? error.message : '无法处理当前选区，请重新选择后再试。',
       );
+      void refreshQuota();
     } finally {
       setLoadingAction(null);
     }
   };
 
   const explainStep = async (parentId: string, targetStepId: string) => {
+    const quotaError = quotaBlockReason(quota, Date.now());
+    if (quotaError) {
+      setPreparationError(quotaError);
+      return;
+    }
     let base = requestInputs.current.get(parentId);
     const parent = tutorBoards.find(({ id }) => id === parentId);
     if (!parent) {
@@ -843,6 +911,7 @@ export default function CanvasPage() {
       const result = await new TutorApiClient(async () => session?.access_token ?? null).execute(
         request,
       );
+      setQuota(result.quota);
       const now = new Date().toISOString();
       const id = crypto.randomUUID();
       const child: PersistedTutorBoardV2 = {
@@ -865,6 +934,7 @@ export default function CanvasPage() {
       commitTutorBoards([...tutorBoards, child]);
     } catch (error) {
       setPreparationError(error instanceof Error ? error.message : '无法解释当前步骤。');
+      void refreshQuota();
     } finally {
       setLoadingAction(null);
     }
@@ -889,6 +959,15 @@ export default function CanvasPage() {
     }
   };
 
+  const cooldownSeconds = quota?.action.nextAllowedAt
+    ? Math.max(0, Math.ceil((Date.parse(quota.action.nextAllowedAt) - quotaClock) / 1_000))
+    : 0;
+  const compactQuota = quota
+    ? `AI ${quota.action.dailyRemaining}/${quota.action.dailyLimit}`
+    : quotaUnavailable
+      ? '额度暂不可用'
+      : '读取额度';
+
   return (
     <main className={styles.page}>
       <header className={styles.header}>
@@ -898,10 +977,53 @@ export default function CanvasPage() {
         </a>
         <div className={styles.context}>
           <strong>学习画布</strong>
-          <span>选择题目后使用 AI 操作</span>
+          <div
+            className={styles.quotaSummary}
+            data-mode={quota?.mode ?? 'loading'}
+            aria-live="polite"
+            aria-label={
+              quota
+                ? `今日 AI 剩余 ${quota.action.dailyRemaining} 次，近 30 天剩余 ${quota.action.periodRemaining} 次，今日插画剩余 ${quota.image.dailyRemaining} 张`
+                : compactQuota
+            }
+          >
+            {quota ? (
+              <>
+                <span>
+                  今日 AI{' '}
+                  <b>
+                    {quota.action.dailyRemaining}/{quota.action.dailyLimit}
+                  </b>
+                </span>
+                <span>
+                  30 天{' '}
+                  <b>
+                    {quota.action.periodRemaining}/{quota.action.periodLimit}
+                  </b>
+                </span>
+                <span>
+                  插画{' '}
+                  <b>
+                    {quota.image.dailyRemaining}/{quota.image.dailyLimit}
+                  </b>
+                </span>
+                {cooldownSeconds > 0 ? (
+                  <span className={styles.cooldown}>
+                    等待 {Math.floor(cooldownSeconds / 60)}:
+                    {String(cooldownSeconds % 60).padStart(2, '0')}
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              <span>{compactQuota}</span>
+            )}
+          </div>
         </div>
         <div className={styles.userBar}>
           <ThemeToggle />
+          <span className={styles.mobileQuota} aria-label={compactQuota}>
+            {compactQuota}
+          </span>
           <span className={styles.saveState}>{syncLabel(syncState, Boolean(user))}</span>
           <button type="button" onClick={() => void exportBoard('excalidraw')}>
             导出

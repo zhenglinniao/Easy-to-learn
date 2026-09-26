@@ -176,7 +176,7 @@ describe('TutorService', () => {
     now = new Date(now.getTime() + 5 * 60 * 1_000);
     await expect(
       service.execute(actor, { ...request, requestId: 'request-4' }),
-    ).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
+    ).rejects.toMatchObject({ code: 'DAILY_QUOTA_EXHAUSTED' });
   });
 
   it('模型超时不扣配额，输入失败和游客越权不会调用模型', async () => {
@@ -213,7 +213,7 @@ describe('TutorService', () => {
     }
     await expect(
       service.execute(actor, { ...request, requestId: 'day-one-4' }),
-    ).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
+    ).rejects.toMatchObject({ code: 'DAILY_QUOTA_EXHAUSTED' });
 
     now = new Date('2026-09-22T16:00:00.000Z');
     await expect(
