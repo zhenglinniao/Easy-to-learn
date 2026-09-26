@@ -154,6 +154,39 @@ describe('TutorBoard', () => {
     expect(screen.getByText('识别为：蔬果 · 营养拆解 · 自动选择')).toBeInTheDocument();
   });
 
+  it('只在关联步骤中嵌入带讲解的教学插画', () => {
+    const illustrated = {
+      ...board,
+      stepIllustration: {
+        stepId: 's1',
+        fileId: 'generated-file-1',
+        altText: '移项步骤教学插画',
+        caption: '箭头表示常数项从左边移动到右边。',
+      },
+    };
+    const { rerender } = render(
+      <TutorBoard
+        board={illustrated}
+        illustrationSrc="data:image/jpeg;base64,AA=="
+        onChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('img', { name: '移项步骤教学插画' })).toBeInTheDocument();
+    expect(screen.getByText('箭头表示常数项从左边移动到右边。')).toBeInTheDocument();
+
+    rerender(
+      <TutorBoard
+        board={{ ...illustrated, stepIndex: 1 }}
+        illustrationSrc="data:image/jpeg;base64,AA=="
+        onChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('img', { name: '移项步骤教学插画' })).not.toBeInTheDocument();
+  });
+
   it('忠实渲染几何标签、角的两条射线、坐标网格和流程边', () => {
     const { container } = render(
       <TutorBlocks

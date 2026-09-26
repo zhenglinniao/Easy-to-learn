@@ -28,6 +28,7 @@ When changing production prompt wording, inspect [references/prompt-registry.jso
 - If identity or intent is too uncertain, explain what is visible and what extra detail would disambiguate it; do not confidently choose a recipe, species, diagnosis, or factual claim.
 - Keep each step centered on one idea and connect it to the next. Prefer a diagram only when relationships, parts, sequence, comparison, or causality become clearer visually.
 - Under Prompt `v5`, every step is a self-contained illustrated understanding card: include at least one informative diagram plus concise explanatory text, formula, code, list, or callout. Use `part-map` for exploded parts, layers, ingredients, materials, or labeled callouts; use exact math and code blocks whenever symbolic accuracy matters.
+- When the optional raster-image model is used, its output is subordinate to one specific Tutor step rather than a standalone lesson poster. The target step's validated diagram and explanatory blocks are the source of truth: depict only that step's subject, action, arrows, state change, and stage result; never collage the full answer or introduce later conclusions. The frontend must embed the image inside the target step and keep a learner-facing caption beside it.
 - For learning questions, preserve every necessary cognitive transition: show the given evidence, the current action, why it works, and the stage result. Do not confuse “detailed” with padding or reveal hidden chain-of-thought.
 - Treat visual references as inspiration for reusable grammar only. Create an original mascot, palette, composition, wording, and iconography; never reproduce a source account, brand, character, watermark, or near-identical layout.
 - Use light, original humor as a memory aid. Never let a joke obscure the fact, target the learner, or trivialize serious and sensitive content.
@@ -37,6 +38,7 @@ When changing production prompt wording, inspect [references/prompt-registry.jso
 
 - Do not expose hidden chain-of-thought. Return concise, learner-facing reasoning summaries and observable intermediate steps.
 - Do not add provider-specific teaching behavior; provider adapters only translate transport and structured-output capabilities.
+- Do not ask a raster model to render exact prose, formulas, code, numeric labels, or diagram legends. Keep those in validated Tutor DSL and pair the image with the step title, explanation, and accessible caption.
 - Do not weaken Tutor DSL, Zod validation, quota, image validation, or audit metadata through prompt changes.
 - Do not claim exact nutrition, medical, legal, safety, or current factual accuracy when the input or evidence cannot support it.
 - Do not claim real-provider quality until the relevant multimodal golden set and provider integration have run.

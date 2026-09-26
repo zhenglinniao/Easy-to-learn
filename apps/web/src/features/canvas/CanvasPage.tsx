@@ -1,4 +1,4 @@
-import { convertToExcalidrawElements, Excalidraw } from '@excalidraw/excalidraw';
+import { Excalidraw } from '@excalidraw/excalidraw';
 import type {
   AppState,
   ExcalidrawImperativeAPI,
@@ -162,10 +162,9 @@ type GeneratedIllustrationAsset = Extract<
   { status: 'generated' }
 >['asset'];
 
-const addGeneratedIllustration = async (
+const addStepIllustrationFile = async (
   api: ExcalidrawImperativeAPI,
   asset: GeneratedIllustrationAsset,
-  selectionBounds: { x: number; y: number; width: number; height: number },
   signal?: AbortSignal,
 ): Promise<void> => {
   const response = await fetch(asset.downloadUrl, signal ? { signal } : undefined);
@@ -183,23 +182,6 @@ const addGeneratedIllustration = async (
       lastRetrieved: Date.now(),
     },
   ] as never);
-  const width = Math.min(480, Math.max(280, asset.width));
-  const height = Math.round((width * asset.height) / asset.width);
-  const [image] = convertToExcalidrawElements([
-    {
-      id: crypto.randomUUID(),
-      type: 'image',
-      x: selectionBounds.x,
-      y: selectionBounds.y + selectionBounds.height + 48,
-      width,
-      height,
-      fileId: asset.fileId as never,
-      status: 'saved',
-      scale: [1, 1],
-    },
-  ] as never);
-  if (!image) throw new Error('生成插画暂时无法放入画布，文字与矢量图解已保留。');
-  api.updateScene({ elements: [...api.getSceneElements(), image] as never });
 };
 
 const sha256 = async (blob: Blob): Promise<string> => {
@@ -289,6 +271,7 @@ export default function CanvasPage() {
   const stageRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<OpenMenu | null>(null);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
+  const [canvasFiles, setCanvasFiles] = useState<CanvasFiles>({});
   const [menu, setMenuState] = useState<OpenMenu | null>(null);
   const [activeAiTasks, setActiveAiTasks] = useState<CanvasAiTask[]>([]);
   const [aiTaskClock, setAiTaskClock] = useState(() => Date.now());
@@ -476,6 +459,7 @@ export default function CanvasPage() {
             })),
           );
           api.addFiles(files as never);
+          setCanvasFiles(api.getFiles());
           if ((await repository.getConflictCopies(boardId)).length > 0) {
             setSyncState('conflict');
           }
@@ -614,6 +598,7 @@ export default function CanvasPage() {
     appState: AppState,
     files: Parameters<NonNullable<React.ComponentProps<typeof Excalidraw>['onChange']>>[2],
   ) => {
+    setCanvasFiles(files);
     const handwriting = migrateElementsToHandwriting(elements);
     const normalizedElements = handwriting.elements as CanvasElements;
 
@@ -985,11 +970,23 @@ export default function CanvasPage() {
           );
           setQuota(illustration.quota);
           if (illustration.status === 'generated') {
-            await addGeneratedIllustration(
-              api,
-              illustration.asset,
-              input.selectionBounds,
-              controller.signal,
+            await addStepIllustrationFile(api, illustration.asset, controller.signal);
+            setCanvasFiles(api.getFiles());
+            commitTutorBoards((current) =>
+              current.map((item) =>
+                item.id === id
+                  ? {
+                      ...item,
+                      stepIllustration: {
+                        stepId: illustration.placement.stepId,
+                        fileId: illustration.asset.fileId,
+                        altText: illustration.placement.altText,
+                        caption: illustration.placement.caption,
+                      },
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : item,
+              ),
             );
           }
           setPrepared((current) =>
@@ -1349,6 +1346,11 @@ export default function CanvasPage() {
             const clientPoint = viewportState
               ? scenePointToClient(board.sceneAnchor, viewportState)
               : { x: board.sceneAnchor.sceneX, y: board.sceneAnchor.sceneY };
+            const illustrationFile = board.stepIllustration
+              ? Object.values(canvasFiles).find(
+                  (file) => file.id === board.stepIllustration?.fileId,
+                )
+              : undefined;
             return (
               <TutorBoard
                 key={board.id}
@@ -1358,6 +1360,7 @@ export default function CanvasPage() {
                   y: clientPoint.y - stageOrigin.y,
                 }}
                 sceneUnitsPerClientPixel={1 / (viewportState?.zoom.value ?? 1)}
+                {...(illustrationFile ? { illustrationSrc: illustrationFile.dataURL } : {})}
                 onChange={(next) =>
                   commitTutorBoards((current) =>
                     current.map((item) => (item.id === next.id ? next : item)),

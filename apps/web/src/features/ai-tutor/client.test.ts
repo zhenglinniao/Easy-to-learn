@@ -279,9 +279,7 @@ describe('TutorApiClient', () => {
     expect(fetcher.mock.calls[0]?.[1]?.body).toBe(fetcher.mock.calls[1]?.[1]?.body);
     expect(fetcher.mock.calls[1]?.[1]?.body).toContain(request.requestId);
 
-    const alwaysFails = vi
-      .fn<typeof fetch>()
-      .mockRejectedValue(new TypeError('Failed to fetch'));
+    const alwaysFails = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('Failed to fetch'));
     await expect(
       new TutorApiClient(async () => 'jwt', alwaysFails).execute(request),
     ).rejects.toThrow('AI 响应连接中断，请检查网络后重试。');
@@ -301,6 +299,12 @@ describe('TutorApiClient', () => {
             byteSize: 1024,
             width: 1024,
             height: 1024,
+          },
+          placement: {
+            stepId: 'step-1',
+            stepTitle: '按层扩散',
+            altText: 'BFS 第一步教学插画',
+            caption: '这张图只对应按层扩散。',
           },
           quota,
         },

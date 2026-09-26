@@ -8,6 +8,7 @@ export interface TutorBoardProps {
   board: PersistedTutorBoardV2;
   screenPosition?: { x: number; y: number };
   sceneUnitsPerClientPixel?: number;
+  illustrationSrc?: string;
   onChange(board: PersistedTutorBoardV2): void;
   onClose(boardId: string): void;
   onExplainStep?(boardId: string, stepId: string): void;
@@ -52,6 +53,7 @@ export function TutorBoard({
   board,
   screenPosition,
   sceneUnitsPerClientPixel = 1,
+  illustrationSrc,
   onChange,
   onClose,
   onExplainStep,
@@ -156,6 +158,13 @@ export function TutorBoard({
       <section className={styles.content} aria-live="polite">
         <p className={styles.stepLabel}>步骤 {board.stepIndex + 1}</p>
         <h3>{step.title}</h3>
+        {board.stepIllustration?.stepId === step.id && illustrationSrc ? (
+          <figure className={styles.stepIllustration}>
+            <span>本步教学插画</span>
+            <img src={illustrationSrc} alt={board.stepIllustration.altText} />
+            <figcaption>{board.stepIllustration.caption}</figcaption>
+          </figure>
+        ) : null}
         <TutorBlocks blocks={step.blocks} />
       </section>
       {onFeedback ? (
