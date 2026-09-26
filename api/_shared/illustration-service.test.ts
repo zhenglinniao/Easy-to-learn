@@ -91,6 +91,46 @@ describe('SenseNova image generation', () => {
     });
   });
 
+  it('瞬时网络失败时重试一次，明确 4xx 时不重试', async () => {
+    const jpeg = Buffer.from([
+      0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x02, 0x00, 0x03, 0x03, 0x01, 0x11, 0x00,
+      0x02, 0x11, 0x00, 0x03, 0x11, 0x00,
+    ]);
+    const retryingFetch = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValueOnce(Response.json({ data: [{ b64_json: jpeg.toString('base64') }] }));
+    const retryingGenerator = new SenseNovaImageGenerator(
+      {
+        baseUrl: 'https://token.sensenova.cn/v1',
+        model: 'sensenova-u1.5-fast',
+        apiKey: 'secret',
+      },
+      retryingFetch,
+    );
+
+    await expect(retryingGenerator.generate('教学插画')).resolves.toMatchObject({
+      width: 3,
+      height: 2,
+    });
+    expect(retryingFetch).toHaveBeenCalledTimes(2);
+
+    const rejectedFetch = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 400 }));
+    const rejectedGenerator = new SenseNovaImageGenerator(
+      {
+        baseUrl: 'https://token.sensenova.cn/v1',
+        model: 'sensenova-u1.5-fast',
+        apiKey: 'secret',
+      },
+      rejectedFetch,
+    );
+
+    await expect(rejectedGenerator.generate('教学插画')).rejects.toThrow('status 400');
+    expect(rejectedFetch).toHaveBeenCalledOnce();
+  });
+
   it('只为适合视觉拆解的完整解答构造无文字插画提示词', () => {
     expect(shouldGenerateIllustration(result)).toBe(true);
     expect(shouldGenerateIllustration({ ...result, mode: 'hint' })).toBe(false);
