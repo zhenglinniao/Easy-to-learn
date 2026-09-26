@@ -9,6 +9,7 @@
   "dependencies": {
     "@easy-to-learn/domain": "workspace:*",
     "@google/genai": "2.24.0",
+    "@supabase/auth-js": "2.116.0",
     "@supabase/supabase-js": "2.116.0",
     "@upstash/redis": "1.39.0",
     "zod": "catalog:"

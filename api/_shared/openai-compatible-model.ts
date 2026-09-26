@@ -29,7 +29,21 @@ interface ResponsesApiResponse {
   }>;
 }
 
-type FetchLike = typeof fetch;
+export interface OpenAiFetchResponse {
+  ok: boolean;
+  status: number;
+  json(): Promise<unknown>;
+}
+
+export type OpenAiFetch = (
+  input: string | URL,
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+    signal?: AbortSignal;
+  },
+) => Promise<OpenAiFetchResponse>;
 
 const responseText = (payload: ChatCompletionResponse): string | undefined => {
   const content = payload.choices?.[0]?.message?.content;
@@ -65,7 +79,7 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
     private readonly reasoningEffort?: ModelReasoningEffort,
     private readonly resolveImage?: TutorImageResolver,
     private readonly promptVersion = DEFAULT_TUTOR_PROMPT_VERSION,
-    private readonly fetchImpl: FetchLike = fetch,
+    private readonly fetchImpl: OpenAiFetch = fetch as unknown as OpenAiFetch,
   ) {}
 
   async generate(request: TutorRequest, correction?: string): Promise<unknown> {
