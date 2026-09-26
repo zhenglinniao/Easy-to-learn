@@ -81,6 +81,11 @@ end
 return count
 `;
 
+const RESERVE_UNMETERED_SCRIPT = `
+if redis.call('SET', KEYS[1], '1', 'PX', ARGV[1], 'NX') then return 0 end
+return 1
+`;
+
 export class RedisAiStateStore implements AiStateStore {
   private readonly encryptionKey: Buffer;
 
@@ -259,6 +264,29 @@ export class RedisAiStateStore implements AiStateStore {
     });
   }
 
+  async reserveUnmetered(
+    actorKey: string,
+    requestId: string,
+    scope: 'action' | 'image',
+    now: Date,
+  ): Promise<boolean> {
+    void now;
+    const result = await this.redis.eval(
+      RESERVE_UNMETERED_SCRIPT,
+      [this.unmeteredReservationKey(actorKey, requestId, scope)],
+      [IDEMPOTENCY_TTL_MS],
+    );
+    return Number(result) === 1;
+  }
+
+  async refundUnmetered(
+    actorKey: string,
+    requestId: string,
+    scope: 'action' | 'image',
+  ): Promise<void> {
+    await this.redis.del(this.unmeteredReservationKey(actorKey, requestId, scope));
+  }
+
   private actorHash(actorKey: string): string {
     return createHmac('sha256', this.actorHashSecret).update(actorKey).digest('hex');
   }
@@ -281,6 +309,14 @@ export class RedisAiStateStore implements AiStateStore {
 
   private imageReservationKey(actorKey: string, requestId: string): string {
     return `ai:image-reservation:${this.actorHash(actorKey)}:${requestId}`;
+  }
+
+  private unmeteredReservationKey(
+    actorKey: string,
+    requestId: string,
+    scope: 'action' | 'image',
+  ): string {
+    return `ai:unmetered:${scope}:${this.actorHash(actorKey)}:${requestId}`;
   }
 
   private cacheKey(actorKey: string, requestId: string): string {

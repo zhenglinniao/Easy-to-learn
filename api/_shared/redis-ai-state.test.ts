@@ -122,4 +122,24 @@ describe('RedisAiStateStore', () => {
       quota: { image: { dailyRemaining: 1 } },
     });
   });
+
+  it('uses a hashed Redis lock to deduplicate unmetered administrator work', async () => {
+    const { redis } = createRedis();
+    redis.eval.mockResolvedValueOnce([0]).mockResolvedValueOnce([1]);
+    const store = new RedisAiStateStore(redis as never, 'actor-secret', encryptionKey);
+
+    await expect(
+      store.reserveUnmetered('user:admin-id', 'same-request', 'action', now),
+    ).resolves.toBe(false);
+    await expect(
+      store.reserveUnmetered('user:admin-id', 'same-request', 'action', now),
+    ).resolves.toBe(true);
+
+    const [, rawKeys] = redis.eval.mock.calls[0]!;
+    const keys = rawKeys as string[];
+    expect(JSON.stringify(keys)).not.toContain('admin-id');
+    expect(JSON.stringify(keys)).toContain('ai:unmetered:action:');
+    await store.refundUnmetered('user:admin-id', 'same-request', 'action');
+    expect(redis.del).toHaveBeenCalledWith(keys[0]);
+  });
 });

@@ -57,6 +57,17 @@ export interface AiStateStore {
   ): Promise<ImageQuotaGrant>;
   refundImages(actorKey: string, requestId: string, now: Date): Promise<void>;
   cache(actorKey: string, requestId: string, data: TutorResponse['data'], now: Date): Promise<void>;
+  reserveUnmetered?(
+    actorKey: string,
+    requestId: string,
+    scope: 'action' | 'image',
+    now: Date,
+  ): Promise<boolean>;
+  refundUnmetered?(
+    actorKey: string,
+    requestId: string,
+    scope: 'action' | 'image',
+  ): Promise<void>;
 }
 
 const unlimitedQuotaStatus = (now: Date): QuotaStatus => {
@@ -87,7 +98,39 @@ const unlimitedQuotaStatus = (now: Date): QuotaStatus => {
 };
 
 export class UnlimitedAiStateStore implements AiStateStore {
+  private readonly localReservations = new Map<string, number>();
+
   constructor(private readonly delegate: AiStateStore) {}
+
+  private async reserveOnce(
+    actorKey: string,
+    requestId: string,
+    scope: 'action' | 'image',
+    now: Date,
+  ): Promise<boolean> {
+    if (this.delegate.reserveUnmetered) {
+      return this.delegate.reserveUnmetered(actorKey, requestId, scope, now);
+    }
+    const key = `${scope}:${actorKey}:${requestId}`;
+    for (const [candidate, createdAt] of this.localReservations) {
+      if (createdAt + IDEMPOTENCY_TTL_MS <= now.getTime()) this.localReservations.delete(candidate);
+    }
+    if (this.localReservations.has(key)) return true;
+    this.localReservations.set(key, now.getTime());
+    return false;
+  }
+
+  private async refundOnce(
+    actorKey: string,
+    requestId: string,
+    scope: 'action' | 'image',
+  ): Promise<void> {
+    if (this.delegate.refundUnmetered) {
+      await this.delegate.refundUnmetered(actorKey, requestId, scope);
+      return;
+    }
+    this.localReservations.delete(`${scope}:${actorKey}:${requestId}`);
+  }
 
   async getCached(actorKey: string, requestId: string): Promise<TutorResponse['data'] | null> {
     const cached = await this.delegate.getCached(actorKey, requestId);
@@ -98,26 +141,33 @@ export class UnlimitedAiStateStore implements AiStateStore {
     return unlimitedQuotaStatus(now);
   }
 
-  async reserve(_actorKey: string, _requestId: string, now: Date): Promise<QuotaGrant> {
-    return { quota: unlimitedQuotaStatus(now), duplicateInFlight: false };
+  async reserve(actorKey: string, requestId: string, now: Date): Promise<QuotaGrant> {
+    return {
+      quota: unlimitedQuotaStatus(now),
+      duplicateInFlight: await this.reserveOnce(actorKey, requestId, 'action', now),
+    };
   }
 
-  async refund(): Promise<void> {}
+  async refund(actorKey: string, requestId: string): Promise<void> {
+    await this.refundOnce(actorKey, requestId, 'action');
+  }
 
   async reserveImages(
-    _actorKey: string,
-    _requestId: string,
+    actorKey: string,
+    requestId: string,
     _count: number,
     now: Date,
   ): Promise<ImageQuotaGrant> {
     return {
       quota: unlimitedQuotaStatus(now),
       granted: true,
-      duplicate: false,
+      duplicate: await this.reserveOnce(actorKey, requestId, 'image', now),
     };
   }
 
-  async refundImages(): Promise<void> {}
+  async refundImages(actorKey: string, requestId: string): Promise<void> {
+    await this.refundOnce(actorKey, requestId, 'image');
+  }
 
   async cache(
     actorKey: string,
@@ -146,6 +196,7 @@ interface ActorState {
   lastAcceptedAt: number | null;
   reservations: Map<string, number>;
   imageReservations: Map<string, number>;
+  unmeteredReservations: Map<string, number>;
 }
 
 export const shanghaiDayWindow = (
@@ -321,6 +372,32 @@ export class MemoryAiStateStore implements AiStateStore {
     });
   }
 
+  async reserveUnmetered(
+    actorKey: string,
+    requestId: string,
+    scope: 'action' | 'image',
+    now: Date,
+  ): Promise<boolean> {
+    const state = this.ensureState(actorKey, now);
+    const key = `${scope}:${requestId}`;
+    for (const [candidate, createdAt] of state.unmeteredReservations) {
+      if (createdAt + IDEMPOTENCY_TTL_MS <= now.getTime()) {
+        state.unmeteredReservations.delete(candidate);
+      }
+    }
+    if (state.unmeteredReservations.has(key)) return true;
+    state.unmeteredReservations.set(key, now.getTime());
+    return false;
+  }
+
+  async refundUnmetered(
+    actorKey: string,
+    requestId: string,
+    scope: 'action' | 'image',
+  ): Promise<void> {
+    this.actors.get(actorKey)?.unmeteredReservations.delete(`${scope}:${requestId}`);
+  }
+
   private ensureState(actorKey: string, now: Date): ActorState {
     const day = shanghaiDayWindow(now).day;
     let state = this.actors.get(actorKey);
@@ -337,6 +414,7 @@ export class MemoryAiStateStore implements AiStateStore {
         lastAcceptedAt: null,
         reservations: new Map(),
         imageReservations: new Map(),
+        unmeteredReservations: new Map(),
       };
       this.actors.set(actorKey, state);
     }

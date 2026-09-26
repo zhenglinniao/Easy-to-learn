@@ -139,4 +139,33 @@ describe('AI quota state', () => {
       image: { dailyRemaining: 2, periodRemaining: 20 },
     });
   });
+
+  it('管理员不限额但同一个 requestId 仍保持文字与插画幂等', async () => {
+    const state = new UnlimitedAiStateStore(new MemoryAiStateStore());
+    const actor = 'user:admin-1';
+    const now = new Date('2026-09-26T00:00:00.000Z');
+
+    await expect(state.reserve(actor, 'same-request', now)).resolves.toMatchObject({
+      duplicateInFlight: false,
+      quota: { unlimited: true },
+    });
+    await expect(state.reserve(actor, 'same-request', now)).resolves.toMatchObject({
+      duplicateInFlight: true,
+    });
+    await expect(state.reserveImages(actor, 'same-request', 1, now)).resolves.toMatchObject({
+      duplicate: false,
+    });
+    await expect(state.reserveImages(actor, 'same-request', 1, now)).resolves.toMatchObject({
+      duplicate: true,
+    });
+
+    await state.refund(actor, 'same-request');
+    await state.refundImages(actor, 'same-request');
+    await expect(state.reserve(actor, 'same-request', now)).resolves.toMatchObject({
+      duplicateInFlight: false,
+    });
+    await expect(state.reserveImages(actor, 'same-request', 1, now)).resolves.toMatchObject({
+      duplicate: false,
+    });
+  });
 });
