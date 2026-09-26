@@ -158,6 +158,7 @@ export const createIllustrationService = async (
           baseUrl: provider.baseUrl,
           model: provider.imageModel,
           apiKey: provider.apiKey,
+          timeoutMs: 90_000,
         })
       : null;
   return new IllustrationService(

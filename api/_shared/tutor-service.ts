@@ -149,6 +149,19 @@ export class TutorService {
           }
           if (validated.success) {
             successfulResult = validated.data;
+            if (providerIndex > 0) {
+              console.info(
+                JSON.stringify({
+                  timestamp: this.now().toISOString(),
+                  level: 'info',
+                  event: 'ai_provider_fallback_succeeded',
+                  requestId: request.requestId,
+                  selectedProviderIndex: providerIndex,
+                  invalidProviderIndexes: invalidAttempts.map((attempt) => attempt.providerIndex),
+                  hadProviderTransportError: Boolean(lastProviderError),
+                }),
+              );
+            }
             break;
           }
           invalidAttempts.push({

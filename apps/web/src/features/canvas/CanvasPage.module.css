@@ -216,6 +216,93 @@
   backdrop-filter: blur(12px);
 }
 
+.aiTaskDock {
+  position: absolute;
+  z-index: 24;
+  right: 18px;
+  bottom: 116px;
+  width: min(310px, calc(100% - 36px));
+  overflow: hidden;
+  border: 1px solid rgba(49, 41, 32, 0.11);
+  border-radius: 18px;
+  background: rgba(255, 253, 249, 0.95);
+  box-shadow: 0 18px 42px rgba(48, 40, 30, 0.14);
+  backdrop-filter: blur(14px);
+}
+
+.aiTaskDock > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid rgba(49, 41, 32, 0.08);
+  font-size: 11px;
+}
+
+.aiTaskDock > header span {
+  color: #81796f;
+  font-variant-numeric: tabular-nums;
+}
+
+.aiTaskDock > div {
+  display: grid;
+}
+
+.aiTaskDock article {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+}
+
+.aiTaskDock article + article {
+  border-top: 1px solid rgba(49, 41, 32, 0.07);
+}
+
+.aiTaskIndex {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-content: center;
+  border-radius: 8px;
+  color: #b74830;
+  background: #ffebe4;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.aiTaskDock p {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  margin: 0;
+}
+
+.aiTaskDock p strong {
+  font-size: 11px;
+}
+
+.aiTaskDock p span {
+  overflow: hidden;
+  color: #81796f;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aiTaskDock button {
+  padding: 5px 8px;
+  border: 1px solid rgba(163, 59, 44, 0.18);
+  border-radius: 999px;
+  color: #a33b2c;
+  background: #fff8f5;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 680;
+  cursor: pointer;
+}
+
 .dialogBackdrop {
   position: fixed;
   z-index: 80;
@@ -484,6 +571,12 @@
     bottom: 78px;
   }
 
+  .aiTaskDock {
+    right: 12px;
+    bottom: 170px;
+    width: min(290px, calc(100% - 24px));
+  }
+
   .dataActions {
     align-items: stretch;
     flex-direction: column;
@@ -535,13 +628,35 @@
 
 :global(html[data-theme='dark']) .mode,
 :global(html[data-theme='dark']) .guide,
-:global(html[data-theme='dark']) .notice {
+:global(html[data-theme='dark']) .notice,
+:global(html[data-theme='dark']) .aiTaskDock {
   border-color: rgba(255, 255, 255, 0.1);
   background: rgba(40, 37, 33, 0.94);
 }
 
 :global(html[data-theme='dark']) .notice {
   color: #c1b8ae;
+}
+
+:global(html[data-theme='dark']) .aiTaskDock > header,
+:global(html[data-theme='dark']) .aiTaskDock article + article {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:global(html[data-theme='dark']) .aiTaskIndex {
+  color: #ffb4a3;
+  background: #412720;
+}
+
+:global(html[data-theme='dark']) .aiTaskDock p span,
+:global(html[data-theme='dark']) .aiTaskDock > header span {
+  color: #aaa197;
+}
+
+:global(html[data-theme='dark']) .aiTaskDock button {
+  border-color: rgba(255, 180, 163, 0.2);
+  color: #ffb4a3;
+  background: #35231f;
 }
 
 :global(html[data-theme='dark']) .dataDialog,
