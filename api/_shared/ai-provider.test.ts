@@ -188,7 +188,7 @@ describe('AI Provider 执行', () => {
     });
   });
 
-  it('提示词约束模式会发送完整 Tutor Schema 且不声明 response_format', async () => {
+  it('SenseNova 使用紧凑 Tutor 契约与输出上限且不声明 response_format', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(
@@ -216,15 +216,53 @@ describe('AI Provider 执行', () => {
     const prompt = body.messages[1].content[0].text as string;
 
     expect(body.response_format).toBeUndefined();
-    expect(prompt).toContain('以下 JSON Schema 是唯一允许的输出结构');
-    expect(prompt).toContain('"additionalProperties"');
-    expect(prompt).toContain('"contentProfile"');
+    expect(body.max_tokens).toBe(2048);
+    expect(body.reasoning_effort).toBe('none');
+    expect(body.temperature).toBe(0.2);
+    expect(prompt).toContain('SenseNova 紧凑输出契约');
+    expect(prompt).toContain('solve/explain_step 使用 1-5 步');
+    expect(prompt).toContain('contentProfile');
+    expect(prompt).not.toContain('"additionalProperties"');
   });
 
   it('SenseNova 瞬时断连时会在同一超时预算内重试一次', async () => {
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: JSON.stringify(modelResult) } }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    const model = createTutorModelFromEnvironment(
+      vi.fn(),
+      {
+        AI_PROVIDERS: 'sensenova',
+        AI_PROVIDER_SENSENOVA_TYPE: 'openai-compatible',
+        AI_PROVIDER_SENSENOVA_BASE_URL: 'https://token.sensenova.cn/v1',
+        AI_PROVIDER_SENSENOVA_API_KEY: 'server-only-secret',
+        AI_PROVIDER_SENSENOVA_MODEL: 'sensenova-6.8-flash-lite',
+        AI_PROVIDER_SENSENOVA_RESPONSE_FORMAT: 'prompt',
+      },
+      fetchMock,
+    );
+
+    await expect(model.generate(request)).resolves.toMatchObject({
+      metadata: { model: 'sensenova/sensenova-6.8-flash-lite' },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('SenseNova 以 200 返回空正文时会在同一超时预算内重试一次', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ choices: [{ message: { content: '' } }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({ choices: [{ message: { content: JSON.stringify(modelResult) } }] }),

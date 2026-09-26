@@ -202,8 +202,15 @@ export const validateAdminModelPolicy = (
       throw new ApiFault('INVALID_INPUT', 'Provider 显示名称格式不正确');
     if (!model || model.length > 160 || /[\r\n]/.test(model))
       throw new ApiFault('INVALID_INPUT', '模型 ID 格式不正确');
-    if (!Number.isInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 25_000)
-      throw new ApiFault('INVALID_INPUT', '单个 Provider 超时必须为 1000 到 25000 毫秒');
+    if (
+      !Number.isInteger(timeoutMs) ||
+      timeoutMs < 1_000 ||
+      timeoutMs > MAX_PROVIDER_CHAIN_TIMEOUT_MS
+    )
+      throw new ApiFault(
+        'INVALID_INPUT',
+        `单个 Provider 超时必须为 1000 到 ${MAX_PROVIDER_CHAIN_TIMEOUT_MS} 毫秒`,
+      );
     if (typeof enabled !== 'boolean')
       throw new ApiFault('INVALID_INPUT', 'Provider 启用状态格式不正确');
     const apiKey = cleanApiKey(candidate.apiKey) ?? existing.get(id)?.apiKey;

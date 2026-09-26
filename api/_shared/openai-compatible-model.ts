@@ -6,6 +6,7 @@ import {
   DEFAULT_TUTOR_PROMPT_VERSION,
   getTutorSystemInstruction,
   parseModelJson,
+  SENSENOVA_COMPACT_TUTOR_CONTRACT,
   type TutorImageResolver,
 } from './model-prompt.js';
 import {
@@ -17,6 +18,8 @@ import {
 export type OpenAiResponseFormat = 'json_schema' | 'json_object' | 'prompt';
 export type OpenAiWireApi = 'chat_completions' | 'responses';
 export type ModelReasoningEffort = 'none' | 'low' | 'high' | 'max';
+
+const SENSENOVA_MAX_OUTPUT_TOKENS = 2_048;
 
 interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string | Array<{ type?: string; text?: string }> } }>;
@@ -86,6 +89,7 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
+      const isSenseNova = this.providerId === 'sensenova' || this.baseUrl.includes('sensenova.cn');
       const chatContent: Array<
         { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
       > = [
@@ -95,8 +99,12 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
             buildTutorPrompt(request, correction, this.promptVersion),
             ...(this.responseFormat === 'prompt'
               ? [
-                  '以下 JSON Schema 是唯一允许的输出结构。必须完整遵守 required、enum、oneOf、additionalProperties 等约束；不得输出 Markdown 代码围栏或解释文字：',
-                  JSON.stringify(domainJsonSchemas.tutorResultV1),
+                  ...(isSenseNova
+                    ? [SENSENOVA_COMPACT_TUTOR_CONTRACT]
+                    : [
+                        '以下 JSON Schema 是唯一允许的输出结构。必须完整遵守 required、enum、oneOf、additionalProperties 等约束；不得输出 Markdown 代码围栏或解释文字：',
+                        JSON.stringify(domainJsonSchemas.tutorResultV1),
+                      ]),
                 ]
               : []),
           ].join('\n'),
@@ -172,29 +180,36 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
             }
           : {
               model: this.model,
-              temperature: correction ? 0 : 0.4,
+              temperature: correction ? 0 : isSenseNova ? 0.2 : 0.4,
+              ...(isSenseNova ? { max_tokens: SENSENOVA_MAX_OUTPUT_TOKENS } : {}),
               messages: [
                 { role: 'system', content: getTutorSystemInstruction(this.promptVersion) },
                 { role: 'user', content: chatContent },
               ],
               ...(responseFormat ? { response_format: responseFormat } : {}),
-              ...(this.reasoningEffort ? { reasoning_effort: this.reasoningEffort } : {}),
+              ...(isSenseNova
+                ? { reasoning_effort: 'none' }
+                : this.reasoningEffort
+                  ? { reasoning_effort: this.reasoningEffort }
+                  : {}),
             };
       const endpoint = this.wireApi === 'responses' ? '/responses' : '/chat/completions';
-      const attempts = this.providerId === 'sensenova' ? 2 : 1;
+      const attempts = isSenseNova ? 2 : 1;
+      const requestUrl = `${baseUrl}${endpoint}`;
+      const requestInit = {
+        method: 'POST' as const,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      };
       let response: OpenAiFetchResponse | undefined;
       let lastTransportError: unknown;
       for (let attempt = 0; attempt < attempts; attempt += 1) {
         try {
-          response = await this.fetchImpl(`${baseUrl}${endpoint}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
-            },
-            body: JSON.stringify(requestBody),
-            signal: controller.signal,
-          });
+          response = await this.fetchImpl(requestUrl, requestInit);
           const retryableStatus = response.status === 429 || response.status >= 500;
           if (response.ok || !retryableStatus || attempt === attempts - 1) break;
         } catch (error) {
@@ -213,11 +228,22 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
           `${this.providerId} request failed with status ${response.status}`,
         );
       }
-      const payload = (await response.json()) as ChatCompletionResponse | ResponsesApiResponse;
-      const text =
+      let payload = (await response.json()) as ChatCompletionResponse | ResponsesApiResponse;
+      let text =
         this.wireApi === 'responses'
           ? responsesOutputText(payload as ResponsesApiResponse)
           : responseText(payload as ChatCompletionResponse);
+      // SenseNova 偶尔会以 200 返回空 content；在同一总超时预算内只重试一次。
+      if (!text && isSenseNova && !controller.signal.aborted) {
+        response = await this.fetchImpl(requestUrl, requestInit);
+        if (!response.ok) {
+          throw new ProviderUnavailableError(
+            `${this.providerId} empty response retry failed with status ${response.status}`,
+          );
+        }
+        payload = (await response.json()) as ChatCompletionResponse | ResponsesApiResponse;
+        text = responseText(payload as ChatCompletionResponse);
+      }
       return attachTrustedMetadata(
         parseModelJson(text),
         `${this.providerId}/${this.model}`,

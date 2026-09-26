@@ -121,6 +121,30 @@ describe('admin model policy', () => {
     });
   });
 
+  it('允许单个 Provider 使用完整 50 秒总预算', () => {
+    const policy = validateAdminModelPolicy(
+      {
+        providers: [
+          {
+            id: 'sensenova',
+            label: 'SenseNova 6.8 Flash Lite',
+            type: 'openai-compatible',
+            enabled: true,
+            baseUrl: 'https://token.sensenova.cn/v1',
+            model: 'sensenova-6.8-flash-lite',
+            timeoutMs: 50_000,
+            responseFormat: 'prompt',
+            wireApi: 'chat_completions',
+            apiKey: 'secret-sensenova',
+          },
+        ],
+      },
+      configs,
+    );
+
+    expect(applyAdminModelPolicy(policy)[0]).toMatchObject({ timeoutMs: 50_000 });
+  });
+
   it('拒绝内网/未知域名、无密钥启用和超过总超时预算', () => {
     const base = {
       id: 'new_model',

@@ -182,6 +182,45 @@ describe('TutorService', () => {
     expect(model.generate).toHaveBeenCalledTimes(1);
   });
 
+  it('将直接放进 blocks 的已知图解对象包进 diagram block', async () => {
+    const model = {
+      generate: vi.fn().mockResolvedValue({
+        ...result,
+        steps: [
+          {
+            id: 'step-1',
+            title: '按顺序观察',
+            blocks: [
+              {
+                type: 'flow',
+                direction: 'LR',
+                nodes: [
+                  { id: 'a', label: '起点', shape: 'rounded', color: 'green' },
+                  { id: 'b', label: '终点', shape: 'rounded', color: 'blue' },
+                ],
+                edges: [{ id: 'e1', from: 'a', to: 'b', style: 'solid' }],
+              },
+              { type: 'paragraph', text: '沿箭头前进。' },
+            ],
+          },
+        ],
+      }),
+    };
+    const service = new TutorService(
+      new MemoryAiStateStore(),
+      model,
+      boards,
+      () => new Date('2026-09-22T00:00:00.000Z'),
+    );
+
+    const response = await service.execute(actor, request);
+
+    expect(response.data.result.steps[0]?.blocks[0]).toMatchObject({
+      type: 'diagram',
+      diagram: { type: 'flow', direction: 'LR' },
+    });
+  });
+
   it('执行五分钟间隔与上海自然日三次配额', async () => {
     const state = new MemoryAiStateStore();
     const model: TutorModel = { generate: vi.fn().mockResolvedValue(result) };
