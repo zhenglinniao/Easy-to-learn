@@ -26,6 +26,35 @@ export interface SyncResult {
   retryAt?: number;
 }
 
+const ASSET_UPLOAD_CONCURRENCY = 3;
+
+export const uploadAssetsWithConcurrency = async (
+  assets: readonly StoredAsset[],
+  uploadOne: (asset: StoredAsset) => Promise<void>,
+  concurrency = ASSET_UPLOAD_CONCURRENCY,
+): Promise<void> => {
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new RangeError('资产上传并发数必须是正整数');
+  }
+  let nextIndex = 0;
+  let firstError: unknown;
+  const worker = async () => {
+    while (firstError === undefined) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const asset = assets[index];
+      if (!asset) return;
+      try {
+        await uploadOne(asset);
+      } catch (error) {
+        firstError ??= error;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, assets.length) }, () => worker()));
+  if (firstError !== undefined) throw firstError;
+};
+
 export class BoardSyncEngine {
   private readonly running = new Map<string, Promise<SyncResult>>();
   private cloudWritesBlocked = false;
@@ -89,9 +118,10 @@ export class BoardSyncEngine {
     try {
       const assets = await this.repository.getAssets(operation.boardId);
       const referencedIds = new Set(board.snapshot.assets.map(({ fileId }) => fileId));
-      for (const asset of assets.filter(
+      const pendingAssets = assets.filter(
         ({ fileId, uploadState }) => referencedIds.has(fileId) && uploadState !== 'uploaded',
-      )) {
+      );
+      await uploadAssetsWithConcurrency(pendingAssets, async (asset) => {
         await this.repository.markAssetState(asset.boardId, asset.fileId, 'uploading');
         try {
           await this.remote.uploadAsset(asset);
@@ -100,7 +130,7 @@ export class BoardSyncEngine {
           await this.repository.markAssetState(asset.boardId, asset.fileId, 'failed');
           throw error;
         }
-      }
+      });
       const remoteRevision = await this.remote.saveSnapshot(board, operation.baseRevision);
       await this.repository.completeSnapshot(operation, remoteRevision);
       return { boardId: operation.boardId, state: 'synced' };
