@@ -14,6 +14,25 @@ describe('CanvasAiTaskRegistry', () => {
     expect(registry.list()).toHaveLength(MAX_CONCURRENT_CANVAS_AI_TASKS);
   });
 
+  it('rejects a duplicate source while preserving independent selections', () => {
+    const registry = new CanvasAiTaskRegistry();
+    const first = registry.start('first', 'solve', {
+      sourceKey: 'selection-a',
+      screenPosition: { x: 120, y: 240 },
+    });
+
+    expect(first).not.toBeNull();
+    expect(registry.start('duplicate', 'solve', { sourceKey: 'selection-a' })).toBeNull();
+    expect(registry.start('second', 'solve', { sourceKey: 'selection-b' })).not.toBeNull();
+    expect(registry.findBySourceKey('selection-a')).toMatchObject({
+      id: 'first',
+      action: 'solve',
+      stage: 'preparing',
+      sourceKey: 'selection-a',
+      screenPosition: { x: 120, y: 240 },
+    });
+  });
+
   it('updates, cancels and finishes tasks without affecting siblings', () => {
     const registry = new CanvasAiTaskRegistry();
     const first = registry.start('first', 'solve');
@@ -25,7 +44,12 @@ describe('CanvasAiTaskRegistry', () => {
     expect(second?.signal.aborted).toBe(true);
     expect(first?.signal.aborted).toBe(false);
     expect(registry.list()).toEqual([
-      { id: 'first', action: 'solve', stage: 'illustrating', elementCount: 4 },
+      expect.objectContaining({
+        id: 'first',
+        action: 'solve',
+        stage: 'illustrating',
+        elementCount: 4,
+      }),
     ]);
 
     registry.finish('first');
