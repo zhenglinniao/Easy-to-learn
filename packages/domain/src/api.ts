@@ -26,6 +26,8 @@ export const API_ERROR_DEFINITIONS = {
   UNSUPPORTED_SCHEMA: { httpStatus: 422, retryable: false },
   RATE_LIMITED: { httpStatus: 429, retryable: true },
   QUOTA_EXCEEDED: { httpStatus: 429, retryable: false },
+  DAILY_QUOTA_EXHAUSTED: { httpStatus: 429, retryable: false },
+  PERIOD_QUOTA_EXHAUSTED: { httpStatus: 429, retryable: false },
   STORAGE_QUOTA_EXCEEDED: { httpStatus: 429, retryable: false },
   AI_PROVIDER_ERROR: { httpStatus: 502, retryable: true },
   DEPENDENCY_UNAVAILABLE: { httpStatus: 503, retryable: true },
@@ -57,10 +59,32 @@ export const apiErrorResponseSchema = z
 export const createDataResponseSchema = <T extends z.ZodType>(dataSchema: T) =>
   z.strictObject({ data: dataSchema });
 
+const actionQuotaSchema = z.strictObject({
+  dailyLimit: z.literal(3),
+  dailyRemaining: nonNegativeIntegerSchema.max(3),
+  periodLimit: z.union([z.literal(15), z.literal(45)]),
+  periodRemaining: nonNegativeIntegerSchema.max(45),
+  nextAllowedAt: isoDateTimeSchema.nullable(),
+  dailyResetsAt: isoDateTimeSchema,
+  periodResetsAt: isoDateTimeSchema.nullable(),
+});
+
+const imageQuotaSchema = z.strictObject({
+  dailyLimit: z.union([z.literal(1), z.literal(2)]),
+  dailyRemaining: nonNegativeIntegerSchema.max(2),
+  periodLimit: z.union([z.literal(3), z.literal(20)]),
+  periodRemaining: nonNegativeIntegerSchema.max(20),
+  periodResetsAt: isoDateTimeSchema.nullable(),
+});
+
 export const quotaStatusSchema = z.strictObject({
+  // 兼容已发布客户端；新客户端读取 action/image。
   dailyLimit: z.literal(3),
   remaining: nonNegativeIntegerSchema.max(3),
   nextAllowedAt: isoDateTimeSchema.nullable(),
+  action: actionQuotaSchema,
+  image: imageQuotaSchema,
+  mode: z.enum(['full', 'vector_only', 'paused']),
 });
 
 const base64Schema = z
@@ -147,11 +171,7 @@ export const tutorResponseSchema = createDataResponseSchema(
   z.strictObject({
     requestId: nonEmptyStringSchema,
     result: tutorResultSchema,
-    quota: z.strictObject({
-      dailyLimit: z.literal(3),
-      remaining: nonNegativeIntegerSchema.max(3),
-      nextAllowedAt: isoDateTimeSchema,
-    }),
+    quota: quotaStatusSchema,
   }),
 );
 
@@ -170,6 +190,10 @@ export const aiFeedbackInputSchema = z.strictObject({
 
 export const anonymousSessionResponseSchema = createDataResponseSchema(
   z.strictObject({ expiresAt: isoDateTimeSchema, quota: quotaStatusSchema }),
+);
+
+export const quotaResponseSchema = createDataResponseSchema(
+  z.strictObject({ quota: quotaStatusSchema }),
 );
 
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;

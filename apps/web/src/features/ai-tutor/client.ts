@@ -1,7 +1,10 @@
 import {
   aiFeedbackInputSchema,
+  anonymousSessionResponseSchema,
+  quotaResponseSchema,
   tutorResponseSchema,
   type AiFeedbackInput,
+  type QuotaStatus,
   type TutorRequest,
   type TutorResponse,
 } from '@easy-to-learn/domain';
@@ -25,6 +28,28 @@ export class TutorApiClient {
     private readonly getAccessToken: () => Promise<string | null>,
     private readonly fetcher: typeof fetch = (input, init) => globalThis.fetch(input, init),
   ) {}
+
+  async quotaStatus(signal?: AbortSignal): Promise<QuotaStatus> {
+    const accessToken = await this.getAccessToken();
+    if (!accessToken) {
+      const response = await this.fetcher('/api/anonymous/session', {
+        method: 'POST',
+        credentials: 'same-origin',
+        ...(signal ? { signal } : {}),
+      });
+      if (!response.ok) throw await this.error(response);
+      return anonymousSessionResponseSchema.parse(await response.json()).data.quota;
+    }
+
+    const response = await this.fetcher('/api/ai/quota', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      credentials: 'same-origin',
+      ...(signal ? { signal } : {}),
+    });
+    if (!response.ok) throw await this.error(response);
+    return quotaResponseSchema.parse(await response.json()).data.quota;
+  }
 
   async execute(request: TutorRequest, signal?: AbortSignal): Promise<TutorResponse['data']> {
     const accessToken = await this.getAccessToken();

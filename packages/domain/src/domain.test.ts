@@ -458,12 +458,30 @@ describe('AI API 契约', () => {
   });
 
   it('固定配额边界和错误码 retryable 语义', () => {
-    expect(
-      quotaStatusSchema.safeParse({ dailyLimit: 3, remaining: 0, nextAllowedAt: null }).success,
-    ).toBe(true);
-    expect(
-      quotaStatusSchema.safeParse({ dailyLimit: 3, remaining: 4, nextAllowedAt: null }).success,
-    ).toBe(false);
+    const quota = {
+      dailyLimit: 3 as const,
+      remaining: 0,
+      nextAllowedAt: null,
+      action: {
+        dailyLimit: 3 as const,
+        dailyRemaining: 0,
+        periodLimit: 15 as const,
+        periodRemaining: 12,
+        nextAllowedAt: null,
+        dailyResetsAt: '2026-09-23T16:00:00.000Z',
+        periodResetsAt: '2026-10-22T00:00:00.000Z',
+      },
+      image: {
+        dailyLimit: 1 as const,
+        dailyRemaining: 1,
+        periodLimit: 3 as const,
+        periodRemaining: 3,
+        periodResetsAt: null,
+      },
+      mode: 'full' as const,
+    };
+    expect(quotaStatusSchema.safeParse(quota).success).toBe(true);
+    expect(quotaStatusSchema.safeParse({ ...quota, remaining: 4 }).success).toBe(false);
     expect(
       apiErrorResponseSchema.safeParse({
         requestId: 'request-1',

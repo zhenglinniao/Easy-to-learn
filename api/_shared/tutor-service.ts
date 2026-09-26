@@ -152,7 +152,7 @@ export class TutorService {
       const data: TutorResponse['data'] = {
         requestId: request.requestId,
         result: validated.data,
-        quota: { dailyLimit: 3, remaining: quota.remaining, nextAllowedAt: quota.nextAllowedAt },
+        quota: quota.quota,
       };
       await this.state.cache(actorKey, request.requestId, data, this.now());
       return { data };
