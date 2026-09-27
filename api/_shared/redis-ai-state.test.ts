@@ -31,7 +31,12 @@ const cachedData = {
     mode: 'hint',
     title: '提示',
     hintLevel: 3,
-    steps: [],
+    steps: [1, 2, 3].map((hintLevel) => ({
+      id: `hint-${hintLevel}`,
+      title: `提示 ${hintLevel}`,
+      hintLevel: hintLevel as 1 | 2 | 3,
+      blocks: [{ type: 'paragraph' as const, text: `第 ${hintLevel} 级提示` }],
+    })),
     metadata: {
       model: 'provider/model',
       promptVersion: 'v1',
@@ -81,6 +86,20 @@ describe('RedisAiStateStore', () => {
     await expect(store.getCached('user:user-1', 'request-1')).resolves.toEqual(cachedData);
 
     values.set(key, 'invalid-ciphertext');
+    await expect(store.getCached('user:user-1', 'request-1')).resolves.toBeNull();
+    expect(redis.del).toHaveBeenCalledWith(key);
+  });
+
+  it('removes authenticated cache entries that no longer satisfy the response contract', async () => {
+    const { redis, values } = createRedis();
+    const store = new RedisAiStateStore(redis as never, 'actor-secret', encryptionKey);
+
+    await store.cache('user:user-1', 'request-1', {
+      ...cachedData,
+      quota: { ...cachedData.quota, remaining: 99 },
+    } as TutorResponse['data']);
+    const [key] = [...values.keys()];
+
     await expect(store.getCached('user:user-1', 'request-1')).resolves.toBeNull();
     expect(redis.del).toHaveBeenCalledWith(key);
   });

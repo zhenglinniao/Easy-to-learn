@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'node:crypto';
 
-import type { QuotaStatus, TutorResponse } from '@easy-to-learn/domain';
+import { tutorResponseSchema, type QuotaStatus, type TutorResponse } from '@easy-to-learn/domain';
 import type { Redis } from '@upstash/redis';
 
 import {
@@ -104,7 +104,7 @@ export class RedisAiStateStore implements AiStateStore {
     const encrypted = await this.redis.get<string>(this.cacheKey(actorKey, requestId));
     if (!encrypted) return null;
     try {
-      return JSON.parse(this.decrypt(encrypted)) as TutorResponse['data'];
+      return tutorResponseSchema.parse({ data: JSON.parse(this.decrypt(encrypted)) }).data;
     } catch {
       await this.redis.del(this.cacheKey(actorKey, requestId));
       return null;
