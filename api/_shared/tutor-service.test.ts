@@ -91,6 +91,30 @@ describe('TutorService', () => {
     expect(first.data.quota).toMatchObject({ dailyLimit: 3, remaining: 2 });
   });
 
+  it('网络重试遇到仍在执行的同一请求时等待超过旧的两秒窗口', async () => {
+    const now = new Date('2026-09-22T00:00:00.000Z');
+    const generate = vi.fn(
+      () =>
+        new Promise<TutorResultV1>((resolve) => {
+          setTimeout(() => resolve(result), 2_200);
+        }),
+    );
+    const service = new TutorService(
+      new MemoryAiStateStore(() => now.getTime()),
+      { generate },
+      boards,
+      () => now,
+    );
+
+    const first = service.execute(actor, request);
+    await vi.waitFor(() => expect(generate).toHaveBeenCalledOnce());
+    const retry = service.execute(actor, request);
+
+    await expect(first).resolves.toMatchObject({ data: { result: { title: '一元一次方程' } } });
+    await expect(retry).resolves.toEqual(await first);
+    expect(generate).toHaveBeenCalledOnce();
+  });
+
   it('执行一次同模型纠错，并拒绝第二次非法输出', async () => {
     const generate = vi
       .fn()

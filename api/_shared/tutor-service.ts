@@ -27,6 +27,8 @@ export class ProviderTimeoutError extends Error {}
 export class ProviderUnavailableError extends Error {}
 
 export const TUTOR_EXECUTION_TIMEOUT_MS = 52_000;
+const DUPLICATE_POLL_INTERVAL_MS = 100;
+const DUPLICATE_WAIT_ATTEMPTS = 200;
 
 const providerFailureDetails = (error: unknown): Record<string, string> => {
   const details: Record<string, string> = {};
@@ -317,8 +319,8 @@ export class TutorService {
 
     const quota = await this.state.reserve(actorKey, request.requestId, this.now());
     if (quota.duplicateInFlight) {
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+      for (let attempt = 0; attempt < DUPLICATE_WAIT_ATTEMPTS; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, DUPLICATE_POLL_INTERVAL_MS));
         const completed = await this.state.getCached(actorKey, request.requestId);
         if (completed) return { data: completed };
       }
