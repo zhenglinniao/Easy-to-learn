@@ -13,7 +13,13 @@ export function AnalyticsTracker() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    if (privacyControlEnabled() || typeof fetch !== 'function') return;
+    // 本地 Vite 不承载 Serverless API，也不应把开发浏览计入正式产品指标。
+    if (
+      import.meta.env.MODE === 'development' ||
+      privacyControlEnabled() ||
+      typeof fetch !== 'function'
+    )
+      return;
 
     const now = Date.now();
     try {
