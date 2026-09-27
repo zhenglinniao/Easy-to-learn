@@ -2,6 +2,7 @@ import type { DiagramColor, DiagramV1, TutorBlock } from '@easy-to-learn/domain'
 import { lazy, Suspense } from 'react';
 
 import styles from './TutorBoard.module.css';
+import { RenderFallbackBoundary } from './RenderFallbackBoundary';
 
 const MathBlock = lazy(() => import('./MathBlock'));
 
@@ -392,17 +393,23 @@ export function TutorBlocks({ blocks }: { blocks: readonly TutorBlock[] }) {
       {blocks.map((block, index) => {
         if (block.type === 'paragraph') return <p key={index}>{block.text}</p>;
         if (block.type === 'math') {
+          const fallback = (
+            <div className={styles.math} aria-label="公式暂以原文显示">
+              {block.latex}
+            </div>
+          );
           return (
-            <Suspense
-              key={index}
-              fallback={
-                <div className={styles.math} aria-label="正在排版公式">
-                  {block.latex}
-                </div>
-              }
-            >
-              <MathBlock latex={block.latex} display={block.display} />
-            </Suspense>
+            <RenderFallbackBoundary key={index} fallback={fallback}>
+              <Suspense
+                fallback={
+                  <div className={styles.math} aria-label="正在排版公式">
+                    {block.latex}
+                  </div>
+                }
+              >
+                <MathBlock latex={block.latex} display={block.display} />
+              </Suspense>
+            </RenderFallbackBoundary>
           );
         }
         if (block.type === 'code') {
