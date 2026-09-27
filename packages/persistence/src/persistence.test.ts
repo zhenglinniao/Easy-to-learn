@@ -214,6 +214,39 @@ describe('LocalBoardRepository', () => {
     const { repository, database } = await createRepository();
     await repository.saveDurableChange(emptySnapshot('local_old'));
     await repository.saveDurableChange(emptySnapshot('local_new'));
+    for (let index = 0; index < 64; index += 1) {
+      await database.put('assets', {
+        boardId: 'local_new',
+        fileId: `file-${index}`,
+        blob: new Blob([String(index)], { type: 'image/png' }),
+        contentHash: index.toString(16).padStart(64, '0'),
+        mimeType: 'image/png',
+        byteSize: String(index).length,
+        width: 1,
+        height: 1,
+        uploadState: 'local',
+        objectPath: `guest/local_new/${index.toString(16).padStart(64, '0')}`,
+      });
+      await database.add('conflictCopies', {
+        boardId: 'local_new',
+        snapshot: emptySnapshot('local_new'),
+        localRevision: index,
+        remoteRevision: 0,
+        createdAt: now.toISOString(),
+      });
+    }
+    await database.put('assets', {
+      boardId: 'local_old',
+      fileId: 'keep-file',
+      blob: new Blob(['keep'], { type: 'image/png' }),
+      contentHash: 'f'.repeat(64),
+      mimeType: 'image/png',
+      byteSize: 4,
+      width: 1,
+      height: 1,
+      uploadState: 'local',
+      objectPath: `guest/local_old/${'f'.repeat(64)}`,
+    });
     const newer = await repository.getBoard('local_new');
     expect(newer).toBeDefined();
     await database.put('boards', { ...newer!, updatedAt: '2026-09-22T00:01:00.000Z' });
@@ -225,6 +258,9 @@ describe('LocalBoardRepository', () => {
     await repository.deleteLocalBoard('local_new');
     expect(await repository.getBoard('local_new')).toBeUndefined();
     expect(await repository.getOutbox('local_new')).toEqual([]);
+    expect(await database.getAllFromIndex('assets', 'by-board', 'local_new')).toEqual([]);
+    expect(await database.getAllFromIndex('conflictCopies', 'by-board', 'local_new')).toEqual([]);
+    expect(await database.getAllFromIndex('assets', 'by-board', 'local_old')).toHaveLength(1);
     await expect(repository.deleteLocalBoard('cloud-board')).rejects.toMatchObject({
       code: 'DATABASE_CORRUPTED',
     });

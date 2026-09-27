@@ -227,17 +227,14 @@ export class LocalBoardRepository {
       'readwrite',
     );
     try {
-      const [assetKeys, outboxKeys, conflictKeys] = await Promise.all([
-        transaction.objectStore('assets').index('by-board').getAllKeys(boardId),
-        transaction.objectStore('outbox').index('by-board').getAllKeys(boardId),
-        transaction.objectStore('conflictCopies').index('by-board').getAllKeys(boardId),
-      ]);
-      await Promise.all([
-        transaction.objectStore('boards').delete(boardId),
-        ...assetKeys.map((key) => transaction.objectStore('assets').delete(key)),
-        ...outboxKeys.map((key) => transaction.objectStore('outbox').delete(key)),
-        ...conflictKeys.map((key) => transaction.objectStore('conflictCopies').delete(key)),
-      ]);
+      await transaction.objectStore('boards').delete(boardId);
+      for (const storeName of ['assets', 'outbox', 'conflictCopies'] as const) {
+        let cursor = await transaction.objectStore(storeName).index('by-board').openCursor(boardId);
+        while (cursor) {
+          await cursor.delete();
+          cursor = await cursor.continue();
+        }
+      }
       await transaction.done;
     } catch (error) {
       transaction.abort();
@@ -651,18 +648,17 @@ export class LocalBoardRepository {
         ['boards', 'assets', 'outbox', 'preferences', 'conflictCopies'],
         'readwrite',
       );
-      const [assetKeys, outboxKeys, conflictKeys] = await Promise.all([
-        transaction.objectStore('assets').index('by-board').getAllKeys(boardId),
-        transaction.objectStore('outbox').index('by-board').getAllKeys(boardId),
-        transaction.objectStore('conflictCopies').index('by-board').getAllKeys(boardId),
-      ]);
       await Promise.all([
         transaction.objectStore('boards').delete(boardId),
         transaction.objectStore('preferences').delete(`conflict-target:${boardId}`),
-        ...assetKeys.map((key) => transaction.objectStore('assets').delete(key)),
-        ...outboxKeys.map((key) => transaction.objectStore('outbox').delete(key)),
-        ...conflictKeys.map((key) => transaction.objectStore('conflictCopies').delete(key)),
       ]);
+      for (const storeName of ['assets', 'outbox', 'conflictCopies'] as const) {
+        let cursor = await transaction.objectStore(storeName).index('by-board').openCursor(boardId);
+        while (cursor) {
+          await cursor.delete();
+          cursor = await cursor.continue();
+        }
+      }
       await transaction.done;
     });
   }
