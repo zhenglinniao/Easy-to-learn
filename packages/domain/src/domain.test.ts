@@ -457,6 +457,27 @@ describe('AI API 契约', () => {
     ).toBe(false);
   });
 
+  it('限制进入鉴权和存储链路的标识符与路径长度', () => {
+    const validRequest = { ...requestBase, mode: 'solve', text: '解释这道题' } as const;
+
+    expect(
+      tutorRequestSchema.safeParse({ ...validRequest, boardId: 'b'.repeat(201) }).success,
+    ).toBe(false);
+    expect(
+      tutorRequestSchema.safeParse({
+        ...validRequest,
+        source: { ...validRequest.source, elementIds: ['e'.repeat(201)] },
+      }).success,
+    ).toBe(false);
+    expect(
+      tutorRequestSchema.safeParse({
+        ...requestBase,
+        mode: 'solve',
+        image: { mimeType: 'image/png', uploadPath: 'p'.repeat(1_025) },
+      }).success,
+    ).toBe(false);
+  });
+
   it('固定配额边界和错误码 retryable 语义', () => {
     const quota = {
       dailyLimit: 3 as const,

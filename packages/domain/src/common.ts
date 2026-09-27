@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 export const nonEmptyStringSchema = z.string().min(1);
+export const identifierSchema = z.string().min(1).max(200);
+export const storagePathSchema = z.string().min(1).max(1_024);
 export const isoDateTimeSchema = z.iso.datetime({ offset: true });
 export const finiteNumberSchema = z.number().finite();
 export const nonNegativeIntegerSchema = z.number().int().nonnegative();

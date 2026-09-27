@@ -3,9 +3,11 @@ import { z } from 'zod';
 import { MAX_INLINE_IMAGE_BYTES, TUTOR_SCHEMA_VERSION } from './constants.js';
 import {
   boundsSchema,
+  identifierSchema,
   isoDateTimeSchema,
   nonEmptyStringSchema,
   nonNegativeIntegerSchema,
+  storagePathSchema,
   tutorImageMimeTypeSchema,
 } from './common.js';
 import { tutorResultSchema, tutorStepSchema } from './tutor.js';
@@ -127,7 +129,7 @@ const tutorImageSchema = z
   .strictObject({
     mimeType: tutorImageMimeTypeSchema,
     base64: base64Schema.optional(),
-    uploadPath: nonEmptyStringSchema.optional(),
+    uploadPath: storagePathSchema.optional(),
   })
   .refine(({ base64, uploadPath }) => base64 !== undefined || uploadPath !== undefined, {
     message: '图片必须包含 base64 或 uploadPath',
@@ -142,18 +144,18 @@ export const tutorRequestSchema = z
   .strictObject({
     requestId: requestIdSchema,
     schemaVersion: z.literal(TUTOR_SCHEMA_VERSION),
-    boardId: nonEmptyStringSchema,
+    boardId: identifierSchema,
     mode: z.enum(['solve', 'hint', 'explain_step']),
     text: z.string().min(1).max(10_000).optional(),
     image: tutorImageSchema.optional(),
     locale: z.literal('zh-CN'),
     source: z.strictObject({
-      elementIds: z.array(nonEmptyStringSchema).min(1).max(500),
+      elementIds: z.array(identifierSchema).min(1).max(500),
       selectionBounds: boundsSchema,
-      contentHash: nonEmptyStringSchema,
+      contentHash: identifierSchema,
     }),
-    parentTutorBoardId: nonEmptyStringSchema.optional(),
-    targetStepId: nonEmptyStringSchema.optional(),
+    parentTutorBoardId: identifierSchema.optional(),
+    targetStepId: identifierSchema.optional(),
     parentContext: tutorParentContextSchema.optional(),
   })
   .superRefine(
@@ -198,7 +200,7 @@ export const tutorResponseSchema = createDataResponseSchema(
 
 export const illustrationRequestSchema = z.strictObject({
   requestId: z.uuid(),
-  boardId: nonEmptyStringSchema,
+  boardId: identifierSchema,
 });
 
 const generatedIllustrationSchema = z.strictObject({
@@ -214,7 +216,7 @@ const generatedIllustrationSchema = z.strictObject({
 });
 
 const illustrationPlacementSchema = z.strictObject({
-  stepId: nonEmptyStringSchema,
+  stepId: identifierSchema,
   stepTitle: z.string().min(1).max(120),
   altText: z.string().min(1).max(240),
   caption: z.string().min(1).max(500),
