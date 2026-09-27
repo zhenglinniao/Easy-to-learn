@@ -10,6 +10,10 @@ type SyncMessage =
 
 export class BroadcastSyncCoordinator {
   private readonly claims = new Map<string, Map<string, number>>();
+  private readonly activeLeases = new Map<
+    string,
+    { token: symbol; renewalTimer: ReturnType<typeof setInterval> }
+  >();
   private readonly channel: BroadcastChannel;
 
   constructor(
@@ -25,6 +29,8 @@ export class BroadcastSyncCoordinator {
   }
 
   async acquire(boardId: string): Promise<SyncLease | null> {
+    if (this.activeLeases.has(boardId)) return null;
+
     const expiresAt = Date.now() + this.leaseMs;
     this.remember(boardId, this.writerId, expiresAt);
     this.channel.postMessage({ type: 'claim', boardId, writerId: this.writerId, expiresAt });
@@ -35,16 +41,27 @@ export class BroadcastSyncCoordinator {
       this.forget(boardId, this.writerId);
       return null;
     }
+
+    const token = Symbol(boardId);
+    const renewalTimer = setInterval(
+      () => this.renew(boardId, token),
+      Math.max(10, Math.floor(this.leaseMs / 2)),
+    );
+    this.activeLeases.set(boardId, { token, renewalTimer });
+
     return {
       boardId,
-      release: () => {
-        this.forget(boardId, this.writerId);
-        this.channel.postMessage({ type: 'release', boardId, writerId: this.writerId });
-      },
+      release: () => this.release(boardId, token),
     };
   }
 
   close(): void {
+    for (const [boardId, lease] of this.activeLeases) {
+      clearInterval(lease.renewalTimer);
+      this.forget(boardId, this.writerId);
+      this.channel.postMessage({ type: 'release', boardId, writerId: this.writerId });
+    }
+    this.activeLeases.clear();
     this.channel.close();
   }
 
@@ -83,5 +100,26 @@ export class BroadcastSyncCoordinator {
     for (const [writerId, expiresAt] of boardClaims ?? []) {
       if (expiresAt <= Date.now()) boardClaims?.delete(writerId);
     }
+  }
+
+  private renew(boardId: string, token: symbol): void {
+    if (this.activeLeases.get(boardId)?.token !== token) return;
+    const expiresAt = Date.now() + this.leaseMs;
+    this.remember(boardId, this.writerId, expiresAt);
+    this.channel.postMessage({
+      type: 'ack',
+      boardId,
+      writerId: this.writerId,
+      expiresAt,
+    });
+  }
+
+  private release(boardId: string, token: symbol): void {
+    const activeLease = this.activeLeases.get(boardId);
+    if (activeLease?.token !== token) return;
+    clearInterval(activeLease.renewalTimer);
+    this.activeLeases.delete(boardId);
+    this.forget(boardId, this.writerId);
+    this.channel.postMessage({ type: 'release', boardId, writerId: this.writerId });
   }
 }

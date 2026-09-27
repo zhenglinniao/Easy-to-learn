@@ -33,7 +33,10 @@ describe('BroadcastSyncCoordinator', () => {
     vi.stubGlobal('BroadcastChannel', FakeBroadcastChannel);
   });
 
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
   it('单标签页可取得并释放同步租约', async () => {
     const coordinator = new BroadcastSyncCoordinator('writer-a', 'test-single', 5_000, 0);
@@ -57,6 +60,32 @@ describe('BroadcastSyncCoordinator', () => {
     expect(secondLease).toBeNull();
     firstLease?.release();
     await expect(second.acquire('board-1')).resolves.not.toBeNull();
+    first.close();
+    second.close();
+  });
+
+  it('长任务持有租约时自动续期，避免另一标签页中途取得写权限', async () => {
+    vi.useFakeTimers();
+    const first = new BroadcastSyncCoordinator('writer-a', 'test-renewal', 40, 0);
+    const second = new BroadcastSyncCoordinator('writer-b', 'test-renewal', 40, 0);
+
+    const firstLeasePromise = first.acquire('board-1');
+    await vi.advanceTimersByTimeAsync(0);
+    const firstLease = await firstLeasePromise;
+    expect(firstLease).not.toBeNull();
+
+    await vi.advanceTimersByTimeAsync(120);
+    const competingLeasePromise = second.acquire('board-1');
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(competingLeasePromise).resolves.toBeNull();
+
+    firstLease?.release();
+    const nextLeasePromise = second.acquire('board-1');
+    await vi.advanceTimersByTimeAsync(0);
+    const nextLease = await nextLeasePromise;
+    expect(nextLease).not.toBeNull();
+
+    nextLease?.release();
     first.close();
     second.close();
   });
