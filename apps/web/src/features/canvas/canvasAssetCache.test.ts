@@ -77,4 +77,35 @@ describe('CanvasAssetCache', () => {
       ),
     ).rejects.toThrow('PNG、JPEG 或 WebP');
   });
+
+  it('rejects remote or mismatched image sources before fetching them', async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal('fetch', fetcher);
+    const cache = new CanvasAssetCache();
+
+    await expect(
+      cache.prepare(
+        { putAsset: vi.fn() },
+        'board-1',
+        'owner-1',
+        [{ id: 'remote-1', dataURL: 'https://example.com/image.png', mimeType: 'image/png' }],
+        new Map(),
+      ),
+    ).rejects.toThrow('图片来源格式不安全');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized dimensions and always releases bitmap resources', async () => {
+    const close = vi.fn();
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn().mockResolvedValue({ width: 10_000, height: 10_000, close }),
+    );
+    const cache = new CanvasAssetCache();
+
+    await expect(
+      cache.prepare({ putAsset: vi.fn() }, 'board-1', 'owner-1', [file()], new Map()),
+    ).rejects.toThrow('图片尺寸不符合要求');
+    expect(close).toHaveBeenCalledOnce();
+  });
 });

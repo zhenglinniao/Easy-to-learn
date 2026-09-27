@@ -1,4 +1,9 @@
-import type { AssetManifestItem } from '@easy-to-learn/domain';
+import {
+  MAX_ASSET_BYTES,
+  MAX_IMAGE_EDGE,
+  MAX_IMAGE_PIXELS,
+  type AssetManifestItem,
+} from '@easy-to-learn/domain';
 import type { StoredAsset } from '@easy-to-learn/persistence';
 
 export interface CanvasAssetFile {
@@ -67,20 +72,39 @@ export class CanvasAssetCache {
           `暂不支持保存 ${file.mimeType || '未知格式'} 图片，请先转换为 PNG、JPEG 或 WebP。`,
         );
       }
+      if (!file.dataURL.startsWith(`data:${file.mimeType};base64,`)) {
+        throw new Error('图片来源格式不安全，已停止保存。');
+      }
       const blob = await fetch(file.dataURL).then((response) => response.blob());
       if (blob.type !== file.mimeType) throw new Error('图片内容与声明格式不一致，已停止保存。');
+      if (blob.size === 0 || blob.size > MAX_ASSET_BYTES) {
+        throw new Error('图片文件大小不符合要求，已停止保存。');
+      }
       const contentHash = await sha256(blob);
       const bitmap = await createImageBitmap(blob);
-      const manifest: AssetManifestItem = {
-        fileId: file.id,
-        objectPath: `${ownerId}/${boardId}/${contentHash}`,
-        contentHash,
-        mimeType: file.mimeType as AssetManifestItem['mimeType'],
-        byteSize: blob.size,
-        width: bitmap.width,
-        height: bitmap.height,
-      };
-      bitmap.close();
+      let manifest: AssetManifestItem;
+      try {
+        if (
+          bitmap.width <= 0 ||
+          bitmap.height <= 0 ||
+          bitmap.width > MAX_IMAGE_EDGE ||
+          bitmap.height > MAX_IMAGE_EDGE ||
+          bitmap.width * bitmap.height > MAX_IMAGE_PIXELS
+        ) {
+          throw new Error('图片尺寸不符合要求，已停止保存。');
+        }
+        manifest = {
+          fileId: file.id,
+          objectPath: `${ownerId}/${boardId}/${contentHash}`,
+          contentHash,
+          mimeType: file.mimeType as AssetManifestItem['mimeType'],
+          byteSize: blob.size,
+          width: bitmap.width,
+          height: bitmap.height,
+        };
+      } finally {
+        bitmap.close();
+      }
       const existing = existingAssets.get(file.id);
       if (
         !existing ||
