@@ -71,7 +71,11 @@ export function AiTaskActivity({ tasks, onCancel }: AiTaskActivityProps) {
                 完成后会自动放到画布
               </span>
             </p>
-            <button type="button" onClick={() => onCancel(task.id)}>
+            <button
+              type="button"
+              onClick={() => onCancel(task.id)}
+              aria-label={`取消画布上的${actionLabel(task.action)}任务`}
+            >
               取消
             </button>
             <span

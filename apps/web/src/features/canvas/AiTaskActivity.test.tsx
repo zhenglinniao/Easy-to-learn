@@ -38,7 +38,9 @@ describe('AiTaskActivity', () => {
     });
     expect(screen.getAllByText(/已等待 6 秒/)).toHaveLength(2);
 
+    fireEvent.click(screen.getByRole('button', { name: '取消画布上的解题任务' }));
     fireEvent.click(screen.getByRole('button', { name: '取消解题任务' }));
-    expect(onCancel).toHaveBeenCalledWith('task-1');
+    expect(onCancel).toHaveBeenNthCalledWith(1, 'task-1');
+    expect(onCancel).toHaveBeenNthCalledWith(2, 'task-1');
   });
 });
