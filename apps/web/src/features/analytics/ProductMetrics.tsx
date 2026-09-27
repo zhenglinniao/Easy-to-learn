@@ -43,8 +43,10 @@ export function ProductMetrics() {
 
   useEffect(() => {
     if (typeof fetch !== 'function') return undefined;
+    let active = true;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
+      if (!active) return;
       setUnavailable(true);
       controller.abort();
     }, METRICS_TIMEOUT_MS);
@@ -53,13 +55,14 @@ export function ProductMetrics() {
         if (!response.ok) throw new Error('metrics unavailable');
         const result = (await response.json()) as { data?: unknown };
         if (!isProductMetricsData(result.data)) throw new Error('invalid metrics response');
-        setMetrics(result.data);
+        if (active) setMetrics(result.data);
       })
       .catch((error: unknown) => {
-        if ((error as { name?: string }).name !== 'AbortError') setUnavailable(true);
+        if (active && (error as { name?: string }).name !== 'AbortError') setUnavailable(true);
       })
       .finally(() => window.clearTimeout(timeout));
     return () => {
+      active = false;
       window.clearTimeout(timeout);
       controller.abort();
     };
