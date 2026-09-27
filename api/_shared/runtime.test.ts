@@ -79,6 +79,13 @@ describe('runtime authentication', () => {
     },
   );
 
+  it('rejects an oversized authorization header before contacting Supabase', async () => {
+    await expect(resolveActor(request(`Bearer ${'x'.repeat(8_193)}`))).rejects.toMatchObject({
+      code: 'AUTH_REQUIRED',
+    });
+    expect(getUser).not.toHaveBeenCalled();
+  });
+
   it('rejects a token that Supabase no longer recognizes', async () => {
     getUser.mockResolvedValue({ data: { user: null }, error: new Error('expired') });
     await expect(resolveActor(request('Bearer expired-token'))).rejects.toMatchObject({

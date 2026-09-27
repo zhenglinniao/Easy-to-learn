@@ -39,6 +39,7 @@ const required = (name: string): string => {
 const bearerToken = (request: HttpRequest): string | undefined => {
   const authorization = header(request, 'authorization');
   if (!authorization) return undefined;
+  if (authorization.length > 8_192) throw new ApiFault('AUTH_REQUIRED', '登录凭据无效');
   const match = /^Bearer[\t ]+(\S+)$/i.exec(authorization);
   if (!match?.[1]) throw new ApiFault('AUTH_REQUIRED', '登录凭据无效');
   return match[1];
