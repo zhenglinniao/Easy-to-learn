@@ -370,6 +370,40 @@ describe('SenseNova image generation', () => {
     });
     expect(generator.generate).not.toHaveBeenCalled();
   });
+
+  it('原请求失败并释放预留后，等待中的重试会接管生图任务', async () => {
+    vi.useFakeTimers();
+    const state = await prepareState();
+    await state.reserveImages('user:user-1', requestId, 1, now);
+    const artifacts: IllustrationArtifactRepository = {
+      read: vi.fn().mockResolvedValue(null),
+      write: vi.fn().mockResolvedValue({ status: 'generated', asset: artifact }),
+    };
+    const image: GeneratedImage = {
+      bytes: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+      mimeType: 'image/jpeg',
+      width: 3,
+      height: 2,
+    };
+    const generator = { generate: vi.fn().mockResolvedValue(image) };
+    const service = new IllustrationService(
+      state,
+      { canAccess: vi.fn().mockResolvedValue(true) },
+      artifacts,
+      generator,
+      () => now,
+    );
+    setTimeout(() => void state.refundImages('user:user-1', requestId, now), 750);
+
+    const pending = service.execute(actor, { requestId, boardId });
+    await vi.advanceTimersByTimeAsync(1_100);
+
+    await expect(pending).resolves.toMatchObject({
+      data: { status: 'generated', asset: artifact },
+    });
+    expect(generator.generate).toHaveBeenCalledTimes(1);
+    expect(artifacts.write).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('illustration artifact cache validation', () => {

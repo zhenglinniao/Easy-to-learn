@@ -511,11 +511,12 @@ export class IllustrationService {
 
     const cached = await this.artifacts.read(actor, requestId);
     if (cached) return { data: { ...cached, placement: target.placement, quota } };
-    const reservation = await this.state.reserveImages(actorKey, requestId, 1, this.now());
+    let reservation = await this.state.reserveImages(actorKey, requestId, 1, this.now());
     if (!reservation.granted) {
       return { data: { status: 'quota_exhausted', quota: reservation.quota } };
     }
     if (reservation.duplicate) {
+      let tookOverReleasedReservation = false;
       for (let attempt = 0; attempt < DUPLICATE_IMAGE_WAIT_ATTEMPTS; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, DUPLICATE_IMAGE_POLL_INTERVAL_MS));
         const existing = await this.artifacts.read(actor, requestId);
@@ -528,10 +529,23 @@ export class IllustrationService {
             },
           };
         }
+        // The original request may have failed and refunded its atomic reservation.
+        // Re-reserving lets this waiter safely take over instead of polling for 50 seconds
+        // and returning a misleading "still generating" response.
+        reservation = await this.state.reserveImages(actorKey, requestId, 1, this.now());
+        if (!reservation.granted) {
+          return { data: { status: 'quota_exhausted', quota: reservation.quota } };
+        }
+        if (!reservation.duplicate) {
+          tookOverReleasedReservation = true;
+          break;
+        }
       }
-      throw new ApiFault('RATE_LIMITED', '这张插画正在生成，请稍后重试', {
-        retryAfterSeconds: 1,
-      });
+      if (!tookOverReleasedReservation) {
+        throw new ApiFault('RATE_LIMITED', '这张插画正在生成，请稍后重试', {
+          retryAfterSeconds: 1,
+        });
+      }
     }
     try {
       const image = await this.generator.generate(buildIllustrationPrompt(completed.result));
