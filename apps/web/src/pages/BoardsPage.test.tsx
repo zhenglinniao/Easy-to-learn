@@ -12,13 +12,16 @@ const services = vi.hoisted(() => ({
   requestDeletion: vi.fn(),
   cancelDeletion: vi.fn(),
 }));
-
-vi.mock('../features/auth', () => ({
-  useAuth: () => ({
+const auth = vi.hoisted(() => ({
+  current: {
     client: {},
     user: { id: 'user-1', email: 'learner@example.com' },
     loading: false,
-  }),
+  },
+}));
+
+vi.mock('../features/auth', () => ({
+  useAuth: () => auth.current,
 }));
 
 vi.mock('../features/boards', () => ({
@@ -48,18 +51,24 @@ const Location = () => {
   return <output>{location.pathname}</output>;
 };
 
-const renderPage = () =>
-  render(
-    <MemoryRouter initialEntries={['/boards']}>
-      <Routes>
-        <Route path="/boards" element={<BoardsPage />} />
-        <Route path="/canvas/:boardId" element={<Location />} />
-      </Routes>
-    </MemoryRouter>,
-  );
+const page = () => (
+  <MemoryRouter initialEntries={['/boards']}>
+    <Routes>
+      <Route path="/boards" element={<BoardsPage />} />
+      <Route path="/canvas/:boardId" element={<Location />} />
+    </Routes>
+  </MemoryRouter>
+);
+
+const renderPage = () => render(page());
 
 beforeEach(() => {
   vi.clearAllMocks();
+  auth.current = {
+    client: {},
+    user: { id: 'user-1', email: 'learner@example.com' },
+    loading: false,
+  };
   services.list.mockResolvedValue([]);
   services.pendingDeletion.mockResolvedValue(null);
 });
@@ -106,5 +115,32 @@ describe('BoardsPage', () => {
 
     resolveDeletion?.({ executeAfter: '2026-10-04T00:00:00.000Z' });
     await waitFor(() => expect(screen.getByRole('button', { name: '取消删除' })).toBeEnabled());
+  });
+
+  it('切换登录账户时不会继续展示上个账户的画板', async () => {
+    let resolveNext:
+      ((value: Array<{ id: string; title: string; updatedAt: string }>) => void) | undefined;
+    services.list
+      .mockResolvedValueOnce([
+        { id: 'old-board', title: '旧账户私有画板', updatedAt: '2026-09-27T00:00:00.000Z' },
+      ])
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveNext = resolve;
+        }),
+      );
+    const view = renderPage();
+    expect(await screen.findByText('旧账户私有画板')).toBeInTheDocument();
+
+    auth.current = {
+      ...auth.current,
+      user: { id: 'user-2', email: 'second@example.com' },
+    };
+    view.rerender(page());
+
+    expect(screen.queryByText('旧账户私有画板')).not.toBeInTheDocument();
+    expect(screen.getByText('正在整理你的画板…')).toBeInTheDocument();
+    resolveNext?.([]);
+    expect(await screen.findByText('第一块画板，等你落笔。')).toBeInTheDocument();
   });
 });

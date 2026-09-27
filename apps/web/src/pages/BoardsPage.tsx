@@ -13,6 +13,7 @@ export default function BoardsPage() {
   const repository = useMemo(() => (client ? new RemoteBoardRepository(client) : null), [client]);
   const account = useMemo(() => (client ? new AccountService(client) : null), [client]);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BoardSummary | null>(null);
@@ -34,10 +35,18 @@ export default function BoardsPage() {
     void repository
       .list()
       .then((items) => {
-        if (active) setBoards(items);
+        if (active) {
+          setBoards(items);
+          setLoadedUserId(user.id);
+        }
       })
       .catch((cause: unknown) => {
-        if (active) setError(toBoardMessage(cause, '暂时无法加载云端画板。'));
+        if (active) {
+          // 账户切换后即使新列表加载失败，也绝不能继续展示上个账户的画板。
+          setBoards([]);
+          setLoadedUserId(user.id);
+          setError(toBoardMessage(cause, '暂时无法加载云端画板。'));
+        }
       })
       .finally(() => {
         if (active) setInitializing(false);
@@ -56,6 +65,8 @@ export default function BoardsPage() {
   }, [account, repository, user]);
   if (loading) return <p className="route-loading">正在恢复登录状态…</p>;
   if (!user) return <Navigate to="/login?redirect=/boards" replace />;
+  const visibleBoards = loadedUserId === user.id ? boards : [];
+  const boardListInitializing = initializing || loadedUserId !== user.id;
   const create = async () => {
     if (!repository || busy) return;
     setBusy(true);
@@ -151,11 +162,11 @@ export default function BoardsPage() {
         </p>
       )}
       <section className={styles.boardGrid} aria-label="画板列表">
-        {initializing ? (
+        {boardListInitializing ? (
           <div className={styles.emptyState} role="status">
             <strong>正在整理你的画板…</strong>
           </div>
-        ) : boards.length === 0 ? (
+        ) : visibleBoards.length === 0 ? (
           <div className={styles.emptyState}>
             <strong>第一块画板，等你落笔。</strong>
             <p>创建画板，或先以游客身份试用无限画布。</p>
@@ -169,7 +180,7 @@ export default function BoardsPage() {
             </button>
           </div>
         ) : (
-          boards.map((board) => (
+          visibleBoards.map((board) => (
             <article className={styles.boardCard} key={board.id}>
               <LinkLike onClick={() => navigate(`/canvas/${board.id}`)}>
                 <span>最近更新</span>
