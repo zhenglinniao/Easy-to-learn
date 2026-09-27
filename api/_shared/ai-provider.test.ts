@@ -344,6 +344,29 @@ describe('AI Provider 执行', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('上传图片解析器挂起时仍遵守 OpenAI-compatible Provider 超时', async () => {
+    const resolveImage = vi.fn(() => new Promise<string>(() => undefined));
+    const fetchMock = vi.fn();
+    const model = createTutorModelFromEnvironment(
+      resolveImage,
+      {
+        AI_PROVIDERS: 'local',
+        AI_PROVIDER_LOCAL_TYPE: 'openai-compatible',
+        AI_PROVIDER_LOCAL_BASE_URL: 'https://api.example.com/v1',
+        AI_PROVIDER_LOCAL_MODEL: 'vision-model',
+        AI_PROVIDER_LOCAL_TIMEOUT_MS: '1000',
+      },
+      fetchMock,
+    );
+
+    const pending = model.generate({
+      ...request,
+      image: { mimeType: 'image/png', uploadPath: 'actor/board/source.png' },
+    });
+    await expect(pending).rejects.toBeInstanceOf(ProviderTimeoutError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('通过 Responses API 发送 JSON Schema、图像与关闭推理参数', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(

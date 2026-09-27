@@ -141,4 +141,17 @@ describe('GeminiTutorModel', () => {
       ProviderTimeoutError,
     );
   });
+
+  it('对象存储读取不响应取消时仍遵守 Provider 总超时', async () => {
+    const resolveImage = vi.fn(() => new Promise<string>(() => undefined));
+    const model = new GeminiTutorModel('secret', 5, 'gemini-test', resolveImage);
+
+    await expect(
+      model.generate({
+        ...request,
+        image: { mimeType: 'image/png', uploadPath: 'actor/board/source.png' },
+      }),
+    ).rejects.toBeInstanceOf(ProviderTimeoutError);
+    expect(generateContent).not.toHaveBeenCalled();
+  });
 });

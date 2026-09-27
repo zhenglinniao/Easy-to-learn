@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import { domainJsonSchemas, type TutorRequest } from '@easy-to-learn/domain';
 
 import { DEFAULT_GEMINI_MODEL } from './ai-provider-config.js';
+import { withAbortSignal } from './abort.js';
 import {
   attachTrustedMetadata,
   buildTutorPrompt,
@@ -46,10 +47,13 @@ export class GeminiTutorModel implements TutorModel {
         parts.push({
           inlineData: {
             mimeType: request.image.mimeType,
-            data: await this.resolveImage(
-              request.requestId,
-              request.image.uploadPath,
-              request.image.mimeType,
+            data: await withAbortSignal(
+              this.resolveImage(
+                request.requestId,
+                request.image.uploadPath,
+                request.image.mimeType,
+              ),
+              controller.signal,
             ),
           },
         });

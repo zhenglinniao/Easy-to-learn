@@ -1,6 +1,7 @@
 import { domainJsonSchemas, type TutorRequest } from '@easy-to-learn/domain';
 import type { Dispatcher } from 'undici';
 
+import { withAbortSignal } from './abort.js';
 import {
   attachTrustedMetadata,
   buildTutorPrompt,
@@ -117,10 +118,9 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
         let data = request.image.base64;
         if (!data && request.image.uploadPath) {
           if (!this.resolveImage) throw new ProviderUnavailableError('图片上传服务未配置');
-          data = await this.resolveImage(
-            request.requestId,
-            request.image.uploadPath,
-            request.image.mimeType,
+          data = await withAbortSignal(
+            this.resolveImage(request.requestId, request.image.uploadPath, request.image.mimeType),
+            controller.signal,
           );
         }
         if (data) {
