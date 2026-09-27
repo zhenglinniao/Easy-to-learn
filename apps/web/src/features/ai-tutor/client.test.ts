@@ -182,6 +182,24 @@ describe('TutorApiClient', () => {
     ).rejects.toThrow('仅支持 PNG 或 JPEG');
   });
 
+  it('上传任务取消后不再执行图片哈希、解码或网络请求', async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const createBitmap = vi.fn();
+    vi.stubGlobal('createImageBitmap', createBitmap);
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      new TutorApiClient(async () => 'access-token', fetcher).uploadImage(
+        'request-1',
+        new Blob(['image'], { type: 'image/png' }),
+        controller.signal,
+      ),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(createBitmap).not.toHaveBeenCalled();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it('在上传前拒绝超大图片和不安全的签名 URL', async () => {
     const fetcher = vi
       .fn<typeof fetch>()

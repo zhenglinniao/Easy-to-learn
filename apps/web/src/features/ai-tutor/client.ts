@@ -34,6 +34,11 @@ const digest = async (blob: Blob): Promise<string> => {
   return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
+const throwIfAborted = (signal?: AbortSignal): void => {
+  if (!signal?.aborted) return;
+  throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+};
+
 const waitForNetworkRetry = (signal?: AbortSignal): Promise<void> =>
   new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -161,8 +166,11 @@ export class TutorApiClient {
       throw new Error('AI 选区图片大小不符合要求');
     }
     const accessToken = await this.getAccessToken();
+    throwIfAborted(signal);
     await this.ensureActor(accessToken, signal);
+    throwIfAborted(signal);
     const contentHash = await digest(blob);
+    throwIfAborted(signal);
     const bitmap = await createImageBitmap(blob);
     let input;
     try {
@@ -186,6 +194,7 @@ export class TutorApiClient {
     } finally {
       bitmap.close();
     }
+    throwIfAborted(signal);
     const headers = new Headers({ 'Content-Type': 'application/json' });
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
     const ticketResponse = await this.fetcher('/api/ai/upload-ticket', {
