@@ -12,6 +12,7 @@ export interface TutorBoardProps {
   onChange(board: PersistedTutorBoardV2): void;
   onClose(boardId: string): void;
   onExplainStep?(boardId: string, stepId: string): void;
+  explainPending?: boolean;
   feedbackState?: 'idle' | 'sending' | 'sent' | 'error';
   onFeedback?(rating: -1 | 1, category?: AiFeedbackCategory): void;
 }
@@ -57,6 +58,7 @@ export function TutorBoard({
   onChange,
   onClose,
   onExplainStep,
+  explainPending = false,
   feedbackState = 'idle',
   onFeedback,
 }: TutorBoardProps) {
@@ -228,8 +230,13 @@ export function TutorBoard({
             上一步
           </button>
           {onExplainStep && board.result.mode !== 'explain_step' && (
-            <button type="button" onClick={() => onExplainStep(board.id, step.id)}>
-              解释这一步
+            <button
+              type="button"
+              disabled={explainPending}
+              aria-busy={explainPending}
+              onClick={() => onExplainStep(board.id, step.id)}
+            >
+              {explainPending ? '正在深入解释…' : '解释这一步'}
             </button>
           )}
           <button

@@ -1043,7 +1043,8 @@ export default function CanvasPage() {
       return;
     }
     const requestId = crypto.randomUUID();
-    const controller = aiTaskRegistry.current.start(requestId, 'explain_step');
+    const sourceKey = `explain-step:${parentId}:${targetStepId}`;
+    const controller = aiTaskRegistry.current.start(requestId, 'explain_step', { sourceKey });
     if (!controller) {
       setPreparationError(
         `同一时间最多处理 ${MAX_CONCURRENT_CANVAS_AI_TASKS} 个 AI 任务，请等待任一任务完成。`,
@@ -1313,6 +1314,11 @@ export default function CanvasPage() {
                   commitTutorBoards((current) => current.filter((item) => item.id !== id))
                 }
                 onExplainStep={(id, stepId) => void explainStep(id, stepId)}
+                explainPending={activeAiTasks.some(
+                  (task) =>
+                    task.sourceKey ===
+                    `explain-step:${board.id}:${board.result.steps[board.stepIndex]?.id ?? ''}`,
+                )}
                 feedbackState={feedbackStates[board.id] ?? 'idle'}
                 {...(canSubmitFeedback(board)
                   ? {

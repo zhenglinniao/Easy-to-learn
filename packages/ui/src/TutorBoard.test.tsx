@@ -175,6 +175,26 @@ describe('TutorBoard', () => {
     expect(screen.queryByRole('button', { name: '解释这一步' })).not.toBeInTheDocument();
   });
 
+  it('深入解释进行中禁用按钮并提供明确反馈', async () => {
+    const user = userEvent.setup();
+    const onExplainStep = vi.fn();
+    render(
+      <TutorBoard
+        board={board}
+        onChange={vi.fn()}
+        onClose={vi.fn()}
+        onExplainStep={onExplainStep}
+        explainPending
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: '正在深入解释…' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    await user.click(button);
+    expect(onExplainStep).not.toHaveBeenCalled();
+  });
+
   it('只在关联步骤中嵌入带讲解的教学插画', () => {
     const illustrated = {
       ...board,
