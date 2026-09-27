@@ -20,7 +20,7 @@ afterEach(() => {
 
 describe('requireAllowedOrigin', () => {
   it('接受白名单中的 Origin', () => {
-    process.env.APP_ORIGINS = 'https://easy.example.com';
+    process.env.APP_ORIGINS = 'https://easy.example.com/';
     expect(() =>
       requireAllowedOrigin(request('PATCH', { origin: 'https://easy.example.com' })),
     ).not.toThrow();
@@ -47,6 +47,18 @@ describe('requireAllowedOrigin', () => {
     ).toThrow('请求来源不被允许');
     expect(() =>
       requireAllowedOrigin(request('PATCH', { 'sec-fetch-site': 'same-origin' })),
+    ).toThrow('请求来源不被允许');
+  });
+
+  it('配置缺失或包含路径等非法值时保持关闭', () => {
+    expect(() => requireAllowedOrigin(request('GET', { 'sec-fetch-site': 'same-origin' }))).toThrow(
+      '请求来源不被允许',
+    );
+
+    process.env.APP_ORIGINS =
+      'javascript:alert(1),https://user:pass@easy.example.com,https://easy.example.com/admin';
+    expect(() =>
+      requireAllowedOrigin(request('PATCH', { origin: 'https://easy.example.com' })),
     ).toThrow('请求来源不被允许');
   });
 });

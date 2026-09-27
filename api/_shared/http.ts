@@ -35,12 +35,30 @@ export const cookieValue = (request: HttpRequest, name: string): string | undefi
     ?.slice(1)
     .join('=');
 
-export const requireAllowedOrigin = (request: HttpRequest): void => {
-  const origin = header(request, 'origin');
-  const allowed = (process.env.APP_ORIGINS ?? '')
+const configuredOrigins = (): string[] =>
+  (process.env.APP_ORIGINS ?? '')
     .split(',')
     .map((value) => value.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .flatMap((value) => {
+      try {
+        const url = new URL(value);
+        const isHttp = url.protocol === 'https:' || url.protocol === 'http:';
+        const isOriginOnly =
+          url.username === '' &&
+          url.password === '' &&
+          url.pathname === '/' &&
+          url.search === '' &&
+          url.hash === '';
+        return isHttp && isOriginOnly ? [url.origin] : [];
+      } catch {
+        return [];
+      }
+    });
+
+export const requireAllowedOrigin = (request: HttpRequest): void => {
+  const origin = header(request, 'origin');
+  const allowed = configuredOrigins();
   if (origin && allowed.includes(origin)) return;
 
   // 浏览器不会保证为同源 GET/HEAD 附带 Origin。此时使用 Referer 的 origin
@@ -56,7 +74,8 @@ export const requireAllowedOrigin = (request: HttpRequest): void => {
         // 非法 Referer 继续按拒绝处理。
       }
     }
-    if (!origin && header(request, 'sec-fetch-site') === 'same-origin') return;
+    if (allowed.length > 0 && !origin && header(request, 'sec-fetch-site') === 'same-origin')
+      return;
   }
 
   throw new ApiFault('FORBIDDEN', '请求来源不被允许');
