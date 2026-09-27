@@ -7,6 +7,8 @@ export default defineConfig({
   envDir: '../..',
   plugins: [react()],
   build: {
+    // Bundle budgets walk this graph so route-level checks include every eagerly imported chunk.
+    manifest: true,
     // 在 Sentry 私有上传流程完成前禁止生成生产 source map，避免部署时公开源码映射。
     sourcemap: false,
   },
