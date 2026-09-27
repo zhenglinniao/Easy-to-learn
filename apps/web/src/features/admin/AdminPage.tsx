@@ -64,6 +64,7 @@ export default function AdminPage() {
     [session?.access_token],
   );
   const [overview, setOverview] = useState<AdminOverview | null>(null);
+  const [overviewUserId, setOverviewUserId] = useState<string | null>(null);
   const [access, setAccess] = useState<{ isAdmin: boolean; userId: string } | null>(null);
   const [models, setModels] = useState<AdminProviderView[]>([]);
   const [savedModelsSnapshot, setSavedModelsSnapshot] = useState('');
@@ -83,6 +84,7 @@ export default function AdminPage() {
         setAccess(permission);
         if (!permission.isAdmin) {
           setOverview(null);
+          setOverviewUserId(null);
           setModels([]);
           setSavedModelsSnapshot('');
           setError(null);
@@ -91,6 +93,7 @@ export default function AdminPage() {
         const data = await client.overview(page, query, signal);
         if (signal?.aborted) return;
         setOverview(data);
+        setOverviewUserId(permission.userId);
         setModels(data.models);
         setSavedModelsSnapshot(JSON.stringify(data.models));
         setError(null);
@@ -116,7 +119,11 @@ export default function AdminPage() {
   if (loading) return <p className="route-loading">正在验证管理员身份…</p>;
   if (!user) return <Navigate to="/login?redirect=/admin" replace />;
 
-  if (!access && !error) {
+  const currentAccess = access?.userId === user.id ? access : null;
+  const currentOverview = overviewUserId === user.id ? overview : null;
+  const currentModels = overviewUserId === user.id ? models : [];
+
+  if (!currentAccess && !error) {
     return (
       <main className={styles.page}>
         <SiteHeader />
@@ -125,7 +132,7 @@ export default function AdminPage() {
     );
   }
 
-  if (access && !access.isAdmin) {
+  if (currentAccess && !currentAccess.isAdmin) {
     return (
       <main className={styles.page}>
         <SiteHeader />
@@ -141,7 +148,7 @@ export default function AdminPage() {
             <div>
               <dt>应填入 ADMIN_USER_IDS 的 UID</dt>
               <dd>
-                <code>{access.userId}</code>
+                <code>{currentAccess.userId}</code>
               </dd>
             </div>
           </dl>
@@ -262,14 +269,14 @@ export default function AdminPage() {
     }
   };
 
-  const activeModels = models.filter(({ enabled }) => enabled).length;
-  const enabledProviders = models.filter(({ enabled }) => enabled);
+  const activeModels = currentModels.filter(({ enabled }) => enabled).length;
+  const enabledProviders = currentModels.filter(({ enabled }) => enabled);
   const activeTimeoutTotal = enabledProviders.reduce(
     (total, provider) => total + provider.timeoutMs,
     0,
   );
   const timeoutExcess = activeTimeoutTotal - MAX_PROVIDER_TIMEOUT_BUDGET_MS;
-  const missingKeyProvider = models.find(
+  const missingKeyProvider = currentModels.find(
     (provider) =>
       (provider.enabled || provider.imageModel) && !provider.hasApiKey && !provider.apiKey?.trim(),
   );
@@ -286,7 +293,8 @@ export default function AdminPage() {
         : missingKeyProvider
           ? `${missingKeyProvider.label} 启用前必须配置 API Key。`
           : null;
-  const hasUnsavedModels = Boolean(overview) && JSON.stringify(models) !== savedModelsSnapshot;
+  const hasUnsavedModels =
+    Boolean(currentOverview) && JSON.stringify(currentModels) !== savedModelsSnapshot;
   return (
     <main className={styles.page}>
       <SiteHeader />
@@ -313,15 +321,15 @@ export default function AdminPage() {
       <dl className={styles.stats} aria-label="管理概览">
         <div>
           <dt>注册账户</dt>
-          <dd>{overview?.pagination.total ?? '—'}</dd>
+          <dd>{currentOverview?.pagination.total ?? '—'}</dd>
         </div>
         <div>
           <dt>本页暂停</dt>
-          <dd>{overview?.pageSuspended ?? '—'}</dd>
+          <dd>{currentOverview?.pageSuspended ?? '—'}</dd>
         </div>
         <div>
           <dt>启用模型</dt>
-          <dd>{overview ? `${activeModels}/${models.length}` : '—'}</dd>
+          <dd>{currentOverview ? `${activeModels}/${currentModels.length}` : '—'}</dd>
         </div>
       </dl>
 
@@ -349,7 +357,10 @@ export default function AdminPage() {
             <button
               type="button"
               disabled={
-                busy === 'models' || !overview || !hasUnsavedModels || Boolean(modelPolicyIssue)
+                busy === 'models' ||
+                !currentOverview ||
+                !hasUnsavedModels ||
+                Boolean(modelPolicyIssue)
               }
               onClick={() => void saveModels()}
             >
@@ -379,7 +390,7 @@ export default function AdminPage() {
           </span>
         </div>
         <fieldset className={styles.modelList} disabled={busy === 'models'}>
-          {models.map((provider, index) => (
+          {currentModels.map((provider, index) => (
             <article className={styles.modelCard} key={provider.id}>
               <div className={styles.modelOrder}>
                 <strong>{index + 1}</strong>
@@ -395,7 +406,7 @@ export default function AdminPage() {
                   <button
                     aria-label={`下移 ${provider.id}`}
                     type="button"
-                    disabled={index === models.length - 1}
+                    disabled={index === currentModels.length - 1}
                     onClick={() => moveModel(index, 1)}
                   >
                     ↓
@@ -581,7 +592,7 @@ export default function AdminPage() {
                 <button
                   type="button"
                   className={styles.removeButton}
-                  disabled={models.length === 1}
+                  disabled={currentModels.length === 1}
                   onClick={() => setModels((items) => items.filter(({ id }) => id !== provider.id))}
                 >
                   移除
@@ -589,10 +600,10 @@ export default function AdminPage() {
               </div>
             </article>
           ))}
-          {!overview && !error && <p className={styles.loading}>正在读取模型策略…</p>}
+          {!currentOverview && !error && <p className={styles.loading}>正在读取模型策略…</p>}
         </fieldset>
-        {overview?.policyUpdatedAt && (
-          <small>上次更新：{dateLabel(overview.policyUpdatedAt)}</small>
+        {currentOverview?.policyUpdatedAt && (
+          <small>上次更新：{dateLabel(currentOverview.policyUpdatedAt)}</small>
         )}
         <aside className={styles.imageModelNote}>
           <strong>调用关系</strong>
@@ -629,8 +640,8 @@ export default function AdminPage() {
         </div>
         {query && (
           <p className={styles.searchHint}>
-            找到 {overview?.pagination.matchingTotal ?? 0} 个匹配账户
-            {overview?.pagination.searchTruncated ? '（仅扫描前 1000 个账户）' : ''}
+            找到 {currentOverview?.pagination.matchingTotal ?? 0} 个匹配账户
+            {currentOverview?.pagination.searchTruncated ? '（仅扫描前 1000 个账户）' : ''}
             ；邮箱会脱敏展示。
           </p>
         )}
@@ -642,7 +653,7 @@ export default function AdminPage() {
             <span>最近登录</span>
             <span>操作</span>
           </div>
-          {overview?.accounts.map((account) => (
+          {currentOverview?.accounts.map((account) => (
             <div className={styles.accountRow} role="row" key={account.id}>
               <div>
                 <strong>{account.email}</strong>
@@ -663,7 +674,7 @@ export default function AdminPage() {
               </button>
             </div>
           ))}
-          {overview?.accounts.length === 0 && (
+          {currentOverview?.accounts.length === 0 && (
             <p className={styles.loading}>没有符合条件的账户。</p>
           )}
         </div>
@@ -679,7 +690,8 @@ export default function AdminPage() {
           <button
             type="button"
             disabled={
-              !overview || page * overview.pagination.perPage >= overview.pagination.matchingTotal
+              !currentOverview ||
+              page * currentOverview.pagination.perPage >= currentOverview.pagination.matchingTotal
             }
             onClick={() => setPage((value) => value + 1)}
           >

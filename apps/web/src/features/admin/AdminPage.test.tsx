@@ -4,14 +4,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import AdminPage from './AdminPage';
 
-vi.mock('../auth', () => ({
-  useAuth: () => ({
+const authState = vi.hoisted(() => ({
+  current: {
     loading: false,
     initializationError: null,
     user: { id: 'admin-user', email: 'admin@example.com' },
     session: { access_token: 'admin-token', user: { id: 'admin-user' } },
     signOut: vi.fn(),
-  }),
+  },
+}));
+
+vi.mock('../auth', () => ({
+  useAuth: () => authState.current,
 }));
 
 vi.mock('../theme', () => ({ ThemeToggle: () => <button type="button">主题</button> }));
@@ -53,10 +57,29 @@ const overview = {
   pageSuspended: 0,
 };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  authState.current = {
+    loading: false,
+    initializationError: null,
+    user: { id: 'admin-user', email: 'admin@example.com' },
+    session: { access_token: 'admin-token', user: { id: 'admin-user' } },
+    signOut: vi.fn(),
+  };
+});
 
 describe('AdminPage', () => {
   it('管理员 UID 未匹配时显示当前账户 UID 和配置指引', async () => {
+    authState.current = {
+      loading: false,
+      initializationError: null,
+      user: { id: 'user-uid-to-configure', email: 'admin@example.com' },
+      session: {
+        access_token: 'admin-token',
+        user: { id: 'user-uid-to-configure' },
+      },
+      signOut: vi.fn(),
+    };
     vi.stubGlobal(
       'fetch',
       vi.fn<typeof fetch>().mockImplementation(
@@ -330,5 +353,64 @@ describe('AdminPage', () => {
       }),
     );
     await waitFor(() => expect(label).toBeEnabled());
+  });
+
+  it('账户切换时立即隐藏上一位管理员的模型与账户数据', async () => {
+    let resolveSecondAccess: ((response: Response) => void) | undefined;
+    const secondAccess = new Promise<Response>((resolve) => {
+      resolveSecondAccess = resolve;
+    });
+    const fetcher = vi.fn<typeof fetch>().mockImplementation((input) => {
+      const url = String(input);
+      if (url === '/api/admin/access' && authState.current.user.id === 'second-user') {
+        return secondAccess;
+      }
+      if (url === '/api/admin/access') {
+        return Promise.resolve(
+          new Response(JSON.stringify({ data: { isAdmin: true, userId: 'admin-user' } }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ data: overview }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    });
+    vi.stubGlobal('fetch', fetcher);
+
+    const view = render(
+      <MemoryRouter>
+        <AdminPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('le****@example.com')).toBeInTheDocument();
+
+    authState.current = {
+      loading: false,
+      initializationError: null,
+      user: { id: 'second-user', email: 'second@example.com' },
+      session: { access_token: 'second-token', user: { id: 'second-user' } },
+      signOut: vi.fn(),
+    };
+    view.rerender(
+      <MemoryRouter>
+        <AdminPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText('le****@example.com')).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Model ID' })).not.toBeInTheDocument();
+    expect(screen.getByText('正在核对管理员白名单…')).toBeInTheDocument();
+
+    resolveSecondAccess?.(
+      new Response(JSON.stringify({ data: { isAdmin: false, userId: 'second-user' } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
   });
 });
