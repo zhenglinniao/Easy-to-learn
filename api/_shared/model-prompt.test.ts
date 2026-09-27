@@ -56,8 +56,8 @@ describe('Tutor Skill prompt registry', () => {
 
   it('只为 explain_step 注入已经验证的父步骤上下文', () => {
     const prompt = buildTutorPrompt(request('explain_step'));
-    expect(prompt).toContain('父辅导板：parent-1');
-    expect(prompt).toContain('目标步骤：step-1');
+    expect(prompt).not.toContain('parent-1');
+    expect(prompt).not.toContain('targetStepId');
     expect(prompt).toContain('目标步骤已验证内容');
     expect(prompt).toContain('先把常数项移到右边');
     expect(buildTutorPrompt(request('solve'))).not.toContain('父辅导板');
