@@ -6,6 +6,9 @@ import {
   illustrationResponseSchema,
   quotaResponseSchema,
   tutorResponseSchema,
+  MAX_ASSET_BYTES,
+  MAX_IMAGE_EDGE,
+  MAX_IMAGE_PIXELS,
   type AiFeedbackInput,
   type ApiErrorCode,
   type IllustrationRequest,
@@ -16,10 +19,24 @@ import {
 } from '@easy-to-learn/domain';
 import { z } from 'zod';
 
+const isSafeUploadUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'https:') return true;
+    return (
+      import.meta.env.DEV &&
+      url.protocol === 'http:' &&
+      (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]')
+    );
+  } catch {
+    return false;
+  }
+};
+
 const uploadTicketResponseSchema = z.strictObject({
   data: z.strictObject({
-    uploadUrl: z.string().url(),
-    uploadPath: z.string().min(1),
+    uploadUrl: z.string().url().refine(isSafeUploadUrl),
+    uploadPath: z.string().min(1).max(1_024),
     expiresAt: z.string().datetime(),
   }),
 });
@@ -135,18 +152,35 @@ export class TutorApiClient {
     if (blob.type !== 'image/png' && blob.type !== 'image/jpeg') {
       throw new Error('AI 选区图片仅支持 PNG 或 JPEG');
     }
+    if (blob.size === 0 || blob.size > MAX_ASSET_BYTES) {
+      throw new Error('AI 选区图片大小不符合要求');
+    }
     const accessToken = await this.getAccessToken();
     await this.ensureActor(accessToken, signal);
+    const contentHash = await digest(blob);
     const bitmap = await createImageBitmap(blob);
-    const input = {
-      requestId,
-      contentHash: await digest(blob),
-      mimeType: blob.type,
-      byteSize: blob.size,
-      width: bitmap.width,
-      height: bitmap.height,
-    };
-    bitmap.close();
+    let input;
+    try {
+      if (
+        bitmap.width <= 0 ||
+        bitmap.height <= 0 ||
+        bitmap.width > MAX_IMAGE_EDGE ||
+        bitmap.height > MAX_IMAGE_EDGE ||
+        bitmap.width * bitmap.height > MAX_IMAGE_PIXELS
+      ) {
+        throw new Error('AI 选区图片尺寸不符合要求');
+      }
+      input = {
+        requestId,
+        contentHash,
+        mimeType: blob.type,
+        byteSize: blob.size,
+        width: bitmap.width,
+        height: bitmap.height,
+      };
+    } finally {
+      bitmap.close();
+    }
     const headers = new Headers({ 'Content-Type': 'application/json' });
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
     const ticketResponse = await this.fetcher('/api/ai/upload-ticket', {

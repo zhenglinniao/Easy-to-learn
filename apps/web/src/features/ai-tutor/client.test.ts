@@ -179,6 +179,38 @@ describe('TutorApiClient', () => {
     ).rejects.toThrow('仅支持 PNG 或 JPEG');
   });
 
+  it('在上传前拒绝超大图片和不安全的签名 URL', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(
+        Response.json({
+          data: {
+            uploadUrl: 'http://storage.example.test/upload',
+            uploadPath: 'actor/request/hash',
+            expiresAt: '2026-09-22T12:10:00.000Z',
+          },
+        }),
+      );
+    const close = vi.fn();
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn().mockResolvedValue({ width: 800, height: 600, close }),
+    );
+    const client = new TutorApiClient(async () => null, fetcher);
+    const oversized = new Blob(['x'], { type: 'image/png' });
+    Object.defineProperty(oversized, 'size', { value: 10 * 1024 * 1024 + 1 });
+
+    await expect(client.uploadImage('request-1', oversized)).rejects.toThrow('图片大小不符合要求');
+    expect(fetcher).not.toHaveBeenCalled();
+
+    await expect(
+      client.uploadImage('request-2', new Blob(['valid-size'], { type: 'image/png' })),
+    ).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
   it('登录用户携带 Bearer 并校验 Tutor DSL 响应', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       Response.json({
