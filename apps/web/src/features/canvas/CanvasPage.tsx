@@ -1,5 +1,4 @@
 import { Excalidraw } from '@excalidraw/excalidraw';
-import 'katex/dist/katex.min.css';
 import type {
   AppState,
   ExcalidrawImperativeAPI,
