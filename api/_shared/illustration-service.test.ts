@@ -340,6 +340,36 @@ describe('SenseNova image generation', () => {
       result: { title: '汉堡的结构' },
     });
   });
+
+  it('同一插画的网络重试会等待超过旧的五秒窗口且不会重复生图', async () => {
+    vi.useFakeTimers();
+    const state = await prepareState();
+    await state.reserveImages('user:user-1', requestId, 1, now);
+    const reads = Array.from({ length: 22 }, () => null);
+    const read = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    for (const value of reads) read.mockResolvedValueOnce(value);
+    read.mockResolvedValue({ status: 'generated', asset: artifact });
+    const artifacts: IllustrationArtifactRepository = {
+      read,
+      write: vi.fn(),
+    };
+    const generator = { generate: vi.fn() };
+    const service = new IllustrationService(
+      state,
+      { canAccess: vi.fn().mockResolvedValue(true) },
+      artifacts,
+      generator,
+      () => now,
+    );
+
+    const pending = service.execute(actor, { requestId, boardId });
+    await vi.advanceTimersByTimeAsync(6_500);
+
+    await expect(pending).resolves.toMatchObject({
+      data: { status: 'generated', asset: artifact },
+    });
+    expect(generator.generate).not.toHaveBeenCalled();
+  });
 });
 
 describe('illustration artifact cache validation', () => {

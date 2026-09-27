@@ -27,6 +27,8 @@ const MAX_IMAGE_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
 const MAX_IMAGE_PROVIDER_ATTEMPTS = 3;
 const IMAGE_RETRY_DELAYS_MS = [300, 900] as const;
+const DUPLICATE_IMAGE_POLL_INTERVAL_MS = 250;
+const DUPLICATE_IMAGE_WAIT_ATTEMPTS = 200;
 
 export interface SenseNovaImageConfig {
   baseUrl: string;
@@ -507,8 +509,8 @@ export class IllustrationService {
       return { data: { status: 'quota_exhausted', quota: reservation.quota } };
     }
     if (reservation.duplicate) {
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 250));
+      for (let attempt = 0; attempt < DUPLICATE_IMAGE_WAIT_ATTEMPTS; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, DUPLICATE_IMAGE_POLL_INTERVAL_MS));
         const existing = await this.artifacts.read(actor, requestId);
         if (existing) {
           return {
