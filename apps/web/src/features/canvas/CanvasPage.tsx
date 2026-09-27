@@ -267,7 +267,13 @@ export default function CanvasPage() {
   useEffect(() => {
     const registry = aiTaskRegistry.current;
     registry.cancelAll();
-    const timer = window.setTimeout(() => setActiveAiTasks([]), 0);
+    const timer = window.setTimeout(() => {
+      setActiveAiTasks([]);
+      setConflictBusy(false);
+      setConflictError(null);
+      setPreparationError(null);
+      setPrepared(null);
+    }, 0);
     return () => {
       window.clearTimeout(timer);
       registry.cancelAll();
@@ -812,11 +818,15 @@ export default function CanvasPage() {
 
   const openRemoteVersion = async () => {
     if (!client || !repositoryRef.current || !api) return;
+    const taskBoardId = boardId;
+    const repository = repositoryRef.current;
+    const canvasApi = api;
     setConflictBusy(true);
     setConflictError(null);
     try {
       const remote = new RemoteBoardRepository(client);
-      const snapshot = await remote.read(boardId);
+      const snapshot = await remote.read(taskBoardId);
+      if (activeBoardId.current !== taskBoardId) return;
       const downloads = await mapWithConcurrency(
         snapshot.assets,
         ASSET_IO_CONCURRENCY,
@@ -825,13 +835,16 @@ export default function CanvasPage() {
           blob: await remote.downloadAsset(manifest.objectPath),
         }),
       );
-      await repositoryRef.current.resolveConflictWithRemote(snapshot, downloads);
-      const assets = await repositoryRef.current.getAssets(boardId);
+      if (activeBoardId.current !== taskBoardId) return;
+      await repository.resolveConflictWithRemote(snapshot, downloads);
+      if (activeBoardId.current !== taskBoardId) return;
+      const assets = await repository.getAssets(taskBoardId);
+      if (activeBoardId.current !== taskBoardId) return;
       hydratedBoard.current = null;
       const handwriting = migrateElementsToHandwriting(
         snapshot.excalidraw.elements as unknown as CanvasElements,
       );
-      api.updateScene({
+      canvasApi.updateScene({
         elements: handwriting.elements as never,
         appState: {
           ...snapshot.excalidraw.appState,
@@ -839,7 +852,7 @@ export default function CanvasPage() {
         } as never,
       });
       if (handwriting.changed) {
-        await repositoryRef.current.saveDurableChange({
+        await repository.saveDurableChange({
           ...snapshot,
           excalidraw: {
             ...snapshot.excalidraw,
@@ -847,50 +860,59 @@ export default function CanvasPage() {
           },
           updatedAt: new Date().toISOString(),
         });
+        if (activeBoardId.current !== taskBoardId) return;
       }
-      api.addFiles(
-        (await mapWithConcurrency(assets, ASSET_IO_CONCURRENCY, async (asset) => ({
-          id: asset.fileId,
-          dataURL: await blobToDataUrl(asset.blob),
-          mimeType: asset.mimeType,
-          created: Date.now(),
-          lastRetrieved: Date.now(),
-        }))) as never,
-      );
+      const files = await mapWithConcurrency(assets, ASSET_IO_CONCURRENCY, async (asset) => ({
+        id: asset.fileId,
+        dataURL: await blobToDataUrl(asset.blob),
+        mimeType: asset.mimeType,
+        created: Date.now(),
+        lastRetrieved: Date.now(),
+      }));
+      if (activeBoardId.current !== taskBoardId) return;
+      canvasApi.addFiles(files as never);
       setTutorBoards(snapshot.tutorBoards);
-      hydratedBoard.current = boardId;
+      hydratedBoard.current = taskBoardId;
       setSyncState(handwriting.changed ? 'dirty' : 'synced');
     } catch (error) {
-      setConflictError(error instanceof Error ? error.message : '暂时无法打开云端版本。');
+      if (activeBoardId.current === taskBoardId) {
+        setConflictError(error instanceof Error ? error.message : '暂时无法打开云端版本。');
+      }
     } finally {
-      setConflictBusy(false);
+      if (activeBoardId.current === taskBoardId) setConflictBusy(false);
     }
   };
 
   const saveConflictAsNewBoard = async () => {
     if (!client || !repositoryRef.current || !user) return;
+    const taskBoardId = boardId;
+    const repository = repositoryRef.current;
     setConflictBusy(true);
     setConflictError(null);
     try {
       const remote = new RemoteBoardRepository(client);
-      let targetBoardId = await repositoryRef.current.getPreparedConflictTarget(boardId);
+      let targetBoardId = await repository.getPreparedConflictTarget(taskBoardId);
       if (!targetBoardId) {
         const created = await remote.create('冲突副本');
         targetBoardId = created.boardId;
-        await repositoryRef.current.prepareConflictCopyAsNewBoard(boardId, targetBoardId, user.id);
+        await repository.prepareConflictCopyAsNewBoard(taskBoardId, targetBoardId, user.id);
       }
       const result = await new BoardSyncEngine(
-        repositoryRef.current,
+        repository,
         new SupabaseBoardGateway(client, crypto.randomUUID()),
       ).syncBoard(targetBoardId);
       if (result.state !== 'synced' && result.state !== 'clean') {
         throw new Error('新画板暂时无法同步，本地副本仍然保留。');
       }
-      await repositoryRef.current.clearCloudBoardCacheAfterConflict(boardId);
-      navigate(`/canvas/${targetBoardId}`, { replace: true });
+      await repository.clearCloudBoardCacheAfterConflict(taskBoardId);
+      if (activeBoardId.current === taskBoardId) {
+        navigate(`/canvas/${targetBoardId}`, { replace: true });
+      }
     } catch (error) {
-      setConflictError(error instanceof Error ? error.message : '无法另存为新画板。');
-      setConflictBusy(false);
+      if (activeBoardId.current === taskBoardId) {
+        setConflictError(error instanceof Error ? error.message : '无法另存为新画板。');
+        setConflictBusy(false);
+      }
     }
   };
 
