@@ -1,11 +1,19 @@
 const ALLOWED_ROUTES = new Set(['/', '/boards', '/canvas', '/admin', '/reset-password']);
-const CANVAS_ROUTE = /^\/canvas\/(?:local_[A-Za-z0-9-]+|[0-9a-f]{8}-[0-9a-f-]{27,})$/i;
+const CANVAS_ROUTE =
+  /^\/canvas\/(?:local_[A-Za-z0-9-]{1,200}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+const MAX_REDIRECT_LENGTH = 2_048;
 
 export const parseSafeRedirect = (
   value: string | null | undefined,
   fallback = '/boards',
 ): string => {
-  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\'))
+  if (
+    !value ||
+    value.length > MAX_REDIRECT_LENGTH ||
+    !value.startsWith('/') ||
+    value.startsWith('//') ||
+    value.includes('\\')
+  )
     return fallback;
   try {
     const url = new URL(value, 'https://easy-to-learn.invalid');
