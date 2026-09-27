@@ -596,7 +596,9 @@ export default function AdminPage() {
         )}
         <aside className={styles.imageModelNote}>
           <strong>调用关系</strong>
-          <span>教学模型按卡片顺序回退；生图模型独立执行，不占用文字模型的回退位置。</span>
+          <span>
+            教学模型按已启用卡片的顺序回退；生图模型独立执行，即使关闭该卡片的文字调用也仍可生图。
+          </span>
         </aside>
       </section>
 

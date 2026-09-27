@@ -131,7 +131,7 @@ describe('runtime image provider selection', () => {
     apiKey: 'configured-secret',
   });
 
-  it('never routes image generation through a disabled provider', () => {
+  it('keeps the image route independent from the text fallback enabled flag', () => {
     const disabled = provider('disabled', false);
     const enabled = provider('enabled', true);
 
@@ -141,9 +141,9 @@ describe('runtime image provider selection', () => {
         updatedAt: null,
         updatedBy: null,
       }),
-    ).toEqual(enabled);
+    ).toEqual(disabled);
     expect(
       selectImageProvider({ providers: [disabled], updatedAt: null, updatedBy: null }),
-    ).toBeUndefined();
+    ).toEqual(disabled);
   });
 });

@@ -191,7 +191,9 @@ export const selectImageProvider = (
 ): Extract<StoredAdminProvider, { type: 'openai-compatible' }> | undefined =>
   policy.providers.find(
     (item): item is Extract<StoredAdminProvider, { type: 'openai-compatible' }> =>
-      item.enabled && item.type === 'openai-compatible' && Boolean(item.imageModel && item.apiKey),
+      // 文字回退开关不控制独立生图链路；管理员可以只启用 DeepSeek 文字，
+      // 同时保留关闭文字调用的 SenseNova Provider 专门生成步骤插画。
+      item.type === 'openai-compatible' && Boolean(item.imageModel && item.apiKey),
   );
 
 export const createIllustrationService = async (
