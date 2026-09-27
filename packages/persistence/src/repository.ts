@@ -609,16 +609,23 @@ export class LocalBoardRepository {
       const assets = transaction.objectStore('assets');
       for (const asset of downloadedAssets) await assets.put(asset);
       const referenced = new Set(snapshot.assets.map(({ fileId }) => fileId));
-      const assetKeys = await assets.index('by-board').getAllKeys(snapshot.boardId);
-      for (const key of assetKeys) {
-        if (!referenced.has(key[1])) await assets.delete(key);
+      let assetCursor = await assets.index('by-board').openCursor(snapshot.boardId);
+      while (assetCursor) {
+        if (!referenced.has(assetCursor.value.fileId)) await assetCursor.delete();
+        assetCursor = await assetCursor.continue();
       }
       const outbox = transaction.objectStore('outbox');
-      const outboxKeys = await outbox.index('by-board').getAllKeys(snapshot.boardId);
-      for (const key of outboxKeys) await outbox.delete(key);
+      let outboxCursor = await outbox.index('by-board').openCursor(snapshot.boardId);
+      while (outboxCursor) {
+        await outboxCursor.delete();
+        outboxCursor = await outboxCursor.continue();
+      }
       const conflicts = transaction.objectStore('conflictCopies');
-      const conflictKeys = await conflicts.index('by-board').getAllKeys(snapshot.boardId);
-      for (const key of conflictKeys) await conflicts.delete(key);
+      let conflictCursor = await conflicts.index('by-board').openCursor(snapshot.boardId);
+      while (conflictCursor) {
+        await conflictCursor.delete();
+        conflictCursor = await conflictCursor.continue();
+      }
       await transaction.objectStore('preferences').delete(`conflict-target:${snapshot.boardId}`);
       const board: StoredBoard = {
         boardId: snapshot.boardId,
