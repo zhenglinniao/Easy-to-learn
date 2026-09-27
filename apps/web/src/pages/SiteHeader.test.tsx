@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -68,5 +68,25 @@ describe('SiteHeader 管理员模式切换', () => {
 
     expect(await screen.findByRole('link', { name: '我的画板' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '切换到管理员配置' })).not.toBeInTheDocument();
+  });
+
+  it('卸载导航栏时取消尚未完成的管理员权限探测', async () => {
+    let signal: AbortSignal | undefined;
+    fetchMock.mockImplementationOnce((_url, init?: RequestInit) => {
+      signal = init?.signal ?? undefined;
+      return new Promise<Response>(() => undefined);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const view = render(
+      <AuthContext.Provider value={authValue()}>
+        <MemoryRouter initialEntries={['/boards']}>
+          <SiteHeader />
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
+
+    await waitFor(() => expect(signal?.aborted).toBe(false));
+    view.unmount();
+    expect(signal?.aborted).toBe(true);
   });
 });

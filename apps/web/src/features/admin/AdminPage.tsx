@@ -79,6 +79,7 @@ export default function AdminPage() {
     async (signal?: AbortSignal) => {
       try {
         const permission = await client.access(signal);
+        if (signal?.aborted) return;
         setAccess(permission);
         if (!permission.isAdmin) {
           setOverview(null);
@@ -88,12 +89,14 @@ export default function AdminPage() {
           return;
         }
         const data = await client.overview(page, query, signal);
+        if (signal?.aborted) return;
         setOverview(data);
         setModels(data.models);
         setSavedModelsSnapshot(JSON.stringify(data.models));
         setError(null);
       } catch (cause) {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return;
+        if (signal?.aborted || (cause instanceof DOMException && cause.name === 'AbortError'))
+          return;
         setError(cause instanceof Error ? cause.message : '无法打开管理员后台');
       }
     },

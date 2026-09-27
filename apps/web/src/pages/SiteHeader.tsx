@@ -18,8 +18,12 @@ export function SiteHeader() {
     const controller = new AbortController();
     void adminClient
       .access(controller.signal)
-      .then(({ isAdmin: allowed }) => setAdminAccess({ userId: user.id, allowed }))
-      .catch(() => setAdminAccess({ userId: user.id, allowed: false }));
+      .then(({ isAdmin: allowed }) => {
+        if (!controller.signal.aborted) setAdminAccess({ userId: user.id, allowed });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setAdminAccess({ userId: user.id, allowed: false });
+      });
     return () => controller.abort();
   }, [adminClient, session?.access_token, user]);
   const isAdmin = Boolean(user && adminAccess?.userId === user.id && adminAccess.allowed);
