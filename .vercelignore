@@ -1,0 +1,4 @@
+# Tests stay in Git and CI, but files inside api/ would otherwise be detected
+# as production Vercel Functions and compiled one-by-one during deployment.
+**/*.test.ts
+

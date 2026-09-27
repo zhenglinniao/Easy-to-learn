@@ -15,8 +15,16 @@ interface VercelConfiguration {
 const configuration = JSON.parse(
   readFileSync(resolve(process.cwd(), 'vercel.json'), 'utf8'),
 ) as VercelConfiguration;
+const deploymentIgnore = readFileSync(resolve(process.cwd(), '.vercelignore'), 'utf8')
+  .split(/\r?\n/u)
+  .map((line) => line.trim())
+  .filter((line) => line && !line.startsWith('#'));
 
 describe('Vercel deployment contract', () => {
+  it('does not publish test files in the serverless api directory', () => {
+    expect(deploymentIgnore).toContain('**/*.test.ts');
+  });
+
   it('keeps long-running AI routes within explicit function budgets', () => {
     expect(configuration.functions['api/ai/tutor.ts']?.maxDuration).toBeGreaterThanOrEqual(60);
     expect(configuration.functions['api/ai/illustration.ts']?.maxDuration).toBeGreaterThanOrEqual(
