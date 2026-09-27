@@ -24,6 +24,7 @@ jobs:
       - name: Install pinned pnpm and Node.js
         uses: pnpm/setup@v3
         with:
+          runtime: node@24.21.0
           cache: true
           require-lockfile: true
 
