@@ -3,7 +3,12 @@ import { Redis } from '@upstash/redis';
 
 import { AiProviderConfigurationError, loadAiProviderConfigs } from './ai-provider-config.js';
 import { createTutorModelFromConfigs } from './ai-provider.js';
-import { AdminModelPolicyStore, applyAdminModelPolicy } from './admin-model-policy.js';
+import {
+  AdminModelPolicyStore,
+  applyAdminModelPolicy,
+  type AdminModelPolicy,
+  type StoredAdminProvider,
+} from './admin-model-policy.js';
 import { isAdminUserId } from './admin-access.js';
 import { UnlimitedAiStateStore, type AiStateStore } from './ai-state.js';
 import { ApiFault } from './fault.js';
@@ -181,6 +186,14 @@ export const createTutorService = async (
   );
 };
 
+export const selectImageProvider = (
+  policy: AdminModelPolicy,
+): Extract<StoredAdminProvider, { type: 'openai-compatible' }> | undefined =>
+  policy.providers.find(
+    (item): item is Extract<StoredAdminProvider, { type: 'openai-compatible' }> =>
+      item.enabled && item.type === 'openai-compatible' && Boolean(item.imageModel && item.apiKey),
+  );
+
 export const createIllustrationService = async (
   actor: TutorActor,
   accessToken?: string,
@@ -190,9 +203,7 @@ export const createIllustrationService = async (
     Redis.fromEnv(),
     required('AI_CACHE_ENCRYPTION_KEY'),
   ).read(configs);
-  const provider = policy.providers.find(
-    (item) => item.type === 'openai-compatible' && item.imageModel && item.apiKey,
-  );
+  const provider = selectImageProvider(policy);
   const generator =
     provider?.type === 'openai-compatible' && provider.imageModel && provider.apiKey
       ? new SenseNovaImageGenerator({

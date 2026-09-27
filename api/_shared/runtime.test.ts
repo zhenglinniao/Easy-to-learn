@@ -12,6 +12,7 @@ vi.mock('@supabase/supabase-js', () => ({
 import {
   resolveActor,
   resolveAuthenticatedAccount,
+  selectImageProvider,
   sessionKeysFromEnvironment,
 } from './runtime.js';
 
@@ -113,4 +114,36 @@ describe('runtime authentication', () => {
       });
     },
   );
+});
+
+describe('runtime image provider selection', () => {
+  const provider = (id: string, enabled: boolean) => ({
+    id,
+    label: id,
+    type: 'openai-compatible' as const,
+    enabled,
+    model: 'sensenova-6.8-flash-lite',
+    timeoutMs: 35_000,
+    baseUrl: 'https://token.sensenova.cn/v1',
+    responseFormat: 'prompt' as const,
+    wireApi: 'chat_completions' as const,
+    imageModel: 'sensenova-u1.5-fast' as const,
+    apiKey: 'configured-secret',
+  });
+
+  it('never routes image generation through a disabled provider', () => {
+    const disabled = provider('disabled', false);
+    const enabled = provider('enabled', true);
+
+    expect(
+      selectImageProvider({
+        providers: [disabled, enabled],
+        updatedAt: null,
+        updatedBy: null,
+      }),
+    ).toEqual(enabled);
+    expect(
+      selectImageProvider({ providers: [disabled], updatedAt: null, updatedBy: null }),
+    ).toBeUndefined();
+  });
 });
