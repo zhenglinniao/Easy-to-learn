@@ -55,6 +55,7 @@ import {
   type CanvasAiTask,
 } from './aiTaskRegistry';
 import { CanvasAssetCache, type CanvasAssetFile } from './canvasAssetCache';
+import { canSubmitFeedback, quotaBlockReason } from './canvasAccessPolicy';
 import { ConflictResolutionDialog } from './ConflictResolutionDialog';
 import { DebouncedLatestTask } from './debouncedLatestTask';
 import { HANDWRITING_FONT_FAMILY, migrateElementsToHandwriting } from './handwriting';
@@ -100,26 +101,6 @@ const radialLoadingAction = (task: CanvasAiTask | undefined): RadialMenuAction |
   task?.action === 'solve' || task?.action === 'hint' ? task.action : null;
 
 type FeedbackState = 'idle' | 'sending' | 'sent' | 'error';
-const AI_FEEDBACK_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-const canSubmitFeedback = (board: PersistedTutorBoardV2): boolean =>
-  Boolean(board.requestId) && Date.now() <= Date.parse(board.createdAt) + AI_FEEDBACK_WINDOW_MS;
-
-const quotaBlockReason = (quota: QuotaStatus | null, now: number): string | null => {
-  if (!quota) return null;
-  if (quota.unlimited) return null;
-  if (quota.action.dailyRemaining === 0)
-    return `今天的 ${quota.action.dailyLimit} 次 AI 额度已用完，明天再来吧。`;
-  if (quota.action.periodRemaining === 0) return '近 30 天 AI 额度已用完，请在额度恢复后再试。';
-  const nextAllowed = quota.action.nextAllowedAt
-    ? Date.parse(quota.action.nextAllowedAt)
-    : Number.NaN;
-  if (Number.isFinite(nextAllowed) && nextAllowed > now) {
-    const seconds = Math.max(1, Math.ceil((nextAllowed - now) / 1_000));
-    return `AI 正在休息，请等待 ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}。`;
-  }
-  return null;
-};
 
 const selectionSignature = (selectedElementIds: AppState['selectedElementIds']): string =>
   Object.keys(selectedElementIds)
