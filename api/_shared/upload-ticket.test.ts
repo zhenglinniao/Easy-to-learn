@@ -153,4 +153,45 @@ describe('UploadTicketService', () => {
       service.resolve(actor, 'request-1', issued.uploadPath, 'image/png'),
     ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
   });
+
+  it('rejects tampered ticket metadata before downloading an object', async () => {
+    const bytes = png(320, 180);
+    const { redis, records } = createRedis();
+    const service = new UploadTicketService(
+      redis as never,
+      'actor-secret',
+      'https://project.supabase.co',
+      'service-role',
+    );
+    const issued = await service.issue(actor, inputFor(bytes));
+    const [key, record] = [...records.entries()][0]!;
+    records.set(key, { ...(record as object), uploadPath: `${issued.uploadPath}/../other` });
+
+    await expect(
+      service.resolve(actor, 'request-1', issued.uploadPath, 'image/png'),
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized uploads before allocating their byte buffer', async () => {
+    const bytes = png(320, 180);
+    const { redis } = createRedis();
+    const service = new UploadTicketService(
+      redis as never,
+      'actor-secret',
+      'https://project.supabase.co',
+      'service-role',
+    );
+    const issued = await service.issue(actor, inputFor(bytes));
+    const arrayBuffer = vi.fn();
+    download.mockResolvedValue({
+      data: { size: 11 * 1024 * 1024, arrayBuffer },
+      error: null,
+    });
+
+    await expect(
+      service.resolve(actor, 'request-1', issued.uploadPath, 'image/png'),
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    expect(arrayBuffer).not.toHaveBeenCalled();
+  });
 });

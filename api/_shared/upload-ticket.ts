@@ -1,5 +1,6 @@
 import { createHash, createHmac } from 'node:crypto';
 
+import { MAX_ASSET_BYTES, MAX_IMAGE_EDGE, MAX_IMAGE_PIXELS } from '@easy-to-learn/domain';
 import { createClient } from '@supabase/supabase-js';
 import type { Redis } from '@upstash/redis';
 
@@ -21,6 +22,37 @@ export interface UploadTicketInput {
 interface TicketRecord extends UploadTicketInput {
   uploadPath: string;
 }
+
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+
+const isTicketRecord = (
+  value: unknown,
+  actorHash: string,
+  requestId: string,
+): value is TicketRecord => {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Partial<TicketRecord>;
+  return (
+    record.requestId === requestId &&
+    typeof record.contentHash === 'string' &&
+    SHA256_PATTERN.test(record.contentHash) &&
+    (record.mimeType === 'image/png' || record.mimeType === 'image/jpeg') &&
+    typeof record.byteSize === 'number' &&
+    Number.isSafeInteger(record.byteSize) &&
+    record.byteSize > 0 &&
+    record.byteSize <= MAX_ASSET_BYTES &&
+    typeof record.width === 'number' &&
+    Number.isSafeInteger(record.width) &&
+    record.width > 0 &&
+    record.width <= MAX_IMAGE_EDGE &&
+    typeof record.height === 'number' &&
+    Number.isSafeInteger(record.height) &&
+    record.height > 0 &&
+    record.height <= MAX_IMAGE_EDGE &&
+    record.width * record.height <= MAX_IMAGE_PIXELS &&
+    record.uploadPath === `${actorHash}/${requestId}/${record.contentHash}`
+  );
+};
 
 const readImageSize = (
   bytes: Buffer,
@@ -95,12 +127,19 @@ export class UploadTicketService {
     mimeType: 'image/png' | 'image/jpeg',
   ): Promise<string> {
     const actorHash = this.actorHash(actor);
-    const record = await this.redis.get<TicketRecord>(this.ticketKey(actorHash, requestId));
-    if (!record || record.uploadPath !== uploadPath || record.mimeType !== mimeType) {
+    const record = await this.redis.get<unknown>(this.ticketKey(actorHash, requestId));
+    if (
+      !isTicketRecord(record, actorHash, requestId) ||
+      record.uploadPath !== uploadPath ||
+      record.mimeType !== mimeType
+    ) {
       throw new ApiFault('INVALID_INPUT', '图片上传票据无效或已过期');
     }
     const { data, error } = await this.supabase().storage.from('ai-temp').download(uploadPath);
     if (error || !data) throw new ApiFault('INVALID_INPUT', '临时图片不存在');
+    if (data.size > MAX_ASSET_BYTES || data.size !== record.byteSize) {
+      throw new ApiFault('INVALID_INPUT', '临时图片完整性校验失败');
+    }
     const bytes = Buffer.from(await data.arrayBuffer());
     const dimensions = readImageSize(bytes, record.mimeType);
     if (
