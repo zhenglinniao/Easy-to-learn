@@ -8,13 +8,19 @@ const configuredOrigin = new URL(
 
 describe('isSafeAssetUrl', () => {
   it('接受 HTTPS 签名资源并拒绝危险协议与外部明文地址', () => {
-    expect(isSafeAssetUrl(`${configuredOrigin}/storage/v1/object?token=opaque`)).toBe(true);
-    expect(isSafeAssetUrl('https://unrelated.example.test/object')).toBe(
-      import.meta.env.VITE_SUPABASE_URL ? false : true,
+    expect(isSafeAssetUrl(`${configuredOrigin}/storage/v1/object?token=opaque`)).toBe(
+      Boolean(import.meta.env.VITE_SUPABASE_URL),
     );
+    expect(isSafeAssetUrl('https://unrelated.example.test/object')).toBe(false);
     expect(isSafeAssetUrl('http://storage.example.test/object')).toBe(false);
     expect(isSafeAssetUrl('javascript:alert(1)')).toBe(false);
     expect(isSafeAssetUrl('not-a-url')).toBe(false);
+  });
+
+  it('缺少 Supabase 公共源配置时拒绝任意 HTTPS 资源', () => {
+    if (!import.meta.env.VITE_SUPABASE_URL) {
+      expect(isSafeAssetUrl('https://storage.example.test/signed-object')).toBe(false);
+    }
   });
 
   it('开发模式只额外允许回环地址', () => {

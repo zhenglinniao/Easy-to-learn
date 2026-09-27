@@ -12,13 +12,13 @@ export const isSafeAssetUrl = (value: string): boolean => {
   try {
     const url = new URL(value);
     const expectedOrigin = configuredSupabaseOrigin();
-    if (expectedOrigin && url.origin !== expectedOrigin) return false;
-    if (url.protocol === 'https:') return true;
-    return (
+    const developmentLoopback =
       import.meta.env.DEV &&
       url.protocol === 'http:' &&
-      (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]')
-    );
+      (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]');
+    if (!expectedOrigin) return developmentLoopback;
+    if (url.origin !== expectedOrigin) return false;
+    return url.protocol === 'https:' || developmentLoopback;
   } catch {
     return false;
   }
