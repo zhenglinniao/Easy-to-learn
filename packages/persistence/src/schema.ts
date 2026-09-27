@@ -9,6 +9,8 @@ export type OutboxOperationType = 'snapshot' | 'delete' | 'migration';
 
 export interface StoredBoard {
   boardId: string;
+  /** 旧版缓存可能缺少该字段；读取云端缓存前必须先验证当前账户。 */
+  ownerId?: string;
   snapshot: PersistedCanvasV2;
   localRevision: number;
   remoteRevision: number;

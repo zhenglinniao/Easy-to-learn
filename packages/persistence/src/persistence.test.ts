@@ -50,12 +50,28 @@ describe('LocalBoardRepository', () => {
     const { repository } = await createRepository();
     const remoteSnapshot = { ...emptySnapshot(), revision: 6 };
 
-    await expect(repository.storeRemoteSnapshot(remoteSnapshot)).resolves.toMatchObject({
+    await expect(repository.storeRemoteSnapshot(remoteSnapshot, 'user-1')).resolves.toMatchObject({
+      ownerId: 'user-1',
       remoteRevision: 6,
       dirty: false,
       snapshot: { revision: 6 },
     });
     expect(await repository.getOutbox('board-1')).toEqual([]);
+  });
+
+  it('旧版云端缓存只能在远端权限验证后绑定当前账户', async () => {
+    const { repository } = await createRepository();
+    await repository.saveDurableChange(emptySnapshot());
+    expect(await repository.getBoard('board-1')).not.toHaveProperty('ownerId');
+
+    await expect(repository.assignBoardOwner('board-1', 'user-1')).resolves.toMatchObject({
+      boardId: 'board-1',
+      ownerId: 'user-1',
+      dirty: true,
+    });
+    await expect(repository.assignBoardOwner('local_guest', 'user-1')).rejects.toMatchObject({
+      code: 'DATABASE_CORRUPTED',
+    });
   });
 
   it('在同一事务保存画板并把同画板快照任务合并为一个', async () => {

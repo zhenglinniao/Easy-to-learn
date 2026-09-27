@@ -175,24 +175,27 @@ const persistBoard = async (
     assetFiles,
     existingAssets,
   );
-  await repository.saveDurableChange({
-    schemaVersion: 2,
-    boardId,
-    revision: 0,
-    excalidraw: {
-      elements: elements.filter((element) => PERSISTED_ELEMENT_TYPES.has(element.type)) as never,
-      appState: {
-        viewBackgroundColor: appState.viewBackgroundColor,
-        gridSize: appState.gridSize,
-        gridStep: appState.gridStep,
-        gridModeEnabled: appState.gridModeEnabled,
-        objectsSnapModeEnabled: appState.objectsSnapModeEnabled,
+  await repository.saveDurableChange(
+    {
+      schemaVersion: 2,
+      boardId,
+      revision: 0,
+      excalidraw: {
+        elements: elements.filter((element) => PERSISTED_ELEMENT_TYPES.has(element.type)) as never,
+        appState: {
+          viewBackgroundColor: appState.viewBackgroundColor,
+          gridSize: appState.gridSize,
+          gridStep: appState.gridStep,
+          gridModeEnabled: appState.gridModeEnabled,
+          objectsSnapModeEnabled: appState.objectsSnapModeEnabled,
+        },
       },
+      assets: manifests,
+      tutorBoards,
+      updatedAt: new Date().toISOString(),
     },
-    assets: manifests,
-    tutorBoards,
-    updatedAt: new Date().toISOString(),
-  });
+    ownerId,
+  );
 };
 
 export default function CanvasPage() {
@@ -290,7 +293,7 @@ export default function CanvasPage() {
     return () => {
       registry.cancelAll();
     };
-  }, [api, boardId]);
+  }, [api, boardId, user?.id]);
 
   const refreshQuota = useCallback(
     async (signal?: AbortSignal) => {
@@ -395,18 +398,31 @@ export default function CanvasPage() {
             new SupabaseBoardGateway(client, crypto.randomUUID()),
           );
           syncCoordinatorRef.current = new BroadcastSyncCoordinator();
-          if (!stored?.dirty) {
+          const cacheOwnerMatches = stored?.ownerId === user.id;
+          if (!cacheOwnerMatches || !stored?.dirty) {
             try {
               const remoteRepository = new RemoteBoardRepository(client);
               const snapshot = await remoteRepository.read(boardId);
-              await mapWithConcurrency(snapshot.assets, ASSET_IO_CONCURRENCY, async (manifest) => {
-                const blob = await remoteRepository.downloadAsset(manifest.objectPath);
-                await repository.putAsset(manifest, blob);
-                await repository.markAssetState(boardId, manifest.fileId, 'uploaded');
-              });
-              stored = await repository.storeRemoteSnapshot(snapshot);
+              if (stored?.dirty && stored.ownerId === undefined) {
+                // 旧版缓存没有 ownerId。只有远端读取已经证明当前账户仍拥有该画板后，
+                // 才允许认领并继续展示未同步修改。
+                stored = await repository.assignBoardOwner(boardId, user.id);
+              } else {
+                await mapWithConcurrency(
+                  snapshot.assets,
+                  ASSET_IO_CONCURRENCY,
+                  async (manifest) => {
+                    const blob = await remoteRepository.downloadAsset(manifest.objectPath);
+                    await repository.putAsset(manifest, blob);
+                    await repository.markAssetState(boardId, manifest.fileId, 'uploaded');
+                  },
+                );
+                stored = await repository.storeRemoteSnapshot(snapshot, user.id);
+              }
             } catch (error) {
-              if (!stored) throw error;
+              // 仅允许当前账户明确拥有的缓存进入离线回退；其他账户或旧版未验证
+              // 缓存必须保持不可见。
+              if (!stored || stored.ownerId !== user.id) throw error;
               if (active) setSyncState('offline');
             }
           }
@@ -423,14 +439,17 @@ export default function CanvasPage() {
             } as never,
           });
           if (handwriting.changed) {
-            await repository.saveDurableChange({
-              ...stored.snapshot,
-              excalidraw: {
-                ...stored.snapshot.excalidraw,
-                elements: handwriting.elements as never,
+            await repository.saveDurableChange(
+              {
+                ...stored.snapshot,
+                excalidraw: {
+                  ...stored.snapshot.excalidraw,
+                  elements: handwriting.elements as never,
+                },
+                updatedAt: new Date().toISOString(),
               },
-              updatedAt: new Date().toISOString(),
-            });
+              stored.ownerId,
+            );
           }
           setTutorBoards(stored.snapshot.tutorBoards);
           setSyncState(stored.dirty || handwriting.changed ? 'dirty' : 'synced');
@@ -618,7 +637,7 @@ export default function CanvasPage() {
       clearTimeout(timer);
       if (syncTimer.current === timer) syncTimer.current = null;
     };
-  }, [boardId, syncState]);
+  }, [boardId, syncState, user?.id]);
 
   useEffect(() => {
     if (syncRetryAt === null || syncState !== 'retrying') return;
@@ -848,7 +867,7 @@ export default function CanvasPage() {
         }),
       );
       if (activeBoardId.current !== taskBoardId) return;
-      await repository.resolveConflictWithRemote(snapshot, downloads);
+      await repository.resolveConflictWithRemote(snapshot, downloads, user?.id);
       if (activeBoardId.current !== taskBoardId) return;
       const assets = await repository.getAssets(taskBoardId);
       if (activeBoardId.current !== taskBoardId) return;
@@ -864,14 +883,17 @@ export default function CanvasPage() {
         } as never,
       });
       if (handwriting.changed) {
-        await repository.saveDurableChange({
-          ...snapshot,
-          excalidraw: {
-            ...snapshot.excalidraw,
-            elements: handwriting.elements as never,
+        await repository.saveDurableChange(
+          {
+            ...snapshot,
+            excalidraw: {
+              ...snapshot.excalidraw,
+              elements: handwriting.elements as never,
+            },
+            updatedAt: new Date().toISOString(),
           },
-          updatedAt: new Date().toISOString(),
-        });
+          user?.id,
+        );
         if (activeBoardId.current !== taskBoardId) return;
       }
       const files = await mapWithConcurrency(assets, ASSET_IO_CONCURRENCY, async (asset) => ({

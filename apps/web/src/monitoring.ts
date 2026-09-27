@@ -67,7 +67,8 @@ export const initializeMonitoring = async ({
         // 控制台参数、输入内容和请求正文可能包含题目或凭据，不进入遥测。
         if (breadcrumb.category === 'console') return null;
         const data = breadcrumb.data;
-        const { message: _message, ...safeBreadcrumb } = breadcrumb;
+        const safeBreadcrumb = { ...breadcrumb };
+        delete safeBreadcrumb.message;
         if (!data) return safeBreadcrumb;
 
         const safeData: Record<string, unknown> = {};

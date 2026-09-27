@@ -78,7 +78,10 @@ export class LocalBoardRepository {
     }
   }
 
-  async saveDurableChange(snapshotInput: PersistedCanvasV2): Promise<StoredBoard> {
+  async saveDurableChange(
+    snapshotInput: PersistedCanvasV2,
+    ownerId?: string,
+  ): Promise<StoredBoard> {
     const snapshot = parsePersistedCanvas(snapshotInput);
     const transaction = this.database.transaction(['boards', 'assets', 'outbox'], 'readwrite');
     try {
@@ -96,8 +99,13 @@ export class LocalBoardRepository {
 
       const boards = transaction.objectStore('boards');
       const existing = await boards.get(snapshot.boardId);
+      const resolvedOwnerId =
+        ownerId ??
+        existing?.ownerId ??
+        (snapshot.boardId.startsWith('local_') ? 'local' : undefined);
       const board: StoredBoard = {
         boardId: snapshot.boardId,
+        ...(resolvedOwnerId ? { ownerId: resolvedOwnerId } : {}),
         snapshot,
         localRevision: (existing?.localRevision ?? 0) + 1,
         remoteRevision: existing?.remoteRevision ?? snapshot.revision,
@@ -130,11 +138,16 @@ export class LocalBoardRepository {
     }
   }
 
-  async storeRemoteSnapshot(snapshotInput: PersistedCanvasV2): Promise<StoredBoard> {
+  async storeRemoteSnapshot(
+    snapshotInput: PersistedCanvasV2,
+    ownerId?: string,
+  ): Promise<StoredBoard> {
     const snapshot = parsePersistedCanvas(snapshotInput);
     const existing = await this.database.get('boards', snapshot.boardId);
+    const resolvedOwnerId = ownerId ?? existing?.ownerId;
     const board: StoredBoard = {
       boardId: snapshot.boardId,
+      ...(resolvedOwnerId ? { ownerId: resolvedOwnerId } : {}),
       snapshot,
       localRevision: existing?.localRevision ?? 0,
       remoteRevision: snapshot.revision,
@@ -183,6 +196,19 @@ export class LocalBoardRepository {
 
   getBoard(boardId: string): Promise<StoredBoard | undefined> {
     return this.database.get('boards', boardId);
+  }
+
+  async assignBoardOwner(boardId: string, ownerId: string): Promise<StoredBoard> {
+    if (!ownerId || ownerId === 'local' || boardId.startsWith('local_')) {
+      throw new LocalPersistenceError('DATABASE_CORRUPTED', '云端画板归属参数无效');
+    }
+    return this.localWrite(async () => {
+      const board = await this.database.get('boards', boardId);
+      if (!board) throw new LocalPersistenceError('DATABASE_CORRUPTED', '找不到待归属的云端画板');
+      const next = { ...board, ownerId };
+      await this.database.put('boards', next);
+      return next;
+    });
   }
 
   async listLocalBoards(): Promise<StoredBoard[]> {
@@ -274,6 +300,7 @@ export class LocalBoardRepository {
       };
       const board: StoredBoard = {
         boardId: targetBoardId,
+        ownerId,
         snapshot,
         localRevision: 1,
         remoteRevision: 0,
@@ -479,6 +506,7 @@ export class LocalBoardRepository {
       };
       const board: StoredBoard = {
         boardId: targetBoardId,
+        ownerId,
         snapshot,
         localRevision: 1,
         remoteRevision: 0,
@@ -538,6 +566,7 @@ export class LocalBoardRepository {
   async resolveConflictWithRemote(
     snapshotInput: PersistedCanvasV2,
     downloads: ReadonlyArray<{ manifest: AssetManifestItem; blob: Blob }> = [],
+    ownerId?: string,
   ): Promise<StoredBoard> {
     const snapshot = parsePersistedCanvas(snapshotInput);
     const downloadedAssets: StoredAsset[] = [];
@@ -596,6 +625,7 @@ export class LocalBoardRepository {
       await transaction.objectStore('preferences').delete(`conflict-target:${snapshot.boardId}`);
       const board: StoredBoard = {
         boardId: snapshot.boardId,
+        ...(ownerId ? { ownerId } : {}),
         snapshot,
         localRevision: 0,
         remoteRevision: snapshot.revision,
