@@ -565,7 +565,7 @@ describe('持久化契约', () => {
   it('校验单资产和画板资产总容量', () => {
     const makeAsset = (index: number, byteSize = MAX_ASSET_BYTES) => ({
       fileId: `file-${index}`,
-      objectPath: `owner/board/hash-${index}`,
+      objectPath: `owner/board-1/${index.toString(16).padStart(64, '0')}`,
       contentHash: index.toString(16).padStart(64, '0'),
       mimeType: 'image/png',
       byteSize,
@@ -587,6 +587,39 @@ describe('持久化契约', () => {
       persistedCanvasSchema.safeParse({
         ...canvasBase,
         assets: [makeAsset(0, MAX_ASSET_BYTES + 1)],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('拒绝跨画板或哈希不一致的资产路径', () => {
+    const contentHash = 'a'.repeat(64);
+    const asset = {
+      fileId: 'file-1',
+      objectPath: `owner/board-1/${contentHash}`,
+      contentHash,
+      mimeType: 'image/png',
+      byteSize: 1,
+      width: 1,
+      height: 1,
+    };
+
+    expect(persistedCanvasSchema.safeParse({ ...canvasBase, assets: [asset] }).success).toBe(true);
+    expect(
+      persistedCanvasSchema.safeParse({
+        ...canvasBase,
+        assets: [{ ...asset, objectPath: `owner/other-board/${contentHash}` }],
+      }).success,
+    ).toBe(false);
+    expect(
+      persistedCanvasSchema.safeParse({
+        ...canvasBase,
+        assets: [{ ...asset, objectPath: `owner/board-1/${'b'.repeat(64)}` }],
+      }).success,
+    ).toBe(false);
+    expect(
+      persistedCanvasSchema.safeParse({
+        ...canvasBase,
+        assets: [{ ...asset, objectPath: `owner/board-1/../${contentHash}` }],
       }).success,
     ).toBe(false);
   });

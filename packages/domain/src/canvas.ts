@@ -52,7 +52,7 @@ export const persistedAppStateSchema = z.strictObject({
 export const assetManifestItemSchema = z
   .strictObject({
     fileId: z.string().min(1).max(100),
-    objectPath: nonEmptyStringSchema,
+    objectPath: z.string().min(1).max(512),
     contentHash: sha256Schema,
     mimeType: supportedImageMimeTypeSchema,
     byteSize: positiveIntegerSchema.max(MAX_ASSET_BYTES),
@@ -62,7 +62,21 @@ export const assetManifestItemSchema = z
   .refine(({ width, height }) => width * height <= MAX_IMAGE_PIXELS, {
     message: '图片总像素不能超过 32 MP',
     path: ['width'],
-  });
+  })
+  .refine(
+    ({ contentHash, objectPath }) => {
+      const segments = objectPath.split('/');
+      return (
+        segments.length === 3 &&
+        segments.every((segment) => segment.length > 0 && segment !== '.' && segment !== '..') &&
+        segments[2] === contentHash
+      );
+    },
+    {
+      message: '画板资产路径必须为 owner/board/contentHash',
+      path: ['objectPath'],
+    },
+  );
 
 export const persistedTutorBoardSchema = z
   .strictObject({
@@ -146,6 +160,13 @@ export const persistedCanvasSchema = z
     const fileIds = new Set<string>();
     const contentHashes = new Set<string>();
     assets.forEach((asset, index) => {
+      if (asset.objectPath.split('/')[1] !== snapshot.boardId) {
+        context.addIssue({
+          code: 'custom',
+          path: ['assets', index, 'objectPath'],
+          message: '画板资产路径必须属于当前画板',
+        });
+      }
       if (fileIds.has(asset.fileId) || contentHashes.has(asset.contentHash)) {
         context.addIssue({
           code: 'custom',
