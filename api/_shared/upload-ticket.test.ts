@@ -194,4 +194,36 @@ describe('UploadTicketService', () => {
     ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     expect(arrayBuffer).not.toHaveBeenCalled();
   });
+
+  it('maps Redis ticket read and write failures to dependency faults', async () => {
+    const bytes = png(320, 180);
+    const writeFailure = createRedis();
+    writeFailure.redis.set.mockRejectedValueOnce(new Error('redis socket details'));
+    const writeService = new UploadTicketService(
+      writeFailure.redis as never,
+      'actor-secret',
+      'https://project.supabase.co',
+      'service-role',
+    );
+    await expect(writeService.issue(actor, inputFor(bytes))).rejects.toMatchObject({
+      code: 'DEPENDENCY_UNAVAILABLE',
+      message: '临时图片票据存储不可用',
+    });
+
+    const readFailure = createRedis();
+    readFailure.redis.get.mockRejectedValueOnce(new Error('redis socket details'));
+    const readService = new UploadTicketService(
+      readFailure.redis as never,
+      'actor-secret',
+      'https://project.supabase.co',
+      'service-role',
+    );
+    await expect(
+      readService.resolve(actor, 'request-1', 'untrusted/path', 'image/png'),
+    ).rejects.toMatchObject({
+      code: 'DEPENDENCY_UNAVAILABLE',
+      message: '临时图片票据存储不可用',
+    });
+    expect(download).not.toHaveBeenCalled();
+  });
 });

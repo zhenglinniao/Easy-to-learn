@@ -110,9 +110,13 @@ export class UploadTicketService {
     );
     if (cleanupError) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '临时图片清理任务创建失败');
     const record: TicketRecord = { ...input, uploadPath };
-    await this.redis.set(this.ticketKey(actorHash, input.requestId), record, {
-      ex: TICKET_TTL_SECONDS,
-    });
+    try {
+      await this.redis.set(this.ticketKey(actorHash, input.requestId), record, {
+        ex: TICKET_TTL_SECONDS,
+      });
+    } catch {
+      throw new ApiFault('DEPENDENCY_UNAVAILABLE', '临时图片票据存储不可用');
+    }
     return {
       uploadUrl: data.signedUrl,
       uploadPath,
@@ -127,7 +131,12 @@ export class UploadTicketService {
     mimeType: 'image/png' | 'image/jpeg',
   ): Promise<string> {
     const actorHash = this.actorHash(actor);
-    const record = await this.redis.get<unknown>(this.ticketKey(actorHash, requestId));
+    let record: unknown;
+    try {
+      record = await this.redis.get<unknown>(this.ticketKey(actorHash, requestId));
+    } catch {
+      throw new ApiFault('DEPENDENCY_UNAVAILABLE', '临时图片票据存储不可用');
+    }
     if (
       !isTicketRecord(record, actorHash, requestId) ||
       record.uploadPath !== uploadPath ||
