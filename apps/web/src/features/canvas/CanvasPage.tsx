@@ -367,7 +367,9 @@ export default function CanvasPage() {
           },
         );
         await repository.cleanupExpiredGuestMigrations();
+        if (!active) return;
         let stored = await repository.getBoard(boardId);
+        if (!active) return;
         const isCloudBoard = Boolean(user && client && !boardId.startsWith('local_'));
         if (isCloudBoard && user && client) {
           syncEngineRef.current = new BoardSyncEngine(
@@ -387,7 +389,7 @@ export default function CanvasPage() {
               stored = await repository.storeRemoteSnapshot(snapshot);
             } catch (error) {
               if (!stored) throw error;
-              setSyncState('offline');
+              if (active) setSyncState('offline');
             }
           }
         }
@@ -456,7 +458,9 @@ export default function CanvasPage() {
           }
         }
       })
-      .catch(() => setPreparationError('本地画板无法恢复，请先导出重要数据后再重试。'));
+      .catch(() => {
+        if (active) setPreparationError('本地画板无法恢复，请先导出重要数据后再重试。');
+      });
     return () => {
       active = false;
       if (syncTimer.current) clearTimeout(syncTimer.current);
