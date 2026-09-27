@@ -124,7 +124,8 @@ describe('AdminService overview', () => {
   const boardQuery = (data: unknown, error: unknown = null) => {
     const query = {
       select: vi.fn(() => query),
-      in: vi.fn(() => Promise.resolve({ data, error })),
+      in: vi.fn(() => query),
+      range: vi.fn(() => Promise.resolve({ data, error })),
     };
     return query;
   };
@@ -177,7 +178,36 @@ describe('AdminService overview', () => {
       pageSuspended: 0,
     });
     expect(boards.in).toHaveBeenCalledWith('owner_id', [learner]);
+    expect(boards.range).toHaveBeenCalledWith(0, 999);
     expect(readPolicy).toHaveBeenCalledOnce();
+  });
+
+  it('counts every board when the database result spans multiple response pages', async () => {
+    listUsers.mockResolvedValue({
+      data: {
+        total: 1,
+        users: [
+          { id: learner, email: 'learner@example.com', created_at: '2026-09-01T00:00:00.000Z' },
+        ],
+      },
+      error: null,
+    });
+    const firstBatch = Array.from({ length: 1_000 }, () => ({ owner_id: learner }));
+    const boards = boardQuery([]);
+    boards.range
+      .mockResolvedValueOnce({ data: firstBatch, error: null })
+      .mockResolvedValueOnce({ data: [{ owner_id: learner }], error: null });
+    from.mockImplementation((table: string) => {
+      if (table === 'boards') return boards;
+      if (table === 'security_audit_events') return { insert: insertAudit };
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    await expect(new AdminService().overview(1, '')).resolves.toMatchObject({
+      accounts: [{ id: learner, boardCount: 1_001 }],
+    });
+    expect(boards.range).toHaveBeenNthCalledWith(1, 0, 999);
+    expect(boards.range).toHaveBeenNthCalledWith(2, 1_000, 1_999);
   });
 
   it('searches across authentication pages and paginates the matching accounts', async () => {

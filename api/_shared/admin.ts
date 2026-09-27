@@ -65,6 +65,7 @@ const USER_ID_PATTERN =
 const ADMIN_PAGE_SIZE = 50;
 const ADMIN_SEARCH_BATCH_SIZE = 200;
 const ADMIN_SEARCH_SCAN_LIMIT = 1_000;
+const BOARD_COUNT_BATCH_SIZE = 1_000;
 
 export interface AdminAccountSummary {
   id: string;
@@ -144,14 +145,21 @@ export class AdminService {
     const userIds = users.map(({ id }) => id);
     const boardCounts = new Map<string, number>();
     if (userIds.length > 0) {
-      const { data: boards, error: boardError } = await this.supabase
-        .from('boards')
-        .select('owner_id')
-        .in('owner_id', userIds);
-      if (boardError) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '无法读取账户画板统计');
-      for (const board of boards ?? []) {
-        const ownerId = String(board.owner_id);
-        boardCounts.set(ownerId, (boardCounts.get(ownerId) ?? 0) + 1);
+      let offset = 0;
+      while (true) {
+        const { data: boards, error: boardError } = await this.supabase
+          .from('boards')
+          .select('owner_id')
+          .in('owner_id', userIds)
+          .range(offset, offset + BOARD_COUNT_BATCH_SIZE - 1);
+        if (boardError) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '无法读取账户画板统计');
+        const batch = boards ?? [];
+        for (const board of batch) {
+          const ownerId = String(board.owner_id);
+          boardCounts.set(ownerId, (boardCounts.get(ownerId) ?? 0) + 1);
+        }
+        if (batch.length < BOARD_COUNT_BATCH_SIZE) break;
+        offset += BOARD_COUNT_BATCH_SIZE;
       }
     }
     const accounts = users.map((user): AdminAccountSummary => ({
