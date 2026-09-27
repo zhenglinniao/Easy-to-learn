@@ -466,4 +466,35 @@ describe('BoardSyncEngine', () => {
     await expect(engine.syncBoard('board-2')).resolves.toMatchObject({ state: 'failed-local' });
     expect(gateway.saveSnapshot).not.toHaveBeenCalled();
   });
+
+  it('远端写入成功后的本地提交失败不会被误判为可重试网络错误', async () => {
+    const { repository } = await createRepository();
+    await repository.saveDurableChange(emptySnapshot());
+    vi.spyOn(repository, 'completeSnapshot').mockRejectedValue(
+      new LocalPersistenceError('LOCAL_WRITE_FAILED', 'commit failed'),
+    );
+    const retry = vi.spyOn(repository, 'scheduleRetry');
+    const gateway = remote();
+    const engine = new BoardSyncEngine(repository, gateway, () => true);
+
+    await expect(engine.syncBoard('board-1')).resolves.toMatchObject({ state: 'failed-local' });
+    expect(gateway.saveSnapshot).toHaveBeenCalledOnce();
+    expect(retry).not.toHaveBeenCalled();
+    expect(engine.areCloudWritesBlocked).toBe(true);
+  });
+
+  it('关键同步写操作把浏览器配额错误映射为本地持久化错误', async () => {
+    const { repository, database } = await createRepository();
+    await repository.saveDurableChange(emptySnapshot());
+    const operation = (await repository.getOutbox('board-1'))[0];
+    expect(operation).toBeDefined();
+    vi.spyOn(database, 'put').mockRejectedValueOnce(
+      new DOMException('quota reached', 'QuotaExceededError'),
+    );
+
+    await expect(repository.scheduleRetry(operation!)).rejects.toMatchObject({
+      name: 'LocalPersistenceError',
+      code: 'QUOTA_EXCEEDED',
+    });
+  });
 });

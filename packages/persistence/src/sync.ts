@@ -106,7 +106,8 @@ export class BoardSyncEngine {
         await this.remote.deleteBoard(operation.boardId);
         await this.repository.completeOperation(operation);
         return { boardId: operation.boardId, state: 'synced' };
-      } catch {
+      } catch (error) {
+        if (error instanceof LocalPersistenceError) throw error;
         return this.retry(operation);
       }
     }
@@ -135,6 +136,7 @@ export class BoardSyncEngine {
       await this.repository.completeSnapshot(operation, remoteRevision);
       return { boardId: operation.boardId, state: 'synced' };
     } catch (error) {
+      if (error instanceof LocalPersistenceError) throw error;
       if (error instanceof RevisionConflictError) {
         await this.repository.createConflictCopy(board, error.remoteRevision);
         await this.repository.completeOperation(operation);

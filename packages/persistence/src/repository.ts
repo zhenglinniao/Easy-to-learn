@@ -29,6 +29,14 @@ export class LocalBoardRepository {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
+  private async localWrite<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      throw toLocalPersistenceError(error);
+    }
+  }
+
   async putAsset(manifestInput: AssetManifestItem, blob: Blob): Promise<StoredAsset> {
     const manifest = assetManifestItemSchema.parse(manifestInput);
     const pathParts = manifest.objectPath.split('/');
@@ -358,52 +366,60 @@ export class LocalBoardRepository {
     fileId: string,
     uploadState: StoredAsset['uploadState'],
   ): Promise<void> {
-    const transaction = this.database.transaction('assets', 'readwrite');
-    const asset = await transaction.store.get([boardId, fileId]);
-    if (asset) await transaction.store.put({ ...asset, uploadState });
-    await transaction.done;
+    await this.localWrite(async () => {
+      const transaction = this.database.transaction('assets', 'readwrite');
+      const asset = await transaction.store.get([boardId, fileId]);
+      if (asset) await transaction.store.put({ ...asset, uploadState });
+      await transaction.done;
+    });
   }
 
   async completeSnapshot(operation: OutboxOperation, remoteRevision: number): Promise<boolean> {
-    const transaction = this.database.transaction(['boards', 'outbox'], 'readwrite');
-    const board = await transaction.objectStore('boards').get(operation.boardId);
-    const isCurrent = board?.localRevision === operation.localRevision;
-    if (board) {
-      await transaction.objectStore('boards').put({
-        ...board,
-        remoteRevision,
-        dirty: !isCurrent,
-        snapshot: { ...board.snapshot, revision: remoteRevision },
-      });
-    }
-    if (isCurrent && operation.id !== undefined) {
-      await transaction.objectStore('outbox').delete(operation.id);
-    } else if (!isCurrent) {
-      const outbox = transaction.objectStore('outbox');
-      const currentKey = await outbox
-        .index('by-board-operation')
-        .getKey([operation.boardId, 'snapshot']);
-      if (currentKey !== undefined) {
-        const currentOperation = await outbox.get(currentKey);
-        if (currentOperation) {
-          await outbox.put({ ...currentOperation, baseRevision: remoteRevision });
+    return this.localWrite(async () => {
+      const transaction = this.database.transaction(['boards', 'outbox'], 'readwrite');
+      const board = await transaction.objectStore('boards').get(operation.boardId);
+      const isCurrent = board?.localRevision === operation.localRevision;
+      if (board) {
+        await transaction.objectStore('boards').put({
+          ...board,
+          remoteRevision,
+          dirty: !isCurrent,
+          snapshot: { ...board.snapshot, revision: remoteRevision },
+        });
+      }
+      if (isCurrent && operation.id !== undefined) {
+        await transaction.objectStore('outbox').delete(operation.id);
+      } else if (!isCurrent) {
+        const outbox = transaction.objectStore('outbox');
+        const currentKey = await outbox
+          .index('by-board-operation')
+          .getKey([operation.boardId, 'snapshot']);
+        if (currentKey !== undefined) {
+          const currentOperation = await outbox.get(currentKey);
+          if (currentOperation) {
+            await outbox.put({ ...currentOperation, baseRevision: remoteRevision });
+          }
         }
       }
-    }
-    await transaction.done;
-    return isCurrent;
+      await transaction.done;
+      return isCurrent;
+    });
   }
 
   async completeOperation(operation: OutboxOperation): Promise<void> {
-    if (operation.id !== undefined) await this.database.delete('outbox', operation.id);
+    await this.localWrite(async () => {
+      if (operation.id !== undefined) await this.database.delete('outbox', operation.id);
+    });
   }
 
   async scheduleRetry(operation: OutboxOperation): Promise<OutboxOperation> {
     const attempts = operation.attempts + 1;
     const delay = Math.min(1_000 * 2 ** Math.min(attempts - 1, 8), 300_000);
     const updated = { ...operation, attempts, nextAttemptAt: this.now().getTime() + delay };
-    await this.database.put('outbox', updated);
-    return updated;
+    return this.localWrite(async () => {
+      await this.database.put('outbox', updated);
+      return updated;
+    });
   }
 
   async createConflictCopy(board: StoredBoard, remoteRevision: number): Promise<ConflictCopy> {
@@ -414,8 +430,10 @@ export class LocalBoardRepository {
       remoteRevision,
       createdAt: this.now().toISOString(),
     };
-    const id = await this.database.add('conflictCopies', copy);
-    return { ...copy, id };
+    return this.localWrite(async () => {
+      const id = await this.database.add('conflictCopies', copy);
+      return { ...copy, id };
+    });
   }
 
   getConflictCopies(boardId: string): Promise<ConflictCopy[]> {
@@ -598,23 +616,25 @@ export class LocalBoardRepository {
     if (boardId.startsWith('local_')) {
       throw new LocalPersistenceError('DATABASE_CORRUPTED', '本地画板不能按云端冲突清理');
     }
-    const transaction = this.database.transaction(
-      ['boards', 'assets', 'outbox', 'preferences', 'conflictCopies'],
-      'readwrite',
-    );
-    const [assetKeys, outboxKeys, conflictKeys] = await Promise.all([
-      transaction.objectStore('assets').index('by-board').getAllKeys(boardId),
-      transaction.objectStore('outbox').index('by-board').getAllKeys(boardId),
-      transaction.objectStore('conflictCopies').index('by-board').getAllKeys(boardId),
-    ]);
-    await Promise.all([
-      transaction.objectStore('boards').delete(boardId),
-      transaction.objectStore('preferences').delete(`conflict-target:${boardId}`),
-      ...assetKeys.map((key) => transaction.objectStore('assets').delete(key)),
-      ...outboxKeys.map((key) => transaction.objectStore('outbox').delete(key)),
-      ...conflictKeys.map((key) => transaction.objectStore('conflictCopies').delete(key)),
-    ]);
-    await transaction.done;
+    await this.localWrite(async () => {
+      const transaction = this.database.transaction(
+        ['boards', 'assets', 'outbox', 'preferences', 'conflictCopies'],
+        'readwrite',
+      );
+      const [assetKeys, outboxKeys, conflictKeys] = await Promise.all([
+        transaction.objectStore('assets').index('by-board').getAllKeys(boardId),
+        transaction.objectStore('outbox').index('by-board').getAllKeys(boardId),
+        transaction.objectStore('conflictCopies').index('by-board').getAllKeys(boardId),
+      ]);
+      await Promise.all([
+        transaction.objectStore('boards').delete(boardId),
+        transaction.objectStore('preferences').delete(`conflict-target:${boardId}`),
+        ...assetKeys.map((key) => transaction.objectStore('assets').delete(key)),
+        ...outboxKeys.map((key) => transaction.objectStore('outbox').delete(key)),
+        ...conflictKeys.map((key) => transaction.objectStore('conflictCopies').delete(key)),
+      ]);
+      await transaction.done;
+    });
   }
 
   async addMigrationBackup(backup: Omit<MigrationBackup, 'id'>): Promise<number> {

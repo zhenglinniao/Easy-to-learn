@@ -29,7 +29,15 @@ export class RevisionConflictError extends Error {
 export const toLocalPersistenceError = (error: unknown): LocalPersistenceError => {
   if (error instanceof LocalPersistenceError) return error;
   const cause = error instanceof Error ? error : undefined;
-  const name = cause?.name ?? '';
+  // 部分浏览器的 DOMException 不继承 Error，但仍通过 name 标识 IndexedDB 故障。
+  const name =
+    cause?.name ??
+    (typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    typeof error.name === 'string'
+      ? error.name
+      : '');
   if (name === 'QuotaExceededError') {
     return new LocalPersistenceError('QUOTA_EXCEEDED', '本地存储空间不足', { cause });
   }
