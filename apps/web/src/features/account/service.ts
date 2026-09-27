@@ -1,5 +1,10 @@
 import { accountDeletionResponseSchema, type AccountDeletionResponse } from '@easy-to-learn/domain';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { z } from 'zod';
+
+const pendingDeletionSchema = z.object({
+  execute_after: z.string().datetime({ offset: true }),
+});
 
 export class AccountApiError extends Error {
   readonly code: string;
@@ -31,7 +36,9 @@ export class AccountService {
       .eq('status', 'pending')
       .maybeSingle();
     if (error) throw error;
-    return data ? { executeAfter: data.execute_after } : null;
+    if (!data) return null;
+    const pending = pendingDeletionSchema.parse(data);
+    return { executeAfter: pending.execute_after };
   }
 
   async requestDeletion(): Promise<AccountDeletionResponse['data']> {

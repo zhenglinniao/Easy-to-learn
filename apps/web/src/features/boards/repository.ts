@@ -6,6 +6,7 @@ import {
   type StoredBoard,
 } from '@easy-to-learn/persistence';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { z } from 'zod';
 
 export interface BoardSummary {
   id: string;
@@ -14,6 +15,14 @@ export interface BoardSummary {
   createdAt: string;
   updatedAt: string;
 }
+
+const boardSummaryRowSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().min(1).max(120),
+  revision: z.coerce.number().int().nonnegative(),
+  created_at: z.string().datetime({ offset: true }),
+  updated_at: z.string().datetime({ offset: true }),
+});
 
 const normalizeListOffset = (value: number): number =>
   Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
@@ -32,13 +41,16 @@ export class RemoteBoardRepository {
       .order('updated_at', { ascending: false })
       .range(safeOffset, safeOffset + safeLimit - 1);
     if (error) throw error;
-    return (data ?? []).map((row) => ({
-      id: row.id,
-      title: row.title,
-      revision: Number(row.revision),
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    }));
+    return (data ?? []).map((untrustedRow) => {
+      const row = boardSummaryRowSchema.parse(untrustedRow);
+      return {
+        id: row.id,
+        title: row.title,
+        revision: row.revision,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    });
   }
   async create(title = '未命名画板'): Promise<PersistedCanvasV2> {
     const { data, error } = await this.client.rpc('create_board', { p_title: title }).single();

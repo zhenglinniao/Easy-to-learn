@@ -37,6 +37,12 @@ describe('AccountService', () => {
     });
   });
 
+  it('拒绝数据库返回的非法删除倒计时', async () => {
+    const service = new AccountService(clientWith({ pending: { execute_after: 'invalid-date' } }));
+
+    await expect(service.pendingDeletion()).rejects.toThrow();
+  });
+
   it('没有会话时不发送删除请求', async () => {
     const fetcher = vi.fn<typeof fetch>();
     const service = new AccountService(clientWith({}), fetcher);

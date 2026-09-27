@@ -97,6 +97,28 @@ describe('RemoteBoardRepository', () => {
     expect(range).toHaveBeenCalledWith(...expected);
   });
 
+  it.each([
+    { field: 'id', value: 'not-a-uuid' },
+    { field: 'title', value: '' },
+    { field: 'revision', value: '-1' },
+    { field: 'updated_at', value: 'not-a-date' },
+  ])('拒绝服务端返回的非法画板摘要：$field', async ({ field, value }) => {
+    const row = {
+      id: snapshot.boardId,
+      title: '数学草稿',
+      revision: '2',
+      created_at: snapshot.updatedAt,
+      updated_at: snapshot.updatedAt,
+      [field]: value,
+    };
+    const range = vi.fn().mockResolvedValue({ data: [row], error: null });
+    const order = vi.fn().mockReturnValue({ range });
+    const select = vi.fn().mockReturnValue({ order });
+    const client = { from: vi.fn().mockReturnValue({ select }) } as unknown as SupabaseClient;
+
+    await expect(new RemoteBoardRepository(client).list()).rejects.toThrow();
+  });
+
   it('拒绝服务端返回的非法快照', async () => {
     const single = vi.fn().mockResolvedValue({ data: { snapshot_json: { schemaVersion: 1 } } });
     const eq = vi.fn().mockReturnValue({ single });
