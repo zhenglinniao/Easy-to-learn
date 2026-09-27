@@ -289,7 +289,6 @@ export const tutorStepSchema = z.strictObject({
   id: nonEmptyStringSchema,
   title: titleSchema,
   blocks: z.array(tutorBlockSchema).min(1).max(30),
-  explanation: z.string().optional(),
   hintLevel: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
 });
 

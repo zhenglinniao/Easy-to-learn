@@ -9,7 +9,6 @@ import {
   MAX_BOARD_ASSET_BYTES,
   MAX_CANVAS_SNAPSHOT_BYTES,
   MAX_INLINE_IMAGE_BYTES,
-  MAX_TUTOR_RESULT_BYTES,
   parsePersistedCanvas,
   persistedCanvasSchema,
   quotaStatusSchema,
@@ -378,9 +377,22 @@ describe('Tutor DSL', () => {
         steps: [
           {
             ...solveResult.steps[0],
-            explanation: 'A'.repeat(MAX_TUTOR_RESULT_BYTES),
+            blocks: Array.from({ length: 30 }, (_, index) => ({
+              type: 'code' as const,
+              language: 'text' as const,
+              code: `${index}`.padEnd(4_000, 'A'),
+            })),
           },
         ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('拒绝不会被前端渲染的旧 explanation 字段', () => {
+    expect(
+      tutorResultSchema.safeParse({
+        ...solveResult,
+        steps: [{ ...solveResult.steps[0], explanation: '重复的隐藏讲解' }],
       }).success,
     ).toBe(false);
   });
