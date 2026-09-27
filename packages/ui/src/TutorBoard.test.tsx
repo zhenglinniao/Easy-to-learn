@@ -1,5 +1,5 @@
 import type { PersistedTutorBoardV2 } from '@easy-to-learn/domain';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -81,7 +81,7 @@ describe('TutorBoard', () => {
     );
   });
 
-  it('把模型内容当作数据渲染，不执行 HTML 或可信链接', () => {
+  it('把模型内容当作数据渲染，不执行 HTML 或可信链接', async () => {
     const unsafe = {
       ...board,
       result: {
@@ -102,6 +102,8 @@ describe('TutorBoard', () => {
       <TutorBoard board={unsafe} onChange={vi.fn()} onClose={vi.fn()} />,
     );
     expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByLabelText('正在排版公式')).not.toBeInTheDocument());
+    expect(container.querySelector('.katex-error')).not.toBeNull();
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('a')).toBeNull();
   });

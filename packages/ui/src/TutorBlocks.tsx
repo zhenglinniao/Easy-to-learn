@@ -1,7 +1,9 @@
 import type { DiagramColor, DiagramV1, TutorBlock } from '@easy-to-learn/domain';
-import katex from 'katex';
+import { lazy, Suspense } from 'react';
 
 import styles from './TutorBoard.module.css';
+
+const MathBlock = lazy(() => import('./MathBlock'));
 
 const colors: Record<DiagramColor, string> = {
   neutral: '#6f675e',
@@ -390,17 +392,17 @@ export function TutorBlocks({ blocks }: { blocks: readonly TutorBlock[] }) {
       {blocks.map((block, index) => {
         if (block.type === 'paragraph') return <p key={index}>{block.text}</p>;
         if (block.type === 'math') {
-          const html = katex.renderToString(block.latex, {
-            displayMode: block.display,
-            throwOnError: false,
-            strict: 'error',
-            trust: false,
-            output: 'htmlAndMathml',
-            maxExpand: 100,
-            maxSize: 10,
-          });
           return (
-            <div key={index} className={styles.math} dangerouslySetInnerHTML={{ __html: html }} />
+            <Suspense
+              key={index}
+              fallback={
+                <div className={styles.math} aria-label="正在排版公式">
+                  {block.latex}
+                </div>
+              }
+            >
+              <MathBlock latex={block.latex} display={block.display} />
+            </Suspense>
           );
         }
         if (block.type === 'code') {
