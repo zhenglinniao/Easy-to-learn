@@ -114,7 +114,7 @@ interface VisualBrief {
 
 ### 4.5 异步生图
 
-图片生成不塞进现有 25 秒文字 Provider 超时预算。处理状态为：
+图片生成不塞进文字 Provider 的 50 秒累计预算；它使用独立接口、独立额度和独立超时。处理状态为：
 
 ```text
 analyzing

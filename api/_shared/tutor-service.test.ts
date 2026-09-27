@@ -1,13 +1,14 @@
 import { createHmac } from 'node:crypto';
 
 import type { TutorRequest, TutorResultV1 } from '@easy-to-learn/domain';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MemoryAiStateStore } from './ai-state.js';
 import { ApiFault } from './fault.js';
 import { issueAnonymousSession, verifyAnonymousSession } from './session.js';
 import {
   ProviderTimeoutError,
+  TUTOR_EXECUTION_TIMEOUT_MS,
   TutorService,
   type BoardAuthorizer,
   type TutorModel,
@@ -47,6 +48,8 @@ const result: TutorResultV1 = {
 
 const boards: BoardAuthorizer = { canAccess: vi.fn().mockResolvedValue(true) };
 const actor = { kind: 'anonymous' as const, id: 'anon-1' };
+
+afterEach(() => vi.useRealTimers());
 
 describe('anonymous session', () => {
   it('签发 30 天会话并拒绝篡改或过期 cookie', () => {
@@ -103,8 +106,18 @@ describe('TutorService', () => {
     await expect(service.execute(actor, request)).resolves.toMatchObject({
       data: { result: { schemaVersion: 1 } },
     });
-    expect(generate).toHaveBeenNthCalledWith(2, request, expect.stringContaining('Tutor DSL'));
-    expect(generate).toHaveBeenNthCalledWith(2, request, expect.stringContaining('schemaVersion'));
+    expect(generate).toHaveBeenNthCalledWith(
+      2,
+      request,
+      expect.stringContaining('Tutor DSL'),
+      expect.anything(),
+    );
+    expect(generate).toHaveBeenNthCalledWith(
+      2,
+      request,
+      expect.stringContaining('schemaVersion'),
+      expect.anything(),
+    );
 
     const invalidState = new MemoryAiStateStore();
     const invalidGenerate = vi
@@ -251,6 +264,7 @@ describe('TutorService', () => {
       2,
       explainRequest,
       expect.stringContaining('不能把目标步骤作为某个微步骤原样返回'),
+      expect.anything(),
     );
   });
 
@@ -468,6 +482,30 @@ describe('TutorService', () => {
       service.execute(actor, { ...request, requestId: 'other', boardId: 'cloud-board' }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(generate).toHaveBeenCalledTimes(2);
+  });
+
+  it('格式纠错与回退共享总时限，避免超过函数执行窗口', async () => {
+    vi.useFakeTimers();
+    const generate = vi.fn(
+      async (_request: TutorRequest, correction?: string, signal?: AbortSignal) => {
+        if (!correction) return { title: 'invalid' };
+        return new Promise((_, reject) => {
+          signal?.addEventListener(
+            'abort',
+            () => reject(new ProviderTimeoutError('provider aborted')),
+            { once: true },
+          );
+        });
+      },
+    );
+    const service = new TutorService(new MemoryAiStateStore(), { generate }, boards);
+    const pending = service.execute(actor, { ...request, requestId: 'deadline-request' });
+    const rejection = expect(pending).rejects.toMatchObject({ code: 'AI_TIMEOUT' });
+    await vi.advanceTimersByTimeAsync(TUTOR_EXECUTION_TIMEOUT_MS);
+
+    await rejection;
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(generate.mock.calls[0]?.[2]).toBe(generate.mock.calls[1]?.[2]);
   });
 
   it('在 Asia/Shanghai 自然日零点重置日配额', async () => {

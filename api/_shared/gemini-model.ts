@@ -31,8 +31,15 @@ export class GeminiTutorModel implements TutorModel {
     this.client = new GoogleGenAI({ apiKey });
   }
 
-  async generate(request: TutorRequest, correction?: string): Promise<unknown> {
+  async generate(
+    request: TutorRequest,
+    correction?: string,
+    parentSignal?: AbortSignal,
+  ): Promise<unknown> {
     const controller = new AbortController();
+    const signal = parentSignal
+      ? AbortSignal.any([controller.signal, parentSignal])
+      : controller.signal;
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       const parts: Array<
@@ -53,7 +60,7 @@ export class GeminiTutorModel implements TutorModel {
                 request.image.uploadPath,
                 request.image.mimeType,
               ),
-              controller.signal,
+              signal,
             ),
           },
         });
@@ -62,7 +69,7 @@ export class GeminiTutorModel implements TutorModel {
         model: this.model,
         contents: [{ role: 'user', parts }],
         config: {
-          abortSignal: controller.signal,
+          abortSignal: signal,
           // 首次生成保留少量表达空间；格式纠错必须稳定服从结构约束。
           temperature: correction ? 0 : 0.4,
           responseMimeType: 'application/json',
@@ -76,7 +83,7 @@ export class GeminiTutorModel implements TutorModel {
         this.promptVersion,
       );
     } catch (error) {
-      if (controller.signal.aborted) throw new ProviderTimeoutError('Gemini timeout');
+      if (signal.aborted) throw new ProviderTimeoutError('Gemini timeout');
       if (error instanceof ProviderUnavailableError) throw error;
       throw new ProviderUnavailableError('Gemini request failed', { cause: error });
     } finally {

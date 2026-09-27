@@ -25,11 +25,15 @@ export class FallbackTutorModel implements TutorModel {
     return this.providers;
   }
 
-  async generate(request: TutorRequest, correction?: string): Promise<unknown> {
+  async generate(
+    request: TutorRequest,
+    correction?: string,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
     let lastError: ProviderTimeoutError | ProviderUnavailableError | undefined;
     for (const provider of this.providers) {
       try {
-        return await provider.generate(request, correction);
+        return await provider.generate(request, correction, signal);
       } catch (error) {
         if (
           !(error instanceof ProviderTimeoutError) &&

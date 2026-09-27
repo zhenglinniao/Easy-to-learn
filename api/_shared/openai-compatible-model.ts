@@ -89,8 +89,15 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
     private readonly fetchImpl: OpenAiFetch = senseNovaFetch as unknown as OpenAiFetch,
   ) {}
 
-  async generate(request: TutorRequest, correction?: string): Promise<unknown> {
+  async generate(
+    request: TutorRequest,
+    correction?: string,
+    parentSignal?: AbortSignal,
+  ): Promise<unknown> {
     const controller = new AbortController();
+    const signal = parentSignal
+      ? AbortSignal.any([controller.signal, parentSignal])
+      : controller.signal;
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       const isSenseNova = this.providerId === 'sensenova' || this.baseUrl.includes('sensenova.cn');
@@ -120,7 +127,7 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
           if (!this.resolveImage) throw new ProviderUnavailableError('图片上传服务未配置');
           data = await withAbortSignal(
             this.resolveImage(request.requestId, request.image.uploadPath, request.image.mimeType),
-            controller.signal,
+            signal,
           );
         }
         if (data) {
@@ -206,7 +213,7 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
           ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
         },
         body: JSON.stringify(requestBody),
-        signal: controller.signal,
+        signal,
         ...(isSenseNova ? { dispatcher: senseNovaDispatcher(requestUrl, this.timeoutMs) } : {}),
       };
       let response: OpenAiFetchResponse | undefined;
@@ -217,7 +224,7 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
           const retryableStatus = response.status === 429 || response.status >= 500;
           if (response.ok || !retryableStatus || attempt === attempts - 1) break;
         } catch (error) {
-          if (controller.signal.aborted) throw error;
+          if (signal.aborted) throw error;
           lastTransportError = error;
           if (attempt === attempts - 1) throw error;
         }
@@ -238,7 +245,7 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
           ? responsesOutputText(payload as ResponsesApiResponse)
           : responseText(payload as ChatCompletionResponse);
       // SenseNova 偶尔会以 200 返回空 content；在同一总超时预算内只重试一次。
-      if (!text && isSenseNova && !controller.signal.aborted) {
+      if (!text && isSenseNova && !signal.aborted) {
         response = await this.fetchImpl(requestUrl, requestInit);
         if (!response.ok) {
           throw new ProviderUnavailableError(
@@ -254,7 +261,7 @@ export class OpenAiCompatibleTutorModel implements TutorModel {
         this.promptVersion,
       );
     } catch (error) {
-      if (controller.signal.aborted) {
+      if (signal.aborted) {
         throw new ProviderTimeoutError(`${this.providerId} timeout`);
       }
       if (error instanceof ProviderUnavailableError) throw error;

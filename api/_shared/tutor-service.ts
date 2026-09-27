@@ -15,7 +15,7 @@ export interface TutorActor {
 }
 
 export interface TutorModel {
-  generate(request: TutorRequest, correction?: string): Promise<unknown>;
+  generate(request: TutorRequest, correction?: string, signal?: AbortSignal): Promise<unknown>;
   fallbackCandidates?(): readonly TutorModel[];
 }
 
@@ -25,6 +25,8 @@ export interface BoardAuthorizer {
 
 export class ProviderTimeoutError extends Error {}
 export class ProviderUnavailableError extends Error {}
+
+export const TUTOR_EXECUTION_TIMEOUT_MS = 52_000;
 
 const providerFailureDetails = (error: unknown): Record<string, string> => {
   const details: Record<string, string> = {};
@@ -324,6 +326,11 @@ export class TutorService {
         retryAfterSeconds: 1,
       });
     }
+    const executionController = new AbortController();
+    const executionTimeout = setTimeout(
+      () => executionController.abort(),
+      TUTOR_EXECUTION_TIMEOUT_MS,
+    );
     try {
       const candidates = this.model.fallbackCandidates?.() ?? [this.model];
       let successfulResult: TutorResponse['data']['result'] | undefined;
@@ -336,13 +343,18 @@ export class TutorService {
 
       for (const [providerIndex, candidateModel] of candidates.entries()) {
         try {
-          let candidate = await candidateModel.generate(request);
+          let candidate = await candidateModel.generate(
+            request,
+            undefined,
+            executionController.signal,
+          );
           let validated = validateTutorCandidate(request, candidate);
           const initialIssues = validated.success ? [] : safeIssueSummary(validated.issues);
           if (!validated.success) {
             candidate = await candidateModel.generate(
               request,
               correctionFromIssues(validated.issues),
+              executionController.signal,
             );
             validated = validateTutorCandidate(request, candidate);
           }
@@ -370,6 +382,9 @@ export class TutorService {
           });
         } catch (error) {
           if (error instanceof ProviderTimeoutError || error instanceof ProviderUnavailableError) {
+            if (executionController.signal.aborted) {
+              throw new ProviderTimeoutError('tutor execution timeout');
+            }
             lastProviderError = error;
             continue;
           }
@@ -433,6 +448,8 @@ export class TutorService {
         throw new ApiFault('AI_PROVIDER_ERROR', 'AI 服务暂时不可用，请稍后重试');
       }
       throw new ApiFault('AI_PROVIDER_ERROR', 'AI 服务暂时不可用，请稍后重试');
+    } finally {
+      clearTimeout(executionTimeout);
     }
   }
 }
