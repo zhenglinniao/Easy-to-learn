@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { AccountService } from '../features/account';
 import { ModalFocusBoundary } from '../components/ModalFocusBoundary';
@@ -19,7 +19,15 @@ export default function BoardsPage() {
   const [renameBoard, setRenameBoard] = useState<BoardSummary | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [pendingDeletion, setPendingDeletion] = useState<string | null>(null);
+  const [accountBusy, setAccountBusy] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   useEffect(() => {
     if (!user || !repository || !account) return;
     let active = true;
@@ -54,11 +62,11 @@ export default function BoardsPage() {
     setError(null);
     try {
       const board = await repository.create();
-      navigate(`/canvas/${board.boardId}`);
+      if (mounted.current) navigate(`/canvas/${board.boardId}`);
     } catch (cause) {
-      setError(toBoardMessage(cause, '无法创建画板，请稍后重试。'));
+      if (mounted.current) setError(toBoardMessage(cause, '无法创建画板，请稍后重试。'));
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
   const remove = async () => {
@@ -66,12 +74,13 @@ export default function BoardsPage() {
     setBusy(true);
     try {
       await repository.delete(confirmDelete.id);
+      if (!mounted.current) return;
       setBoards((items) => items.filter(({ id }) => id !== confirmDelete.id));
       setConfirmDelete(null);
     } catch {
-      setError('删除失败，画板没有被改动。');
+      if (mounted.current) setError('删除失败，画板没有被改动。');
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
   const rename = async () => {
@@ -79,6 +88,7 @@ export default function BoardsPage() {
     setBusy(true);
     try {
       await repository.rename(renameBoard.id, renameTitle);
+      if (!mounted.current) return;
       setBoards((items) =>
         items.map((board) =>
           board.id === renameBoard.id ? { ...board, title: renameTitle.trim() } : board,
@@ -86,9 +96,35 @@ export default function BoardsPage() {
       );
       setRenameBoard(null);
     } catch {
-      setError('重命名失败，原名称已保留。');
+      if (mounted.current) setError('重命名失败，原名称已保留。');
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
+    }
+  };
+  const cancelAccountDeletion = async () => {
+    if (!account || accountBusy) return;
+    setAccountBusy(true);
+    setError(null);
+    try {
+      await account.cancelDeletion();
+      if (mounted.current) setPendingDeletion(null);
+    } catch {
+      if (mounted.current) setError('取消账户删除失败，请稍后重试。');
+    } finally {
+      if (mounted.current) setAccountBusy(false);
+    }
+  };
+  const requestAccountDeletion = async () => {
+    if (!account || accountBusy) return;
+    setAccountBusy(true);
+    setError(null);
+    try {
+      const { executeAfter } = await account.requestDeletion();
+      if (mounted.current) setPendingDeletion(executeAfter);
+    } catch {
+      if (mounted.current) setError('请重新登录后再申请删除账户。');
+    } finally {
+      if (mounted.current) setAccountBusy(false);
     }
   };
   return (
@@ -168,24 +204,17 @@ export default function BoardsPage() {
           </p>
         </div>
         {pendingDeletion ? (
-          <button
-            type="button"
-            onClick={() => void account?.cancelDeletion().then(() => setPendingDeletion(null))}
-          >
-            取消删除
+          <button type="button" disabled={accountBusy} onClick={() => void cancelAccountDeletion()}>
+            {accountBusy ? '正在取消…' : '取消删除'}
           </button>
         ) : (
           <button
             className={styles.dangerButton}
             type="button"
-            onClick={() =>
-              void account
-                ?.requestDeletion()
-                .then(({ executeAfter }) => setPendingDeletion(executeAfter))
-                .catch(() => setError('请重新登录后再申请删除账户。'))
-            }
+            disabled={accountBusy}
+            onClick={() => void requestAccountDeletion()}
           >
-            申请删除账户
+            {accountBusy ? '正在提交…' : '申请删除账户'}
           </button>
         )}
       </section>
