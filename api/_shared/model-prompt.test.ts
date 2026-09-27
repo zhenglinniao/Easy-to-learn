@@ -98,8 +98,6 @@ describe('Tutor Skill prompt registry', () => {
   });
 
   it('拒绝将供应商异常超长文本交给 JSON 与 DSL 解析', () => {
-    expect(() => parseModelJson('x'.repeat(MAX_MODEL_TEXT_CHARACTERS + 1))).toThrow(
-      /安全长度上限/,
-    );
+    expect(() => parseModelJson('x'.repeat(MAX_MODEL_TEXT_CHARACTERS + 1))).toThrow(/安全长度上限/);
   });
 });
