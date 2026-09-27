@@ -82,6 +82,21 @@ describe('RemoteBoardRepository', () => {
     ]);
   });
 
+  it.each([
+    { offset: -5, limit: 0, expected: [0, 0] },
+    { offset: 3.9, limit: 2.8, expected: [3, 4] },
+    { offset: Number.NaN, limit: Number.POSITIVE_INFINITY, expected: [0, 29] },
+  ])('规范化非法分页范围 %#', async ({ offset, limit, expected }) => {
+    const range = vi.fn().mockResolvedValue({ data: [], error: null });
+    const order = vi.fn().mockReturnValue({ range });
+    const select = vi.fn().mockReturnValue({ order });
+    const client = { from: vi.fn().mockReturnValue({ select }) } as unknown as SupabaseClient;
+
+    await new RemoteBoardRepository(client).list(offset, limit);
+
+    expect(range).toHaveBeenCalledWith(...expected);
+  });
+
   it('拒绝服务端返回的非法快照', async () => {
     const single = vi.fn().mockResolvedValue({ data: { snapshot_json: { schemaVersion: 1 } } });
     const eq = vi.fn().mockReturnValue({ single });

@@ -15,15 +15,22 @@ export interface BoardSummary {
   updatedAt: string;
 }
 
+const normalizeListOffset = (value: number): number =>
+  Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
+
+const normalizeListLimit = (value: number): number =>
+  Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value), 1), 100) : 30;
+
 export class RemoteBoardRepository {
   constructor(private readonly client: SupabaseClient) {}
   async list(offset = 0, limit = 30): Promise<BoardSummary[]> {
-    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const safeOffset = normalizeListOffset(offset);
+    const safeLimit = normalizeListLimit(limit);
     const { data, error } = await this.client
       .from('boards')
       .select('id,title,revision,created_at,updated_at')
       .order('updated_at', { ascending: false })
-      .range(offset, offset + safeLimit - 1);
+      .range(safeOffset, safeOffset + safeLimit - 1);
     if (error) throw error;
     return (data ?? []).map((row) => ({
       id: row.id,
