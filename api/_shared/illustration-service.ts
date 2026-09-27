@@ -323,7 +323,14 @@ export class IllustrationArtifactStore implements IllustrationArtifactRepository
       await client.storage.from('ai-temp').remove([stored.objectPath]);
       throw new ApiFault('DEPENDENCY_UNAVAILABLE', '生成图片暂时无法保存');
     }
-    await this.redis.set(this.cacheKey(actor, requestId), stored, { ex: IMAGE_TTL_SECONDS });
+    try {
+      await this.redis.set(this.cacheKey(actor, requestId), stored, { ex: IMAGE_TTL_SECONDS });
+    } catch {
+      // 没有幂等缓存就不能安全地把同一 requestId 视为已完成；删除刚上传的
+      // 临时对象，避免客户端重试时留下多个不可追踪的插画。
+      await client.storage.from('ai-temp').remove([stored.objectPath]);
+      throw new ApiFault('DEPENDENCY_UNAVAILABLE', '生成图片缓存暂时无法写入');
+    }
     return this.response(stored);
   }
 
