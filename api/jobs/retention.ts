@@ -100,7 +100,7 @@ export default async function handler(request: HttpRequest, response: HttpRespon
       if (!removeError) {
         const { error: completedError } = await client
           .from('asset_cleanup_jobs')
-          .update({ status: 'completed' })
+          .update({ status: 'completed', last_error_code: null })
           .eq('id', job.id)
           .eq('status', 'running');
         if (completedError) {

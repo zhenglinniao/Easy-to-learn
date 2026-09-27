@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(51);
+select plan(56);
 
 select has_table('public', 'boards', '存在 boards 表');
 select has_table('public', 'board_assets', '存在 board_assets 表');
@@ -402,6 +402,42 @@ select is(
   (select count(*) from public.asset_cleanup_jobs where status = 'running'),
   1::bigint,
   '领取后的资产任务进入 running 状态'
+);
+
+update public.asset_cleanup_jobs
+set updated_at = pg_catalog.now() - interval '20 minutes', attempts = 0
+where status = 'running';
+set local role service_role;
+select lives_ok(
+  $$select * from public.claim_asset_cleanup_jobs(100, pg_catalog.now())$$,
+  '服务端可以重新领取租约过期的清理任务'
+);
+reset role;
+select is(
+  (select attempts from public.asset_cleanup_jobs where status = 'running'),
+  1,
+  '重新领取租约过期任务会累计一次失败尝试'
+);
+select ok(
+  (select updated_at >= pg_catalog.now() - interval '1 minute'
+   from public.asset_cleanup_jobs where status = 'running'),
+  '重新领取会刷新任务租约时间'
+);
+
+update public.asset_cleanup_jobs
+set updated_at = pg_catalog.now() - interval '20 minutes', attempts = 9
+where status = 'running';
+set local role service_role;
+select lives_ok(
+  $$select * from public.claim_asset_cleanup_jobs(100, pg_catalog.now())$$,
+  '服务端可以终结反复丢失租约的清理任务'
+);
+reset role;
+select is(
+  (select pg_catalog.concat(status, ':', attempts::text)
+   from public.asset_cleanup_jobs where last_error_code = 'WORKER_LEASE_EXPIRED'),
+  'failed:10',
+  '第十次租约失效后任务进入 failed 状态'
 );
 
 select * from finish();

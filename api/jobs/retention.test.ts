@@ -236,7 +236,10 @@ describe('retention job', () => {
 
     expect(storageFrom).toHaveBeenCalledWith('ai-temp');
     expect(remove).toHaveBeenCalledWith(['request/generated.png']);
-    expect(completedUpdate.update).toHaveBeenCalledWith({ status: 'completed' });
+    expect(completedUpdate.update).toHaveBeenCalledWith({
+      status: 'completed',
+      last_error_code: null,
+    });
     expect(completedUpdate.eq).toHaveBeenCalledWith('status', 'running');
     expect(output.statusCode()).toBe(200);
     expect(output.body()).toMatchObject({ data: { assetsDeleted: 1, assetFailures: 0 } });

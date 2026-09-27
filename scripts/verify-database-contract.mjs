@@ -107,6 +107,13 @@ assert(
   migration.includes("'orphaned_upload', v_now + interval '24 hours'"),
   '取消引用的画板资产没有进入 24 小时延迟清理队列',
 );
+assert(
+  migration.includes("job.updated_at <= p_now - interval '15 minutes'") &&
+    migration.includes(
+      "last_error_code = case\n          when candidates.lease_expired then 'WORKER_LEASE_EXPIRED'",
+    ),
+  '资产清理领取函数没有回收失效的 worker 租约',
+);
 
 let assertions = 0;
 for (const { name, sql } of testFiles) {

@@ -19,22 +19,38 @@ begin
 
   return query
   with candidates as (
-    select job.id
+    select job.id, job.status = 'running' as lease_expired
     from public.asset_cleanup_jobs as job
-    where job.status = 'pending'
-      and job.not_before <= p_now
+    where (
+        (job.status = 'pending' and job.not_before <= p_now)
+        or (
+          job.status = 'running'
+          and job.updated_at <= p_now - interval '15 minutes'
+        )
+      )
+      and job.attempts < 10
     order by job.not_before, job.created_at
     for update skip locked
     limit p_limit
   ), claimed as (
     update public.asset_cleanup_jobs as job
-    set status = 'running'
+    set status = case
+          when candidates.lease_expired and job.attempts + 1 >= 10 then 'failed'
+          else 'running'
+        end,
+        attempts = job.attempts + case when candidates.lease_expired then 1 else 0 end,
+        last_error_code = case
+          when candidates.lease_expired then 'WORKER_LEASE_EXPIRED'
+          else job.last_error_code
+        end,
+        updated_at = p_now
     from candidates
     where job.id = candidates.id
-    returning job.id, job.object_path, job.reason, job.attempts
+    returning job.id, job.object_path, job.reason, job.attempts, job.status
   )
   select claimed.id, claimed.object_path, claimed.reason, claimed.attempts
-  from claimed;
+  from claimed
+  where claimed.status = 'running';
 end;
 $$;
 
