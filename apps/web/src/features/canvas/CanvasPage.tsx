@@ -558,36 +558,47 @@ export default function CanvasPage() {
   }, []);
 
   useEffect(() => {
-    if (syncState !== 'dirty' || !syncEngineRef.current || !syncCoordinatorRef.current) return;
+    const engine = syncEngineRef.current;
+    const coordinator = syncCoordinatorRef.current;
+    const repository = repositoryRef.current;
+    if (syncState !== 'dirty' || !engine || !coordinator || !repository) return;
+    let active = true;
     if (syncTimer.current) clearTimeout(syncTimer.current);
-    syncTimer.current = setTimeout(() => {
-      syncTimer.current = null;
+    const timer = setTimeout(() => {
+      if (syncTimer.current === timer) syncTimer.current = null;
       void (async () => {
-        const lease = await syncCoordinatorRef.current?.acquire(boardId);
+        const lease = await coordinator.acquire(boardId);
         if (!lease) return;
         try {
+          if (!active) return;
           setSyncState('syncing-snapshot');
-          const result = await syncEngineRef.current?.syncBoard(boardId);
-          if (result?.retryAt) {
+          const result = await engine.syncBoard(boardId);
+          if (!active) return;
+          if (result.retryAt) {
             setSyncState('retrying');
             setSyncRetryAt(result.retryAt);
-          } else if (result) {
+          } else {
             setSyncRetryAt(null);
             setSyncState(result.state);
           }
-          if ((await repositoryRef.current?.getOutbox(boardId))?.length) {
-            if (!result?.retryAt) setSyncState('dirty');
+          if ((await repository.getOutbox(boardId)).length && active) {
+            if (!result.retryAt) setSyncState('dirty');
           }
         } finally {
           lease.release();
         }
       })().catch(() => {
-        setSyncState('retrying');
-        setSyncRetryAt(Date.now() + SYNC_FAILURE_RETRY_MS);
+        if (active) {
+          setSyncState('retrying');
+          setSyncRetryAt(Date.now() + SYNC_FAILURE_RETRY_MS);
+        }
       });
     }, 3_000);
+    syncTimer.current = timer;
     return () => {
-      if (syncTimer.current) clearTimeout(syncTimer.current);
+      active = false;
+      clearTimeout(timer);
+      if (syncTimer.current === timer) syncTimer.current = null;
     };
   }, [boardId, syncState]);
 
@@ -659,7 +670,12 @@ export default function CanvasPage() {
             await inspectTutorSource(sourceSnapshot.elements, board.source.elementIds),
           ),
         ).then((next) => {
-          if (latestCanvasSnapshotRef.current?.elements !== sourceSnapshot.elements) return;
+          const latest = latestCanvasSnapshotRef.current;
+          if (
+            latest?.boardId !== sourceSnapshot.boardId ||
+            latest.elements !== sourceSnapshot.elements
+          )
+            return;
           if (JSON.stringify(next) !== JSON.stringify(tutorBoardsRef.current)) {
             tutorBoardsRef.current = next;
             setTutorBoards(next);
