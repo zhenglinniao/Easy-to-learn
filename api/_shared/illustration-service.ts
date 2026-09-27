@@ -9,6 +9,7 @@ import {
 } from '@easy-to-learn/domain';
 
 import type { AiStateStore } from './ai-state.js';
+import { withAbortSignal } from './abort.js';
 import { ApiFault } from './fault.js';
 import {
   ProviderTimeoutError,
@@ -140,7 +141,10 @@ export class SenseNovaImageGenerator implements ImageGenerator {
           lastError = error;
           const retryDelay = IMAGE_RETRY_DELAYS_MS[attempt];
           if (retryDelay !== undefined) {
-            await new Promise((resolve) => setTimeout(resolve, retryDelay));
+            await withAbortSignal(
+              new Promise((resolve) => setTimeout(resolve, retryDelay)),
+              controller.signal,
+            );
           }
         }
       }

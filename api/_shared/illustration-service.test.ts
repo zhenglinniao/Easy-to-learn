@@ -1,5 +1,5 @@
 import type { TutorResultV1 } from '@easy-to-learn/domain';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MemoryAiStateStore } from './ai-state.js';
 import {
@@ -51,6 +51,8 @@ const artifact = {
   width: 3,
   height: 2,
 };
+
+afterEach(() => vi.useRealTimers());
 
 describe('SenseNova image generation', () => {
   it('按官方 U1.5 生图协议请求并验证 JPEG 尺寸', async () => {
@@ -192,6 +194,27 @@ describe('SenseNova image generation', () => {
 
     await expect(rejectedGenerator.generate('教学插画')).rejects.toThrow('status 400');
     expect(rejectedFetch).toHaveBeenCalledOnce();
+  });
+
+  it('总超时触发时会中止重试等待且不再发起请求', async () => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn().mockRejectedValue(new TypeError('fetch failed'));
+    const generator = new SenseNovaImageGenerator(
+      {
+        baseUrl: 'https://token.sensenova.cn/v1',
+        model: 'sensenova-u1.5-fast',
+        apiKey: 'secret',
+        timeoutMs: 50,
+      },
+      fetcher,
+    );
+    const pending = generator.generate('教学插画');
+    const rejection = expect(pending).rejects.toThrow('sensenova image timeout');
+    expect(fetcher).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(50);
+
+    await rejection;
+    expect(fetcher).toHaveBeenCalledOnce();
   });
 
   it('只为适合视觉拆解的完整解答构造无文字插画提示词', () => {
