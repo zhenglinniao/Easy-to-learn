@@ -260,7 +260,12 @@ export default function CanvasPage() {
 
   useEffect(() => {
     const registry = aiTaskRegistry.current;
-    return () => registry.cancelAll();
+    registry.cancelAll();
+    const timer = window.setTimeout(() => setActiveAiTasks([]), 0);
+    return () => {
+      window.clearTimeout(timer);
+      registry.cancelAll();
+    };
   }, [boardId]);
 
   const refreshQuota = useCallback(
