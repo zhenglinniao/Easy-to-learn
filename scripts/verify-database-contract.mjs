@@ -75,6 +75,7 @@ for (const signature of [
   'public.record_analytics_visit(text, timestamptz)',
   'public.get_public_product_metrics()',
   'public.enqueue_account_asset_cleanup(uuid, timestamptz)',
+  'public.claim_asset_cleanup_jobs(integer, timestamptz)',
 ]) {
   assert(
     migration.includes(`revoke all on function ${signature}`) &&

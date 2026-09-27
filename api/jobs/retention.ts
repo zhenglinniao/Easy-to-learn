@@ -85,12 +85,10 @@ export default async function handler(request: HttpRequest, response: HttpRespon
       }
     }
 
-    const { data: cleanup, error: cleanupReadError } = await client
-      .from('asset_cleanup_jobs')
-      .select('id,object_path,reason,attempts')
-      .eq('status', 'pending')
-      .lte('not_before', now)
-      .limit(100);
+    const { data: cleanup, error: cleanupReadError } = await client.rpc(
+      'claim_asset_cleanup_jobs',
+      { p_limit: 100, p_now: now },
+    );
     if (cleanupReadError) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '无法读取资产清理队列');
     let assetsDeleted = 0;
     let assetFailures = 0;
@@ -103,7 +101,8 @@ export default async function handler(request: HttpRequest, response: HttpRespon
         const { error: completedError } = await client
           .from('asset_cleanup_jobs')
           .update({ status: 'completed' })
-          .eq('id', job.id);
+          .eq('id', job.id)
+          .eq('status', 'running');
         if (completedError) {
           throw new ApiFault('DEPENDENCY_UNAVAILABLE', '无法记录资产清理完成状态');
         }
@@ -117,8 +116,16 @@ export default async function handler(request: HttpRequest, response: HttpRespon
             attempts,
             status: attempts >= 10 ? 'failed' : 'pending',
             last_error_code: 'STORAGE_DELETE_FAILED',
+            ...(attempts >= 10
+              ? {}
+              : {
+                  not_before: new Date(
+                    Date.parse(now) + Math.min(60, 2 ** attempts) * 60_000,
+                  ).toISOString(),
+                }),
           })
-          .eq('id', job.id);
+          .eq('id', job.id)
+          .eq('status', 'running');
         if (retryError) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '无法记录资产清理失败状态');
       }
     }

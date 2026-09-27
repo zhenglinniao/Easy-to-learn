@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(46);
+select plan(51);
 
 select has_table('public', 'boards', '存在 boards 表');
 select has_table('public', 'board_assets', '存在 board_assets 表');
@@ -46,6 +46,28 @@ select ok(
     'execute'
   ),
   '只有服务端角色可以调用账户资产清理入队函数'
+);
+select has_function(
+  'public',
+  'claim_asset_cleanup_jobs',
+  array['integer', 'timestamp with time zone'],
+  '存在资产清理原子领取函数'
+);
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.claim_asset_cleanup_jobs(integer, timestamptz)',
+    'execute'
+  ),
+  '普通用户不能领取资产清理任务'
+);
+select ok(
+  has_function_privilege(
+    'service_role',
+    'public.claim_asset_cleanup_jobs(integer, timestamptz)',
+    'execute'
+  ),
+  '只有服务端角色可以领取资产清理任务'
 );
 select has_function(
   'public',
@@ -368,6 +390,18 @@ select is(
   ),
   1::bigint,
   '删除画板会原子写入资产清理任务'
+);
+
+set local role service_role;
+select lives_ok(
+  $$select * from public.claim_asset_cleanup_jobs(100, pg_catalog.now())$$,
+  '服务端可以原子领取到期的资产清理任务'
+);
+reset role;
+select is(
+  (select count(*) from public.asset_cleanup_jobs where status = 'running'),
+  1::bigint,
+  '领取后的资产任务进入 running 状态'
 );
 
 select * from finish();

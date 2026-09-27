@@ -117,9 +117,7 @@ describe('retention job', () => {
   });
 
   it('reports a clean empty run with an observable request id', async () => {
-    from
-      .mockReturnValueOnce(query({ data: [], error: null }))
-      .mockReturnValueOnce(query({ data: [], error: null }));
+    from.mockReturnValueOnce(query({ data: [], error: null }));
     const output = response();
     await handler(
       { method: 'GET', headers: { authorization: 'Bearer cron-secret' } },
@@ -136,13 +134,11 @@ describe('retention job', () => {
   it('returns a multi-status summary when storage deletion must be retried', async () => {
     from
       .mockReturnValueOnce(query({ data: [], error: null }))
-      .mockReturnValueOnce(
-        query({
-          data: [{ id: 4, object_path: 'owner/board/hash', reason: 'board_deleted', attempts: 2 }],
-          error: null,
-        }),
-      )
       .mockReturnValueOnce(query({ data: null, error: null }));
+    rpc.mockResolvedValueOnce({
+      data: [{ id: 4, object_path: 'owner/board/hash', reason: 'board_deleted', attempts: 2 }],
+      error: null,
+    });
     remove.mockResolvedValue({ data: null, error: new Error('storage unavailable') });
     const output = response();
     await handler(
@@ -161,8 +157,7 @@ describe('retention job', () => {
     from
       .mockReturnValueOnce(query({ data: [{ user_id: 'user-1' }], error: null }))
       .mockReturnValueOnce(query({ data: { user_id: 'user-1' }, error: null }))
-      .mockReturnValueOnce(auditQuery)
-      .mockReturnValueOnce(query({ data: [], error: null }));
+      .mockReturnValueOnce(auditQuery);
     const output = response();
 
     await handler(
@@ -187,8 +182,7 @@ describe('retention job', () => {
     from
       .mockReturnValueOnce(query({ data: [{ user_id: 'user-2' }], error: null }))
       .mockReturnValueOnce(query({ data: { user_id: 'user-2' }, error: null }))
-      .mockReturnValueOnce(failedUpdate)
-      .mockReturnValueOnce(query({ data: [], error: null }));
+      .mockReturnValueOnce(failedUpdate);
     deleteUser.mockResolvedValueOnce({ data: null, error: new Error('auth unavailable') });
     const output = response();
 
@@ -208,8 +202,7 @@ describe('retention job', () => {
     from
       .mockReturnValueOnce(query({ data: [{ user_id: 'user-3' }], error: null }))
       .mockReturnValueOnce(query({ data: { user_id: 'user-3' }, error: null }))
-      .mockReturnValueOnce(failedUpdate)
-      .mockReturnValueOnce(query({ data: [], error: null }));
+      .mockReturnValueOnce(failedUpdate);
     rpc
       .mockResolvedValueOnce({ data: null, error: new Error('queue unavailable') })
       .mockResolvedValueOnce({ data: null, error: null });
@@ -228,17 +221,11 @@ describe('retention job', () => {
 
   it('completes successful temporary asset cleanup in the isolated bucket', async () => {
     const completedUpdate = query({ data: null, error: null });
-    from
-      .mockReturnValueOnce(query({ data: [], error: null }))
-      .mockReturnValueOnce(
-        query({
-          data: [
-            { id: 9, object_path: 'request/generated.png', reason: 'temp_expired', attempts: 0 },
-          ],
-          error: null,
-        }),
-      )
-      .mockReturnValueOnce(completedUpdate);
+    from.mockReturnValueOnce(query({ data: [], error: null })).mockReturnValueOnce(completedUpdate);
+    rpc.mockResolvedValueOnce({
+      data: [{ id: 9, object_path: 'request/generated.png', reason: 'temp_expired', attempts: 0 }],
+      error: null,
+    });
     remove.mockResolvedValue({ data: null, error: null });
     const output = response();
 
@@ -250,21 +237,18 @@ describe('retention job', () => {
     expect(storageFrom).toHaveBeenCalledWith('ai-temp');
     expect(remove).toHaveBeenCalledWith(['request/generated.png']);
     expect(completedUpdate.update).toHaveBeenCalledWith({ status: 'completed' });
+    expect(completedUpdate.eq).toHaveBeenCalledWith('status', 'running');
     expect(output.statusCode()).toBe(200);
     expect(output.body()).toMatchObject({ data: { assetsDeleted: 1, assetFailures: 0 } });
   });
 
   it('stops retrying an asset after the tenth failed deletion attempt', async () => {
     const failedUpdate = query({ data: null, error: null });
-    from
-      .mockReturnValueOnce(query({ data: [], error: null }))
-      .mockReturnValueOnce(
-        query({
-          data: [{ id: 10, object_path: 'owner/board/hash', reason: 'board_deleted', attempts: 9 }],
-          error: null,
-        }),
-      )
-      .mockReturnValueOnce(failedUpdate);
+    from.mockReturnValueOnce(query({ data: [], error: null })).mockReturnValueOnce(failedUpdate);
+    rpc.mockResolvedValueOnce({
+      data: [{ id: 10, object_path: 'owner/board/hash', reason: 'board_deleted', attempts: 9 }],
+      error: null,
+    });
     remove.mockResolvedValue({ data: null, error: new Error('storage unavailable') });
     const output = response();
 
@@ -278,13 +262,13 @@ describe('retention job', () => {
       status: 'failed',
       last_error_code: 'STORAGE_DELETE_FAILED',
     });
+    expect(failedUpdate.eq).toHaveBeenCalledWith('status', 'running');
     expect(output.statusCode()).toBe(207);
   });
 
   it('does not report success when a cleanup queue read fails', async () => {
-    from
-      .mockReturnValueOnce(query({ data: [], error: null }))
-      .mockReturnValueOnce(query({ data: null, error: new Error('database unavailable') }));
+    from.mockReturnValueOnce(query({ data: [], error: null }));
+    rpc.mockResolvedValueOnce({ data: null, error: new Error('database unavailable') });
     const output = response();
     await handler(
       { method: 'GET', headers: { authorization: 'Bearer cron-secret' } },
@@ -293,6 +277,9 @@ describe('retention job', () => {
 
     expect(output.statusCode()).toBe(503);
     expect(output.body()).toMatchObject({ code: 'DEPENDENCY_UNAVAILABLE' });
-    expect(rpc).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledWith('claim_asset_cleanup_jobs', {
+      p_limit: 100,
+      p_now: expect.any(String),
+    });
   });
 });
