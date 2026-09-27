@@ -266,4 +266,19 @@ describe('admin model policy', () => {
       message: '已保存的模型配置无法读取',
     });
   });
+
+  it('将 Redis 写入故障映射为可识别的依赖错误', async () => {
+    const redis = {
+      get: async () => null,
+      set: async () => Promise.reject(new Error('redis offline')),
+    } as unknown as Redis;
+    const store = new AdminModelPolicyStore(redis, key);
+
+    await expect(
+      store.write(configs, defaultAdminModelPolicy(configs), 'admin-id'),
+    ).rejects.toMatchObject({
+      code: 'DEPENDENCY_UNAVAILABLE',
+      message: '模型配置存储暂时不可用',
+    });
+  });
 });

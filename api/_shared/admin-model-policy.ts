@@ -367,7 +367,11 @@ export class AdminModelPolicyStore {
   ): Promise<AdminModelPolicy> {
     const validated = validateAdminModelPolicy(value, configs, await this.read(configs));
     const policy = { ...validated, updatedAt: new Date().toISOString(), updatedBy: adminUserId };
-    await this.redis.set(ADMIN_MODEL_POLICY_KEY, encrypt(policy, this.encryptionKey));
+    try {
+      await this.redis.set(ADMIN_MODEL_POLICY_KEY, encrypt(policy, this.encryptionKey));
+    } catch {
+      throw new ApiFault('DEPENDENCY_UNAVAILABLE', '模型配置存储暂时不可用');
+    }
     return policy;
   }
 }
