@@ -7,6 +7,17 @@ interface BoardErrorLike {
 const hasMessage = (error: BoardErrorLike, value: string): boolean =>
   error.message?.includes(value) ?? false;
 
+export const isAuthoritativeBoardAccessError = (error: unknown): boolean => {
+  const candidate = (typeof error === 'object' && error !== null ? error : {}) as BoardErrorLike;
+  return (
+    candidate.code === 'PGRST116' ||
+    candidate.status === 401 ||
+    candidate.status === 403 ||
+    hasMessage(candidate, 'BOARD_NOT_FOUND') ||
+    hasMessage(candidate, 'JWT expired')
+  );
+};
+
 export const toBoardMessage = (
   error: unknown,
   fallback = '画板服务暂时不可用，请稍后重试。',
@@ -16,7 +27,11 @@ export const toBoardMessage = (
   if (hasMessage(candidate, 'STORAGE_QUOTA_EXCEEDED')) {
     return '画板或图片存储已达到上限，请先整理已有内容。';
   }
-  if (hasMessage(candidate, 'BOARD_NOT_FOUND') || candidate.code === 'PGRST116') {
+  if (
+    hasMessage(candidate, 'BOARD_NOT_FOUND') ||
+    candidate.code === 'PGRST116' ||
+    candidate.status === 403
+  ) {
     return '这块画板不存在，或你没有访问权限。';
   }
   if (hasMessage(candidate, 'AUTH_REQUIRED') || candidate.status === 401) {

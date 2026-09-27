@@ -36,7 +36,13 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { useAuth } from '../auth';
 import { TutorApiClient, tutorErrorMessage } from '../ai-tutor';
-import { GuestBoardMigrationService, RemoteBoardRepository, SupabaseBoardGateway } from '../boards';
+import {
+  GuestBoardMigrationService,
+  isAuthoritativeBoardAccessError,
+  RemoteBoardRepository,
+  SupabaseBoardGateway,
+  toBoardMessage,
+} from '../boards';
 import { downloadJson } from '../account';
 import { ModalFocusBoundary } from '../../components/ModalFocusBoundary';
 import { ThemeToggle, useTheme } from '../theme';
@@ -422,6 +428,7 @@ export default function CanvasPage() {
                 stored = await repository.storeRemoteSnapshot(snapshot, user.id);
               }
             } catch (error) {
+              if (isAuthoritativeBoardAccessError(error)) throw error;
               // 仅允许当前账户明确拥有的缓存进入离线回退；其他账户或旧版未验证
               // 缓存必须保持不可见。
               if (!stored || stored.ownerId !== user.id) throw error;
@@ -499,8 +506,12 @@ export default function CanvasPage() {
           }
         }
       })
-      .catch(() => {
-        if (active) setPreparationError('本地画板无法恢复，请先导出重要数据后再重试。');
+      .catch((error: unknown) => {
+        if (active) {
+          setPreparationError(
+            toBoardMessage(error, '本地画板无法恢复，请先导出重要数据后再重试。'),
+          );
+        }
       });
     return () => {
       active = false;
