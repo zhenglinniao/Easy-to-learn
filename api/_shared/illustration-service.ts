@@ -88,6 +88,44 @@ interface StoredIllustration {
   height: number;
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+
+export const validateStoredIllustration = (
+  value: unknown,
+  actorHash: string,
+  requestId: string,
+): StoredIllustration | null => {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<StoredIllustration>;
+  const pathPrefix = `${actorHash}/${requestId}/`;
+  if (
+    typeof candidate.fileId !== 'string' ||
+    !UUID_PATTERN.test(candidate.fileId) ||
+    typeof candidate.objectPath !== 'string' ||
+    !candidate.objectPath.startsWith(pathPrefix) ||
+    !candidate.objectPath.endsWith('.jpg') ||
+    !SHA256_PATTERN.test(candidate.objectPath.slice(pathPrefix.length, -4)) ||
+    candidate.mimeType !== 'image/jpeg' ||
+    typeof candidate.byteSize !== 'number' ||
+    !Number.isSafeInteger(candidate.byteSize) ||
+    candidate.byteSize <= 0 ||
+    candidate.byteSize > MAX_IMAGE_BYTES ||
+    typeof candidate.width !== 'number' ||
+    !Number.isSafeInteger(candidate.width) ||
+    candidate.width <= 0 ||
+    candidate.width > MAX_IMAGE_EDGE ||
+    typeof candidate.height !== 'number' ||
+    !Number.isSafeInteger(candidate.height) ||
+    candidate.height <= 0 ||
+    candidate.height > MAX_IMAGE_EDGE ||
+    candidate.width * candidate.height > MAX_IMAGE_PIXELS
+  ) {
+    return null;
+  }
+  return candidate as StoredIllustration;
+};
+
 type GeneratedIllustrationData = Omit<
   Extract<IllustrationResponse['data'], { status: 'generated' }>,
   'quota' | 'placement'
@@ -229,8 +267,19 @@ export class IllustrationArtifactStore implements IllustrationArtifactRepository
   ) {}
 
   async read(actor: TutorActor, requestId: string): Promise<GeneratedIllustrationData | null> {
-    const stored = await this.redis.get<StoredIllustration>(this.cacheKey(actor, requestId));
-    if (!stored) return null;
+    const cacheKey = this.cacheKey(actor, requestId);
+    let value: unknown;
+    try {
+      value = await this.redis.get<unknown>(cacheKey);
+    } catch {
+      throw new ApiFault('DEPENDENCY_UNAVAILABLE', '生成图片缓存暂时无法读取');
+    }
+    if (!value) return null;
+    const stored = validateStoredIllustration(value, this.actorHash(actor), requestId);
+    if (!stored) {
+      await this.redis.del(cacheKey).catch(() => undefined);
+      return null;
+    }
     return this.response(stored);
   }
 

@@ -7,6 +7,7 @@ import {
   IllustrationService,
   SenseNovaImageGenerator,
   shouldGenerateIllustration,
+  validateStoredIllustration,
   type GeneratedImage,
   type IllustrationArtifactRepository,
 } from './illustration-service.js';
@@ -338,5 +339,47 @@ describe('SenseNova image generation', () => {
     await expect(state.getCached('user:user-1', requestId)).resolves.toMatchObject({
       result: { title: '汉堡的结构' },
     });
+  });
+});
+
+describe('illustration artifact cache validation', () => {
+  const actorHash = 'a'.repeat(64);
+  const stored = {
+    fileId: '00000000-0000-4000-8000-000000000020',
+    objectPath: `${actorHash}/${requestId}/${'b'.repeat(64)}.jpg`,
+    mimeType: 'image/jpeg',
+    byteSize: 128,
+    width: 3,
+    height: 2,
+  };
+
+  it('accepts only the expected actor and request scoped object path', () => {
+    expect(validateStoredIllustration(stored, actorHash, requestId)).toEqual(stored);
+    expect(
+      validateStoredIllustration(
+        { ...stored, objectPath: `${'c'.repeat(64)}/${requestId}/${'b'.repeat(64)}.jpg` },
+        actorHash,
+        requestId,
+      ),
+    ).toBeNull();
+    expect(
+      validateStoredIllustration(
+        { ...stored, objectPath: `${actorHash}/${requestId}/../other.jpg` },
+        actorHash,
+        requestId,
+      ),
+    ).toBeNull();
+  });
+
+  it.each([
+    { field: 'fileId', value: 'not-a-uuid' },
+    { field: 'mimeType', value: 'image/svg+xml' },
+    { field: 'byteSize', value: 0 },
+    { field: 'width', value: 4097 },
+    { field: 'height', value: Number.NaN },
+  ])('rejects invalid $field metadata', ({ field, value }) => {
+    expect(
+      validateStoredIllustration({ ...stored, [field]: value }, actorHash, requestId),
+    ).toBeNull();
   });
 });
