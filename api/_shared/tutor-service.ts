@@ -27,8 +27,8 @@ export class ProviderTimeoutError extends Error {}
 export class ProviderUnavailableError extends Error {}
 
 export const TUTOR_EXECUTION_TIMEOUT_MS = 52_000;
-const DUPLICATE_POLL_INTERVAL_MS = 100;
-const DUPLICATE_WAIT_ATTEMPTS = 200;
+const DUPLICATE_POLL_INTERVAL_MS = 250;
+const DUPLICATE_WAIT_ATTEMPTS = 80;
 
 const providerFailureDetails = (error: unknown): Record<string, string> => {
   const details: Record<string, string> = {};

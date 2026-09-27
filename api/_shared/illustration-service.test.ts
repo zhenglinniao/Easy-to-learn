@@ -345,7 +345,7 @@ describe('SenseNova image generation', () => {
     vi.useFakeTimers();
     const state = await prepareState();
     await state.reserveImages('user:user-1', requestId, 1, now);
-    const reads = Array.from({ length: 22 }, () => null);
+    const reads = Array.from({ length: 10 }, () => null);
     const read = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null);
     for (const value of reads) read.mockResolvedValueOnce(value);
     read.mockResolvedValue({ status: 'generated', asset: artifact });
