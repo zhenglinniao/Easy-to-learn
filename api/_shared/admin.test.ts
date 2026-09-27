@@ -167,11 +167,48 @@ describe('AdminService overview', () => {
           boardCount: 2,
         },
       ],
-      pagination: { page: 1, perPage: 50, total: 2 },
+      pagination: {
+        page: 1,
+        perPage: 50,
+        total: 2,
+        matchingTotal: 1,
+        searchTruncated: false,
+      },
       pageSuspended: 0,
     });
     expect(boards.in).toHaveBeenCalledWith('owner_id', [learner]);
     expect(readPolicy).toHaveBeenCalledOnce();
+  });
+
+  it('searches across authentication pages and paginates the matching accounts', async () => {
+    listUsers
+      .mockResolvedValueOnce({ data: { total: 201, users: [] }, error: null })
+      .mockResolvedValueOnce({
+        data: {
+          total: 201,
+          users: [
+            {
+              id: learner,
+              email: 'learner@example.com',
+              created_at: '2026-09-01T00:00:00.000Z',
+            },
+          ],
+        },
+        error: null,
+      });
+    const boards = boardQuery([]);
+    from.mockImplementation((table: string) => {
+      if (table === 'boards') return boards;
+      if (table === 'security_audit_events') return { insert: insertAudit };
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    await expect(new AdminService().overview(1, 'learner')).resolves.toMatchObject({
+      accounts: [{ id: learner }],
+      pagination: { total: 201, matchingTotal: 1, searchTruncated: false },
+    });
+    expect(listUsers).toHaveBeenNthCalledWith(1, { page: 1, perPage: 200 });
+    expect(listUsers).toHaveBeenNthCalledWith(2, { page: 2, perPage: 200 });
   });
 
   it('reports account and board dependency failures explicitly', async () => {

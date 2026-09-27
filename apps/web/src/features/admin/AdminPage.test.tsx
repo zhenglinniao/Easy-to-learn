@@ -28,7 +28,13 @@ const overview = {
       boardCount: 2,
     },
   ],
-  pagination: { page: 1, perPage: 50, total: 1 },
+  pagination: {
+    page: 1,
+    perPage: 50,
+    total: 1,
+    matchingTotal: 1,
+    searchTruncated: false,
+  },
   models: [
     {
       id: 'primary',

@@ -62,6 +62,9 @@ const isSuspended = (user: AdminAuthUser): boolean =>
 
 const USER_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ADMIN_PAGE_SIZE = 50;
+const ADMIN_SEARCH_BATCH_SIZE = 200;
+const ADMIN_SEARCH_SCAN_LIMIT = 1_000;
 
 export interface AdminAccountSummary {
   id: string;
@@ -90,28 +93,54 @@ export class AdminService {
     search: string,
   ): Promise<{
     accounts: AdminAccountSummary[];
-    pagination: { page: number; perPage: number; total: number };
+    pagination: {
+      page: number;
+      perPage: number;
+      total: number;
+      matchingTotal: number;
+      searchTruncated: boolean;
+    };
     models: AdminModelPolicyView['providers'];
     policyUpdatedAt: string | null;
     pageSuspended: number;
   }> {
-    const perPage = 50;
-    const listResult = await this.supabase.auth.admin.listUsers({ page, perPage });
+    const perPage = ADMIN_PAGE_SIZE;
+    const needle = search.trim().toLowerCase();
+    const listResult = await this.supabase.auth.admin.listUsers({
+      page: needle ? 1 : page,
+      perPage: needle ? ADMIN_SEARCH_BATCH_SIZE : perPage,
+    });
     if (listResult.error) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '无法读取账户列表');
     // Supabase 将成功响应与空数组错误响应建模为联合类型。Vercel 会逐个编译
     // Serverless 函数，无法稳定地通过上方错误判断收窄，因此在服务边界统一类型。
-    const listedUsers = listResult.data.users as AdminAuthUser[];
+    let listedUsers = listResult.data.users as AdminAuthUser[];
     const total =
       'total' in listResult.data && typeof listResult.data.total === 'number'
         ? listResult.data.total
         : listedUsers.length;
-    const needle = search.trim().toLowerCase();
-    const users = listedUsers.filter(
+    if (needle) {
+      const pagesToScan = Math.min(
+        Math.ceil(total / ADMIN_SEARCH_BATCH_SIZE),
+        Math.ceil(ADMIN_SEARCH_SCAN_LIMIT / ADMIN_SEARCH_BATCH_SIZE),
+      );
+      for (let searchPage = 2; searchPage <= pagesToScan; searchPage += 1) {
+        const next = await this.supabase.auth.admin.listUsers({
+          page: searchPage,
+          perPage: ADMIN_SEARCH_BATCH_SIZE,
+        });
+        if (next.error) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '无法读取账户列表');
+        listedUsers = listedUsers.concat(next.data.users as AdminAuthUser[]);
+      }
+    }
+    const matchingUsers = listedUsers.filter(
       (user) =>
         !needle ||
         user.id.toLowerCase().includes(needle) ||
         user.email?.toLowerCase().includes(needle),
     );
+    const users = needle
+      ? matchingUsers.slice((page - 1) * perPage, page * perPage)
+      : matchingUsers;
     const userIds = users.map(({ id }) => id);
     const boardCounts = new Map<string, number>();
     if (userIds.length > 0) {
@@ -138,7 +167,13 @@ export class AdminService {
     const policy = await this.policyStore.read(configs);
     return {
       accounts,
-      pagination: { page, perPage, total },
+      pagination: {
+        page,
+        perPage,
+        total,
+        matchingTotal: needle ? matchingUsers.length : total,
+        searchTruncated: Boolean(needle && total > ADMIN_SEARCH_SCAN_LIMIT),
+      },
       models: toAdminModelPolicyView(policy).providers,
       policyUpdatedAt: policy.updatedAt,
       pageSuspended: accounts.filter(({ suspended }) => suspended).length,

@@ -615,9 +615,9 @@ export default function AdminPage() {
             }}
           >
             <label>
-              <span className={styles.srOnly}>筛选当前页邮箱或用户 ID</span>
+              <span className={styles.srOnly}>搜索邮箱或用户 ID</span>
               <input
-                placeholder="筛选当前页邮箱或用户 ID"
+                placeholder="搜索邮箱或用户 ID"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
@@ -627,8 +627,9 @@ export default function AdminPage() {
         </div>
         {query && (
           <p className={styles.searchHint}>
-            当前仅筛选第 {page} 页已加载账户，共匹配 {overview?.accounts.length ?? 0}{' '}
-            个；清空关键词可恢复本页。
+            找到 {overview?.pagination.matchingTotal ?? 0} 个匹配账户
+            {overview?.pagination.searchTruncated ? '（仅扫描前 1000 个账户）' : ''}
+            ；邮箱会脱敏展示。
           </p>
         )}
         <div className={styles.accountTable} role="table" aria-label="账户列表">
@@ -675,7 +676,9 @@ export default function AdminPage() {
           <span>第 {page} 页</span>
           <button
             type="button"
-            disabled={!overview || page * overview.pagination.perPage >= overview.pagination.total}
+            disabled={
+              !overview || page * overview.pagination.perPage >= overview.pagination.matchingTotal
+            }
             onClick={() => setPage((value) => value + 1)}
           >
             下一页

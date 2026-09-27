@@ -26,7 +26,13 @@ export interface AdminAccountView {
 
 export interface AdminOverview {
   accounts: AdminAccountView[];
-  pagination: { page: number; perPage: number; total: number };
+  pagination: {
+    page: number;
+    perPage: number;
+    total: number;
+    matchingTotal: number;
+    searchTruncated: boolean;
+  };
   models: AdminProviderView[];
   policyUpdatedAt: string | null;
   pageSuspended: number;

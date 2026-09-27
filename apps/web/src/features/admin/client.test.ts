@@ -4,7 +4,13 @@ import { AdminApiClient, AdminApiError } from './client';
 
 const overview = {
   accounts: [],
-  pagination: { page: 1, perPage: 50, total: 0 },
+  pagination: {
+    page: 1,
+    perPage: 50,
+    total: 0,
+    matchingTotal: 0,
+    searchTruncated: false,
+  },
   models: [
     {
       id: 'primary',
