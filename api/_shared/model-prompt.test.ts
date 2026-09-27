@@ -6,6 +6,7 @@ import tutorPromptRegistry from '../../skills/canvas-tutor-planner/references/pr
 import {
   buildTutorPrompt,
   DEFAULT_TUTOR_PROMPT_VERSION,
+  MAX_MODEL_TEXT_CHARACTERS,
   parseModelJson,
   resolveTutorPromptVersion,
   TUTOR_SYSTEM_INSTRUCTION,
@@ -94,5 +95,11 @@ describe('Tutor Skill prompt registry', () => {
       title: '含 } 的字符串',
       schemaVersion: 1,
     });
+  });
+
+  it('拒绝将供应商异常超长文本交给 JSON 与 DSL 解析', () => {
+    expect(() => parseModelJson('x'.repeat(MAX_MODEL_TEXT_CHARACTERS + 1))).toThrow(
+      /安全长度上限/,
+    );
   });
 });

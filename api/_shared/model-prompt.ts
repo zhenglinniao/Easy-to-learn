@@ -50,6 +50,11 @@ export const getTutorSystemInstruction = (promptVersion = DEFAULT_TUTOR_PROMPT_V
 
 export const TUTOR_SYSTEM_INSTRUCTION = getTutorSystemInstruction();
 
+// Normal Tutor DSL responses are well below this ceiling (the compact contract asks
+// SenseNova for <=16 KiB). Keep enough room for richer providers while preventing an
+// unbounded provider response from entering JSON parsing and schema validation.
+export const MAX_MODEL_TEXT_CHARACTERS = 128 * 1024;
+
 export const SENSENOVA_COMPACT_TUTOR_CONTRACT = [
   'SenseNova 紧凑输出契约（服务器会再次严格校验）：',
   '只返回一个 JSON 对象，不要 Markdown、解释前言、尾注或 metadata（metadata 由服务器写入）。总 JSON 控制在 16KB 内。',
@@ -95,6 +100,9 @@ export const buildTutorPrompt = (
 
 export const parseModelJson = (text: string | undefined): unknown => {
   if (!text) throw new ProviderUnavailableError('模型没有返回文本');
+  if (text.length > MAX_MODEL_TEXT_CHARACTERS) {
+    throw new ProviderUnavailableError('模型返回内容超过安全长度上限');
+  }
   const parseCandidate = (candidate: string): unknown => {
     const parsed: unknown = JSON.parse(candidate);
     // 部分 OpenAI-compatible Responses 实现会把结构化 JSON 再编码为字符串。
