@@ -10,7 +10,12 @@ const managedEnvironment = [
   'AI_PROVIDER_PRIMARY_MODEL',
   'AI_PROVIDER_PRIMARY_TYPE',
   'AI_PROVIDERS',
+  'AI_CACHE_ENCRYPTION_KEY',
+  'ACTOR_HASH_SECRET',
+  'ANON_SESSION_KEYS',
+  'APP_ORIGINS',
   'SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_URL',
   'UPSTASH_REDIS_REST_TOKEN',
   'UPSTASH_REDIS_REST_URL',
@@ -54,8 +59,13 @@ describe('GET /api/health', () => {
       AI_PROVIDER_PRIMARY_MODEL: 'model-1',
       AI_PROVIDER_PRIMARY_BASE_URL: 'https://provider.example.test/v1',
       AI_PROVIDER_PRIMARY_API_KEY: 'secret',
+      AI_CACHE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+      ACTOR_HASH_SECRET: 'actor-secret',
+      ANON_SESSION_KEYS: `v1:${'a'.repeat(32)}`,
+      APP_ORIGINS: 'https://easy.example.com',
       SUPABASE_URL: 'https://project.supabase.co',
       SUPABASE_ANON_KEY: 'anon-key',
+      SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
       UPSTASH_REDIS_REST_URL: 'https://redis.example.test',
       UPSTASH_REDIS_REST_TOKEN: 'redis-token',
       VERCEL_GIT_COMMIT_SHA: 'abc123',
@@ -70,7 +80,7 @@ describe('GET /api/health', () => {
         data: {
           status: 'ok',
           commit: 'abc123',
-          dependencies: { supabase: 'ok', redis: 'ok', ai: 'ok' },
+          dependencies: { supabase: 'ok', redis: 'ok', ai: 'ok', security: 'ok' },
         },
       },
     });
@@ -88,7 +98,12 @@ describe('GET /api/health', () => {
         data: {
           status: 'degraded',
           commit: 'local',
-          dependencies: { supabase: 'degraded', redis: 'degraded', ai: 'degraded' },
+          dependencies: {
+            supabase: 'degraded',
+            redis: 'degraded',
+            ai: 'degraded',
+            security: 'degraded',
+          },
         },
       },
     });
@@ -98,6 +113,35 @@ describe('GET /api/health', () => {
     expect(invalid.result()).toMatchObject({
       statusCode: 400,
       body: { code: 'INVALID_INPUT', retryable: false },
+    });
+  });
+
+  it('reports malformed security settings and cache keys as degraded', async () => {
+    Object.assign(process.env, {
+      AI_PROVIDERS: 'primary',
+      AI_PROVIDER_PRIMARY_TYPE: 'openai-compatible',
+      AI_PROVIDER_PRIMARY_MODEL: 'model-1',
+      AI_PROVIDER_PRIMARY_BASE_URL: 'https://provider.example.test/v1',
+      AI_PROVIDER_PRIMARY_API_KEY: 'secret',
+      AI_CACHE_ENCRYPTION_KEY: 'not-32-byte-base64',
+      ACTOR_HASH_SECRET: 'actor-secret',
+      ANON_SESSION_KEYS: 'v1:short',
+      APP_ORIGINS: 'https://easy.example.com/path',
+      SUPABASE_URL: 'https://project.supabase.co',
+      SUPABASE_ANON_KEY: 'anon-key',
+      SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+      UPSTASH_REDIS_REST_URL: 'https://redis.example.test',
+      UPSTASH_REDIS_REST_TOKEN: 'redis-token',
+    });
+    const recorder = responseRecorder();
+
+    await handler({ method: 'GET', headers: {} } as HttpRequest, recorder.response);
+
+    expect(recorder.result().body).toMatchObject({
+      data: {
+        status: 'degraded',
+        dependencies: { supabase: 'ok', redis: 'ok', ai: 'degraded', security: 'degraded' },
+      },
     });
   });
 });

@@ -221,7 +221,7 @@ pnpm check
 
 - 生产别名：[https://easy-to-learn-steel.vercel.app](https://easy-to-learn-steel.vercel.app)
 - 已验收路由：`/`、`/canvas`、`/api/health` 均返回 HTTP 200。
-- 最近一次验收时健康状态：应用版本正常，`supabase`、`redis` 和 `ai` 均为 `ok`；应以当前 `/api/health` 返回为准。
+- 最近一次验收时健康状态：应用版本正常，`supabase`、`redis`、`ai` 和 `security` 均为 `ok`；其中 `security` 会校验来源白名单和匿名会话密钥，`ai` 也会校验缓存加密与 actor 摘要配置。应以当前 `/api/health` 返回为准。
 - 已完成游客文字题端到端验收：建立匿名会话、调用 DeepSeek、解析 Tutor DSL 和扣减每日配额均成功。
 - 外部密钥、数据库迁移和模型权限可能独立变化；每次发布前仍需在 Preview 环境重新验证上传、账户删除、管理员操作和真实模型调用。
 
