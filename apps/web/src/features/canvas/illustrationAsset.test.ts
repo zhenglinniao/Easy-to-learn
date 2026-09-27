@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { addStepIllustrationFile, type GeneratedIllustrationAsset } from './illustrationAsset';
 
 const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+const storageOrigin = new URL(import.meta.env.VITE_SUPABASE_URL ?? 'https://storage.example.test')
+  .origin;
 const asset: GeneratedIllustrationAsset = {
   fileId: '00000000-0000-4000-8000-000000000020',
-  downloadUrl: 'https://storage.example.test/illustration.jpg?token=opaque',
+  downloadUrl: `${storageOrigin}/illustration.jpg?token=opaque`,
   mimeType: 'image/jpeg',
   byteSize: bytes.byteLength,
   width: 100,
@@ -70,5 +72,18 @@ describe('addStepIllustrationFile', () => {
     ).rejects.toThrow('文件校验失败');
     expect(blob).not.toHaveBeenCalled();
     expect(addFiles).not.toHaveBeenCalled();
+  });
+
+  it('rejects an insecure download URL before starting a request', async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    await expect(
+      addStepIllustrationFile(
+        { addFiles: vi.fn() } as never,
+        { ...asset, downloadUrl: 'http://storage.example.test/illustration.jpg' },
+        undefined,
+        fetcher,
+      ),
+    ).rejects.toThrow('下载地址不安全');
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TutorApiClient, TutorApiError, tutorErrorMessage } from './client';
 
+const storageOrigin = new URL(import.meta.env.VITE_SUPABASE_URL ?? 'https://storage.example.test')
+  .origin;
+
 const guestQuota = (nextAllowedAt: string) => ({
   dailyLimit: 3 as const,
   remaining: 2,
@@ -139,7 +142,7 @@ describe('TutorApiClient', () => {
       .mockResolvedValueOnce(
         Response.json({
           data: {
-            uploadUrl: 'https://storage.example.test/upload?token=opaque',
+            uploadUrl: `${storageOrigin}/upload?token=opaque`,
             uploadPath: 'actor/request/hash',
             expiresAt: '2026-09-22T12:10:00.000Z',
           },
@@ -166,7 +169,7 @@ describe('TutorApiClient', () => {
     );
     expect(fetcher).toHaveBeenNthCalledWith(
       3,
-      'https://storage.example.test/upload?token=opaque',
+      `${storageOrigin}/upload?token=opaque`,
       expect.objectContaining({ method: 'PUT', body: blob }),
     );
     expect(close).toHaveBeenCalledOnce();

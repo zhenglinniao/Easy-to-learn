@@ -19,23 +19,11 @@ import {
 } from '@easy-to-learn/domain';
 import { z } from 'zod';
 
-const isSafeUploadUrl = (value: string): boolean => {
-  try {
-    const url = new URL(value);
-    if (url.protocol === 'https:') return true;
-    return (
-      import.meta.env.DEV &&
-      url.protocol === 'http:' &&
-      (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]')
-    );
-  } catch {
-    return false;
-  }
-};
+import { isSafeAssetUrl } from './assetUrl';
 
 const uploadTicketResponseSchema = z.strictObject({
   data: z.strictObject({
-    uploadUrl: z.string().url().refine(isSafeUploadUrl),
+    uploadUrl: z.string().url().refine(isSafeAssetUrl),
     uploadPath: z.string().min(1).max(1_024),
     expiresAt: z.string().datetime(),
   }),

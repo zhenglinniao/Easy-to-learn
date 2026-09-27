@@ -1,6 +1,8 @@
 import type { IllustrationResponse } from '@easy-to-learn/domain';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 
+import { isSafeAssetUrl } from '../ai-tutor/assetUrl';
+
 export type GeneratedIllustrationAsset = Extract<
   IllustrationResponse['data'],
   { status: 'generated' }
@@ -22,6 +24,9 @@ export const addStepIllustrationFile = async (
   signal?: AbortSignal,
   fetcher: typeof fetch = (input, init) => globalThis.fetch(input, init),
 ): Promise<void> => {
+  if (!isSafeAssetUrl(asset.downloadUrl)) {
+    throw new Error('生成插画下载地址不安全，文字与矢量图解已保留。');
+  }
   const response = await fetcher(asset.downloadUrl, signal ? { signal } : undefined);
   if (!response.ok) throw new Error('生成插画暂时无法下载，文字与矢量图解已保留。');
 
