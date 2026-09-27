@@ -292,7 +292,7 @@ describe('TutorService', () => {
     );
   });
 
-  it('主模型两次内容校验失败后使用下一顺位模型', async () => {
+  it('主模型内容校验失败后立即给下一顺位模型留出执行预算', async () => {
     const primary: TutorModel = {
       generate: vi.fn().mockResolvedValue({ title: '缺少 Tutor DSL 字段' }),
     };
@@ -311,7 +311,7 @@ describe('TutorService', () => {
     await expect(service.execute(actor, request)).resolves.toMatchObject({
       data: { result: { title: '一元一次方程' } },
     });
-    expect(primary.generate).toHaveBeenCalledTimes(2);
+    expect(primary.generate).toHaveBeenCalledOnce();
     expect(backup.generate).toHaveBeenCalledOnce();
   });
 

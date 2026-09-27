@@ -340,7 +340,7 @@ export class TutorService {
       const invalidAttempts: Array<{
         providerIndex: number;
         initialIssues: ReturnType<typeof safeIssueSummary>;
-        correctionIssues: ReturnType<typeof safeIssueSummary>;
+        correctionIssues: ReturnType<typeof safeIssueSummary> | null;
       }> = [];
 
       for (const [providerIndex, candidateModel] of candidates.entries()) {
@@ -352,7 +352,10 @@ export class TutorService {
           );
           let validated = validateTutorCandidate(request, candidate);
           const initialIssues = validated.success ? [] : safeIssueSummary(validated.issues);
-          if (!validated.success) {
+          const isLastProvider = providerIndex === candidates.length - 1;
+          // 有备用模型时直接回退，避免慢模型再做一次纠错并耗尽整条 52 秒预算。
+          // 唯一模型或最后顺位仍保留一次纠错，兼顾结构稳定性。
+          if (!validated.success && isLastProvider) {
             candidate = await candidateModel.generate(
               request,
               correctionFromIssues(validated.issues),
@@ -380,7 +383,7 @@ export class TutorService {
           invalidAttempts.push({
             providerIndex,
             initialIssues,
-            correctionIssues: safeIssueSummary(validated.issues),
+            correctionIssues: isLastProvider ? safeIssueSummary(validated.issues) : null,
           });
         } catch (error) {
           if (error instanceof ProviderTimeoutError || error instanceof ProviderUnavailableError) {
