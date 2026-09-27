@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto';
+
 import type { TutorRequest, TutorResultV1 } from '@easy-to-learn/domain';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -57,6 +59,13 @@ describe('anonymous session', () => {
     expect(() =>
       verifyAnonymousSession(issued.cookieValue, [key], new Date('2026-10-23T00:00:00.000Z')),
     ).toThrow(ApiFault);
+    expect(() => verifyAnonymousSession('x'.repeat(2_049), [key], now)).toThrow(ApiFault);
+
+    const nullPayload = Buffer.from('null').toString('base64url');
+    const nullSignature = createHmac('sha256', key.secret).update(nullPayload).digest('base64url');
+    expect(() => verifyAnonymousSession(`${nullPayload}.${nullSignature}`, [key], now)).toThrow(
+      ApiFault,
+    );
   });
 });
 
