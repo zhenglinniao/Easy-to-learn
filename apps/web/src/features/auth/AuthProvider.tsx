@@ -46,10 +46,11 @@ export function AuthProvider({
   useEffect(() => {
     if (!client) return;
     let active = true;
+    let receivedAuthEvent = false;
     void client.auth
       .getSession()
       .then(({ data, error }) => {
-        if (!active) return;
+        if (!active || receivedAuthEvent) return;
         setSession(data.session);
         setInitializationError(
           error ? toAuthMessage(error, '无法恢复登录状态，请重新登录。') : null,
@@ -57,13 +58,16 @@ export function AuthProvider({
         setLoading(false);
       })
       .catch(() => {
-        if (!active) return;
+        if (!active || receivedAuthEvent) return;
         setSession(null);
         setInitializationError('无法恢复登录状态，请检查网络后重试。');
         setLoading(false);
       });
     const { data } = client.auth.onAuthStateChange((_event: AuthChangeEvent, next) => {
       if (active) {
+        // Supabase 的 INITIAL_SESSION / SIGNED_IN / SIGNED_OUT 事件比并行发起的
+        // getSession 更接近当前状态；旧恢复请求不得覆盖较新的账户切换。
+        receivedAuthEvent = true;
         setSession(next);
         setLoading(false);
       }

@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AuthChangeEvent, SupabaseClient } from '@supabase/supabase-js';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -190,5 +190,43 @@ describe('AuthProvider', () => {
 
     expect(await screen.findByText('无法恢复登录状态，请检查网络后重试。')).toBeInTheDocument();
     expect(screen.getByText('游客')).toBeInTheDocument();
+  });
+
+  it('较晚返回的会话恢复结果不会覆盖更新的登录事件', async () => {
+    let resolveSession:
+      | ((value: { data: { session: { user: { email: string } } }; error: null }) => void)
+      | undefined;
+    const pendingSession = new Promise<{
+      data: { session: { user: { email: string } } };
+      error: null;
+    }>((resolve) => {
+      resolveSession = resolve;
+    });
+    let onAuthStateChange:
+      ((event: AuthChangeEvent, session: { user: { email: string } }) => void) | undefined;
+    const client = {
+      auth: {
+        getSession: vi.fn(() => pendingSession),
+        onAuthStateChange: vi.fn((callback) => {
+          onAuthStateChange = callback;
+          return { data: { subscription: { unsubscribe: vi.fn() } } };
+        }),
+      },
+    } as unknown as SupabaseClient;
+    render(
+      <AuthProvider client={client}>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    onAuthStateChange?.('SIGNED_IN', { user: { email: 'new@example.com' } });
+    expect(await screen.findByText('new@example.com')).toBeInTheDocument();
+    resolveSession?.({
+      data: { session: { user: { email: 'stale@example.com' } } },
+      error: null,
+    });
+
+    await waitFor(() => expect(screen.queryByText('stale@example.com')).not.toBeInTheDocument());
+    expect(screen.getByText('new@example.com')).toBeInTheDocument();
   });
 });
