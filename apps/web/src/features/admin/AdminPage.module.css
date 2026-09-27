@@ -159,6 +159,13 @@
 .modelList {
   display: grid;
   gap: 9px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.modelList:disabled .modelCard {
+  opacity: 0.72;
 }
 .modelCard {
   display: grid;

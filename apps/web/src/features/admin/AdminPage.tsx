@@ -332,10 +332,18 @@ export default function AdminPage() {
             <h2 id="models-title">运行策略</h2>
           </div>
           <div className={styles.modelActions}>
-            <button type="button" onClick={() => addPreset('sensenova')}>
+            <button
+              type="button"
+              disabled={busy === 'models'}
+              onClick={() => addPreset('sensenova')}
+            >
               添加商汤日日新
             </button>
-            <button type="button" onClick={() => addPreset('deepseek')}>
+            <button
+              type="button"
+              disabled={busy === 'models'}
+              onClick={() => addPreset('deepseek')}
+            >
               添加 DeepSeek
             </button>
             <button
@@ -370,7 +378,7 @@ export default function AdminPage() {
               `启用模型超时预算：${activeTimeoutTotal}/${MAX_PROVIDER_TIMEOUT_BUDGET_MS} ms`}
           </span>
         </div>
-        <div className={styles.modelList}>
+        <fieldset className={styles.modelList} disabled={busy === 'models'}>
           {models.map((provider, index) => (
             <article className={styles.modelCard} key={provider.id}>
               <div className={styles.modelOrder}>
@@ -582,7 +590,7 @@ export default function AdminPage() {
             </article>
           ))}
           {!overview && !error && <p className={styles.loading}>正在读取模型策略…</p>}
-        </div>
+        </fieldset>
         {overview?.policyUpdatedAt && (
           <small>上次更新：{dateLabel(overview.policyUpdatedAt)}</small>
         )}

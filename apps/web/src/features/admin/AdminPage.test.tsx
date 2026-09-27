@@ -269,4 +269,60 @@ describe('AdminPage', () => {
     );
     expect(screen.getByRole('button', { name: '保存并生效' })).toBeEnabled();
   });
+
+  it('保存模型策略时锁定编辑器，避免等待期间的新草稿被重载覆盖', async () => {
+    let finishSave: ((response: Response) => void) | undefined;
+    const pendingSave = new Promise<Response>((resolve) => {
+      finishSave = resolve;
+    });
+    const fetcher = vi.fn<typeof fetch>().mockImplementation((input, init) => {
+      const url = String(input);
+      if (url === '/api/admin/access') {
+        return Promise.resolve(
+          new Response(JSON.stringify({ data: { isAdmin: true, userId: 'admin-user' } }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }
+      if (url.startsWith('/api/admin/overview')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ data: overview }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }
+      if (url === '/api/admin/models' && init?.method === 'PATCH') return pendingSave;
+      return Promise.resolve(
+        new Response(JSON.stringify({ data: { ok: true } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    });
+    vi.stubGlobal('fetch', fetcher);
+
+    render(
+      <MemoryRouter>
+        <AdminPage />
+      </MemoryRouter>,
+    );
+
+    const label = await screen.findByLabelText('显示名称');
+    fireEvent.change(label, { target: { value: 'Primary updated' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存并生效' }));
+
+    expect(await screen.findByRole('button', { name: '正在保存…' })).toBeDisabled();
+    expect(label).toBeDisabled();
+    expect(screen.getByRole('button', { name: '添加商汤日日新' })).toBeDisabled();
+
+    finishSave?.(
+      new Response(JSON.stringify({ data: { ok: true } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    await waitFor(() => expect(label).toBeEnabled());
+  });
 });
