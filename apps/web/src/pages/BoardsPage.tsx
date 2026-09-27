@@ -18,8 +18,10 @@ export default function BoardsPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BoardSummary | null>(null);
   const [renameBoard, setRenameBoard] = useState<BoardSummary | null>(null);
+  const [modalUserId, setModalUserId] = useState<string | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [pendingDeletion, setPendingDeletion] = useState<string | null>(null);
+  const [deletionStatusUserId, setDeletionStatusUserId] = useState<string | null>(null);
   const [accountBusy, setAccountBusy] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const mounted = useRef(true);
@@ -54,10 +56,17 @@ export default function BoardsPage() {
     void account
       .pendingDeletion()
       .then((pending) => {
-        if (active) setPendingDeletion(pending?.executeAfter ?? null);
+        if (active) {
+          setPendingDeletion(pending?.executeAfter ?? null);
+          setDeletionStatusUserId(user.id);
+        }
       })
       .catch(() => {
         // 账户删除状态不应阻断核心画板列表。
+        if (active) {
+          setPendingDeletion(null);
+          setDeletionStatusUserId(user.id);
+        }
       });
     return () => {
       active = false;
@@ -67,6 +76,9 @@ export default function BoardsPage() {
   if (!user) return <Navigate to="/login?redirect=/boards" replace />;
   const visibleBoards = loadedUserId === user.id ? boards : [];
   const boardListInitializing = initializing || loadedUserId !== user.id;
+  const visiblePendingDeletion = deletionStatusUserId === user.id ? pendingDeletion : null;
+  const visibleConfirmDelete = modalUserId === user.id ? confirmDelete : null;
+  const visibleRenameBoard = modalUserId === user.id ? renameBoard : null;
   const create = async () => {
     if (!repository || busy) return;
     setBusy(true);
@@ -81,12 +93,12 @@ export default function BoardsPage() {
     }
   };
   const remove = async () => {
-    if (!repository || !confirmDelete) return;
+    if (!repository || !visibleConfirmDelete) return;
     setBusy(true);
     try {
-      await repository.delete(confirmDelete.id);
+      await repository.delete(visibleConfirmDelete.id);
       if (!mounted.current) return;
-      setBoards((items) => items.filter(({ id }) => id !== confirmDelete.id));
+      setBoards((items) => items.filter(({ id }) => id !== visibleConfirmDelete.id));
       setConfirmDelete(null);
     } catch {
       if (mounted.current) setError('删除失败，画板没有被改动。');
@@ -95,14 +107,14 @@ export default function BoardsPage() {
     }
   };
   const rename = async () => {
-    if (!repository || !renameBoard || !renameTitle.trim()) return;
+    if (!repository || !visibleRenameBoard || !renameTitle.trim()) return;
     setBusy(true);
     try {
-      await repository.rename(renameBoard.id, renameTitle);
+      await repository.rename(visibleRenameBoard.id, renameTitle);
       if (!mounted.current) return;
       setBoards((items) =>
         items.map((board) =>
-          board.id === renameBoard.id ? { ...board, title: renameTitle.trim() } : board,
+          board.id === visibleRenameBoard.id ? { ...board, title: renameTitle.trim() } : board,
         ),
       );
       setRenameBoard(null);
@@ -118,7 +130,10 @@ export default function BoardsPage() {
     setError(null);
     try {
       await account.cancelDeletion();
-      if (mounted.current) setPendingDeletion(null);
+      if (mounted.current) {
+        setPendingDeletion(null);
+        setDeletionStatusUserId(user.id);
+      }
     } catch {
       if (mounted.current) setError('取消账户删除失败，请稍后重试。');
     } finally {
@@ -131,7 +146,10 @@ export default function BoardsPage() {
     setError(null);
     try {
       const { executeAfter } = await account.requestDeletion();
-      if (mounted.current) setPendingDeletion(executeAfter);
+      if (mounted.current) {
+        setPendingDeletion(executeAfter);
+        setDeletionStatusUserId(user.id);
+      }
     } catch {
       if (mounted.current) setError('请重新登录后再申请删除账户。');
     } finally {
@@ -192,12 +210,19 @@ export default function BoardsPage() {
                   type="button"
                   onClick={() => {
                     setRenameBoard(board);
+                    setModalUserId(user.id);
                     setRenameTitle(board.title);
                   }}
                 >
                   重命名
                 </button>
-                <button type="button" onClick={() => setConfirmDelete(board)}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmDelete(board);
+                    setModalUserId(user.id);
+                  }}
+                >
                   删除
                 </button>
               </div>
@@ -209,12 +234,12 @@ export default function BoardsPage() {
         <div>
           <strong>账户与数据</strong>
           <p>
-            {pendingDeletion
-              ? `账户将在 ${new Date(pendingDeletion).toLocaleString('zh-CN')} 后删除。`
+            {visiblePendingDeletion
+              ? `账户将在 ${new Date(visiblePendingDeletion).toLocaleString('zh-CN')} 后删除。`
               : '你可以申请删除账户；提交后有 7 天冷静期。'}
           </p>
         </div>
-        {pendingDeletion ? (
+        {visiblePendingDeletion ? (
           <button type="button" disabled={accountBusy} onClick={() => void cancelAccountDeletion()}>
             {accountBusy ? '正在取消…' : '取消删除'}
           </button>
@@ -229,7 +254,7 @@ export default function BoardsPage() {
           </button>
         )}
       </section>
-      {confirmDelete && (
+      {visibleConfirmDelete && (
         <div className={styles.dialogBackdrop} role="presentation">
           <ModalFocusBoundary
             className={styles.dialog}
@@ -239,7 +264,7 @@ export default function BoardsPage() {
               if (!busy) setConfirmDelete(null);
             }}
           >
-            <h2 id="delete-title">永久删除“{confirmDelete.title}”？</h2>
+            <h2 id="delete-title">永久删除“{visibleConfirmDelete.title}”？</h2>
             <p>数据库记录会立即删除，关联图片将在 24 小时内清理。此操作没有回收站。</p>
             <div>
               <button type="button" onClick={() => setConfirmDelete(null)}>
@@ -257,7 +282,7 @@ export default function BoardsPage() {
           </ModalFocusBoundary>
         </div>
       )}
-      {renameBoard && (
+      {visibleRenameBoard && (
         <div className={styles.dialogBackdrop} role="presentation">
           <ModalFocusBoundary
             className={styles.dialog}

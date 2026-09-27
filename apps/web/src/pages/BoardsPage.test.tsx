@@ -143,4 +143,31 @@ describe('BoardsPage', () => {
     resolveNext?.([]);
     expect(await screen.findByText('第一块画板，等你落笔。')).toBeInTheDocument();
   });
+
+  it('切换账户时隐藏上一账户的删除倒计时与画板操作弹窗', async () => {
+    const user = userEvent.setup();
+    services.list
+      .mockResolvedValueOnce([
+        { id: 'old-board', title: '旧账户私有画板', updatedAt: '2026-09-27T00:00:00.000Z' },
+      ])
+      .mockResolvedValueOnce([]);
+    services.pendingDeletion
+      .mockResolvedValueOnce({ executeAfter: '2026-10-04T00:00:00.000Z' })
+      .mockReturnValueOnce(new Promise(() => undefined));
+    const view = renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '删除' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('旧账户私有画板');
+    expect(await screen.findByRole('button', { name: '取消删除' })).toBeInTheDocument();
+
+    auth.current = {
+      ...auth.current,
+      user: { id: 'user-2', email: 'second@example.com' },
+    };
+    view.rerender(page());
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.queryByText(/账户将在/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '申请删除账户' })).toBeInTheDocument();
+  });
 });
