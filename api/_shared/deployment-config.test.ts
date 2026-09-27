@@ -32,6 +32,7 @@ describe('Vercel deployment contract', () => {
     expect(csp).toContain('https://*.supabase.co');
     expect(csp).toContain('wss://*.supabase.co');
     expect(csp).toContain('https://*.ingest.sentry.io');
+    expect(csp).toContain("font-src 'self' data: blob:");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(globalHeaders).toEqual(
