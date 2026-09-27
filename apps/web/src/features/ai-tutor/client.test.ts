@@ -321,6 +321,33 @@ describe('TutorApiClient', () => {
     expect(alwaysFails).toHaveBeenCalledTimes(2);
   });
 
+  it('等待重试期间允许调用方立即取消请求', async () => {
+    const controller = new AbortController();
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('Failed to fetch'));
+    const request = {
+      requestId: 'request-abort-retry',
+      schemaVersion: 1 as const,
+      boardId: '00000000-0000-4000-8000-000000000001',
+      mode: 'solve' as const,
+      text: '2x + 3 = 11',
+      locale: 'zh-CN' as const,
+      source: {
+        elementIds: ['element-1'],
+        selectionBounds: { x: 0, y: 0, width: 100, height: 40 },
+        contentHash: 'hash',
+      },
+    };
+    const pending = new TutorApiClient(async () => 'jwt', fetcher).execute(
+      request,
+      controller.signal,
+    );
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+    controller.abort();
+
+    await expect(pending).rejects.toHaveProperty('name', 'AbortError');
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
   it('请求独立生图链路并校验生成资产', async () => {
     const quota = guestQuota('2026-09-23T00:05:00.000Z');
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(

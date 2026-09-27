@@ -34,6 +34,23 @@ const digest = async (blob: Blob): Promise<string> => {
   return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
+const waitForNetworkRetry = (signal?: AbortSignal): Promise<void> =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, 250);
+    const onAbort = () => {
+      window.clearTimeout(timeout);
+      reject(signal?.reason ?? new DOMException('Aborted', 'AbortError'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+
 export class TutorApiError extends Error {
   override readonly name = 'TutorApiError';
 
@@ -230,6 +247,7 @@ export class TutorApiClient {
         if (attempt === 1) {
           throw new Error(failureMessage, { cause: error });
         }
+        await waitForNetworkRetry(signal);
       }
     }
     throw new Error(failureMessage);
