@@ -396,6 +396,8 @@ export default function CanvasPage() {
           syncEngineRef.current = new BoardSyncEngine(
             repository,
             new SupabaseBoardGateway(client, crypto.randomUUID()),
+            undefined,
+            user.id,
           );
           syncCoordinatorRef.current = new BroadcastSyncCoordinator();
           const cacheOwnerMatches = stored?.ownerId === user.id;
@@ -481,6 +483,8 @@ export default function CanvasPage() {
               new BoardSyncEngine(
                 repository,
                 new SupabaseBoardGateway(client, crypto.randomUUID()),
+                undefined,
+                user.id,
               ),
             ).migrate(boardId, user.id);
             if (active) navigate(`/canvas/${targetBoardId}`, { replace: true });
@@ -934,6 +938,8 @@ export default function CanvasPage() {
       const result = await new BoardSyncEngine(
         repository,
         new SupabaseBoardGateway(client, crypto.randomUUID()),
+        undefined,
+        user.id,
       ).syncBoard(targetBoardId);
       if (result.state !== 'synced' && result.state !== 'clean') {
         throw new Error('新画板暂时无法同步，本地副本仍然保留。');

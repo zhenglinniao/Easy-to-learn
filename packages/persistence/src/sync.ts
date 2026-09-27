@@ -63,6 +63,7 @@ export class BoardSyncEngine {
     private readonly repository: LocalBoardRepository,
     private readonly remote: RemoteBoardGateway,
     private readonly isOnline: () => boolean = () => navigator.onLine,
+    private readonly expectedOwnerId?: string,
   ) {}
 
   get areCloudWritesBlocked(): boolean {
@@ -115,6 +116,12 @@ export class BoardSyncEngine {
     if (!board) {
       await this.repository.completeOperation(operation);
       return { boardId: operation.boardId, state: 'clean' };
+    }
+    if (this.expectedOwnerId && board.ownerId !== this.expectedOwnerId) {
+      throw new LocalPersistenceError(
+        'DATABASE_CORRUPTED',
+        '本地画板归属与当前登录账户不一致，已阻止云端写入',
+      );
     }
     try {
       const assets = await this.repository.getAssets(operation.boardId);

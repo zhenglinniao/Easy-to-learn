@@ -483,6 +483,18 @@ describe('BoardSyncEngine', () => {
     expect(gateway.saveSnapshot).not.toHaveBeenCalled();
   });
 
+  it('本地画板不属于当前账户时阻止任何云端写入', async () => {
+    const { repository } = await createRepository();
+    await repository.saveDurableChange(emptySnapshot(), 'user-1');
+    const gateway = remote();
+    const engine = new BoardSyncEngine(repository, gateway, () => true, 'user-2');
+
+    await expect(engine.syncBoard('board-1')).resolves.toMatchObject({ state: 'failed-local' });
+    expect(engine.areCloudWritesBlocked).toBe(true);
+    expect(gateway.uploadAsset).not.toHaveBeenCalled();
+    expect(gateway.saveSnapshot).not.toHaveBeenCalled();
+  });
+
   it('远端写入成功后的本地提交失败不会被误判为可重试网络错误', async () => {
     const { repository } = await createRepository();
     await repository.saveDurableChange(emptySnapshot());
