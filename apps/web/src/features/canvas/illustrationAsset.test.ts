@@ -86,4 +86,17 @@ describe('addStepIllustrationFile', () => {
     ).rejects.toThrow('下载地址不安全');
     expect(fetcher).not.toHaveBeenCalled();
   });
+
+  it('does not download or register a late illustration after cancellation', async () => {
+    const addFiles = vi.fn();
+    const fetcher = vi.fn<typeof fetch>();
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      addStepIllustrationFile({ addFiles } as never, asset, controller.signal, fetcher),
+    ).rejects.toHaveProperty('name', 'AbortError');
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(addFiles).not.toHaveBeenCalled();
+  });
 });

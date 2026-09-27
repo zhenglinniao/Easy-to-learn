@@ -10,11 +10,28 @@ export type GeneratedIllustrationAsset = Extract<
 
 const MAX_ILLUSTRATION_BYTES = 10 * 1024 * 1024;
 
-export const blobToDataUrl = (blob: Blob): Promise<string> =>
+export const blobToDataUrl = (blob: Blob, signal?: AbortSignal): Promise<string> =>
   new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
+    const cleanup = () => signal?.removeEventListener('abort', abort);
+    const abort = () => reader.abort();
+    reader.onload = () => {
+      cleanup();
+      resolve(String(reader.result));
+    };
+    reader.onerror = () => {
+      cleanup();
+      reject(reader.error);
+    };
+    reader.onabort = () => {
+      cleanup();
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    signal?.addEventListener('abort', abort, { once: true });
     reader.readAsDataURL(blob);
   });
 
@@ -24,6 +41,7 @@ export const addStepIllustrationFile = async (
   signal?: AbortSignal,
   fetcher: typeof fetch = (input, init) => globalThis.fetch(input, init),
 ): Promise<void> => {
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   if (!isSafeAssetUrl(asset.downloadUrl)) {
     throw new Error('生成插画下载地址不安全，文字与矢量图解已保留。');
   }
@@ -44,10 +62,12 @@ export const addStepIllustrationFile = async (
   ) {
     throw new Error('生成插画文件校验失败，文字与矢量图解已保留。');
   }
+  const dataURL = await blobToDataUrl(blob, signal);
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   api.addFiles([
     {
       id: asset.fileId,
-      dataURL: await blobToDataUrl(blob),
+      dataURL,
       mimeType: asset.mimeType,
       created: Date.now(),
       lastRetrieved: Date.now(),

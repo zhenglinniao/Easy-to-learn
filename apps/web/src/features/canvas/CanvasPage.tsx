@@ -31,7 +31,7 @@ import {
   type SyncState,
 } from '@easy-to-learn/persistence';
 import { RadialMenu, TutorBoard, type RadialMenuAction } from '@easy-to-learn/ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { useAuth } from '../auth';
@@ -62,6 +62,7 @@ import {
 import { mapWithConcurrency } from './mapWithConcurrency';
 import { syncStateAfterNetworkChange } from './syncResume';
 import { syncStatusLabel } from './syncStatus';
+import { isCurrentCanvasTask } from './taskScope';
 import { useOnlineStatus } from './useOnlineStatus';
 
 const ASSET_IO_CONCURRENCY = 4;
@@ -244,6 +245,7 @@ export default function CanvasPage() {
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sourceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hydratedBoard = useRef<string | null>(null);
+  const activeBoardId = useRef(boardId);
 
   const syncActiveAiTasks = () => setActiveAiTasks(aiTaskRegistry.current.list());
   const updateAiTask = (
@@ -253,6 +255,10 @@ export default function CanvasPage() {
     aiTaskRegistry.current.update(taskId, update);
     syncActiveAiTasks();
   };
+
+  useLayoutEffect(() => {
+    activeBoardId.current = boardId;
+  }, [boardId]);
 
   useEffect(() => {
     tutorBoardsRef.current = tutorBoards;
@@ -890,6 +896,7 @@ export default function CanvasPage() {
       return;
     }
     const requestId = crypto.randomUUID();
+    const taskBoardId = boardId;
     const controller = aiTaskRegistry.current.start(requestId, action, {
       sourceKey,
       ...(currentMenu ? { screenPosition: { x: currentMenu.x, y: currentMenu.y } } : {}),
@@ -906,12 +913,14 @@ export default function CanvasPage() {
     setPreparationError(null);
     try {
       const input = await prepareTutorSelection(selection, api.getFiles());
+      if (!isCurrentCanvasTask(controller.signal, taskBoardId, activeBoardId.current)) return;
       updateAiTask(requestId, { stage: 'answering', elementCount: input.elementIds.length });
       const client = new TutorApiClient(async () => session?.access_token ?? null);
       const uploadedImage =
         input.image && !input.image.base64
           ? await client.uploadImage(requestId, input.image.blob, controller.signal)
           : null;
+      if (!isCurrentCanvasTask(controller.signal, taskBoardId, activeBoardId.current)) return;
       const base = {
         schemaVersion: 1 as const,
         boardId,
@@ -934,6 +943,7 @@ export default function CanvasPage() {
         mode: action,
       });
       const response = await client.execute(request, controller.signal);
+      if (!isCurrentCanvasTask(controller.signal, taskBoardId, activeBoardId.current)) return;
       setQuota(response.quota);
       const now = new Date().toISOString();
       const id = crypto.randomUUID();
@@ -977,6 +987,7 @@ export default function CanvasPage() {
             { requestId, boardId },
             controller.signal,
           );
+          if (!isCurrentCanvasTask(controller.signal, taskBoardId, activeBoardId.current)) return;
           setQuota(illustration.quota);
           if (illustration.status === 'generated') {
             await addStepIllustrationFile(api, illustration.asset, controller.signal);
@@ -1017,7 +1028,11 @@ export default function CanvasPage() {
         }
       }
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (
+        (error instanceof DOMException && error.name === 'AbortError') ||
+        !isCurrentCanvasTask(controller.signal, taskBoardId, activeBoardId.current)
+      )
+        return;
       setPreparationError(tutorErrorMessage(error, '无法处理当前选区，请重新选择后再试。'));
       void refreshQuota();
     } finally {
@@ -1048,6 +1063,7 @@ export default function CanvasPage() {
       return;
     }
     const requestId = crypto.randomUUID();
+    const taskBoardId = boardId;
     const sourceKey = `explain-step:${parentId}:${targetStepId}`;
     const controller = aiTaskRegistry.current.start(requestId, 'explain_step', { sourceKey });
     if (!controller) {
@@ -1065,11 +1081,13 @@ export default function CanvasPage() {
         ) as AppState['selectedElementIds'];
         const selection = getTutorSelection(api.getSceneElements(), sourceIds);
         const input = await prepareTutorSelection(selection, api.getFiles());
+        if (!isCurrentCanvasTask(controller.signal, taskBoardId, activeBoardId.current)) return;
         const client = new TutorApiClient(async () => session?.access_token ?? null);
         const uploadedImage =
           input.image && !input.image.base64
             ? await client.uploadImage(requestId, input.image.blob, controller.signal)
             : null;
+        if (!isCurrentCanvasTask(controller.signal, taskBoardId, activeBoardId.current)) return;
         base = {
           schemaVersion: 1,
           boardId,
@@ -1102,6 +1120,7 @@ export default function CanvasPage() {
         request,
         controller.signal,
       );
+      if (!isCurrentCanvasTask(controller.signal, taskBoardId, activeBoardId.current)) return;
       setQuota(result.quota);
       const now = new Date().toISOString();
       const id = crypto.randomUUID();
@@ -1124,7 +1143,11 @@ export default function CanvasPage() {
       requestInputs.current.set(id, base);
       commitTutorBoards((current) => [...current, child]);
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (
+        (error instanceof DOMException && error.name === 'AbortError') ||
+        !isCurrentCanvasTask(controller.signal, taskBoardId, activeBoardId.current)
+      )
+        return;
       setPreparationError(tutorErrorMessage(error, '无法解释当前步骤。'));
       void refreshQuota();
     } finally {
