@@ -161,7 +161,6 @@ describe('retention job', () => {
     from
       .mockReturnValueOnce(query({ data: [{ user_id: 'user-1' }], error: null }))
       .mockReturnValueOnce(query({ data: { user_id: 'user-1' }, error: null }))
-      .mockReturnValueOnce(query({ data: [], error: null }))
       .mockReturnValueOnce(auditQuery)
       .mockReturnValueOnce(query({ data: [], error: null }));
     const output = response();
@@ -172,6 +171,10 @@ describe('retention job', () => {
     );
 
     expect(deleteUser).toHaveBeenCalledWith('user-1');
+    expect(rpc).toHaveBeenNthCalledWith(1, 'enqueue_account_asset_cleanup', {
+      p_user_id: 'user-1',
+      p_not_before: expect.any(String),
+    });
     expect(auditQuery.insert).toHaveBeenCalledWith(
       expect.objectContaining({ event_type: 'account_deleted', outcome: 'success' }),
     );
@@ -184,7 +187,6 @@ describe('retention job', () => {
     from
       .mockReturnValueOnce(query({ data: [{ user_id: 'user-2' }], error: null }))
       .mockReturnValueOnce(query({ data: { user_id: 'user-2' }, error: null }))
-      .mockReturnValueOnce(query({ data: [], error: null }))
       .mockReturnValueOnce(failedUpdate)
       .mockReturnValueOnce(query({ data: [], error: null }));
     deleteUser.mockResolvedValueOnce({ data: null, error: new Error('auth unavailable') });
@@ -199,6 +201,29 @@ describe('retention job', () => {
     expect(output.statusCode()).toBe(207);
     expect(output.body()).toMatchObject({ data: { accountsDeleted: 0, accountFailures: 1 } });
     expect(rpc).toHaveBeenCalledWith('purge_expired_operational_records');
+  });
+
+  it('does not delete an account unless all of its asset cleanup jobs were queued', async () => {
+    const failedUpdate = query({ data: null, error: null });
+    from
+      .mockReturnValueOnce(query({ data: [{ user_id: 'user-3' }], error: null }))
+      .mockReturnValueOnce(query({ data: { user_id: 'user-3' }, error: null }))
+      .mockReturnValueOnce(failedUpdate)
+      .mockReturnValueOnce(query({ data: [], error: null }));
+    rpc
+      .mockResolvedValueOnce({ data: null, error: new Error('queue unavailable') })
+      .mockResolvedValueOnce({ data: null, error: null });
+    const output = response();
+
+    await handler(
+      { method: 'GET', headers: { authorization: 'Bearer cron-secret' } },
+      output.value,
+    );
+
+    expect(deleteUser).not.toHaveBeenCalled();
+    expect(failedUpdate.update).toHaveBeenCalledWith({ status: 'failed' });
+    expect(output.statusCode()).toBe(207);
+    expect(output.body()).toMatchObject({ data: { accountsDeleted: 0, accountFailures: 1 } });
   });
 
   it('completes successful temporary asset cleanup in the isolated bucket', async () => {

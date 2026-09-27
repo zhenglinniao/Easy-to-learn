@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(43);
+select plan(46);
 
 select has_table('public', 'boards', '存在 boards 表');
 select has_table('public', 'board_assets', '存在 board_assets 表');
@@ -24,6 +24,28 @@ select has_function(
   'purge_expired_operational_records',
   array[]::text[],
   '存在运行数据保留期清理函数'
+);
+select has_function(
+  'public',
+  'enqueue_account_asset_cleanup',
+  array['uuid', 'timestamp with time zone'],
+  '存在账户资产清理入队函数'
+);
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.enqueue_account_asset_cleanup(uuid, timestamptz)',
+    'execute'
+  ),
+  '普通用户不能调用账户资产清理入队函数'
+);
+select ok(
+  has_function_privilege(
+    'service_role',
+    'public.enqueue_account_asset_cleanup(uuid, timestamptz)',
+    'execute'
+  ),
+  '只有服务端角色可以调用账户资产清理入队函数'
 );
 select has_function(
   'public',

@@ -54,32 +54,11 @@ export default async function handler(request: HttpRequest, response: HttpRespon
       if (claimError) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '无法领取账户删除任务');
       if (!claimed) continue;
       try {
-        const { data: boards, error: boardError } = await client
-          .from('boards')
-          .select('id')
-          .eq('owner_id', userId);
-        if (boardError) throw new Error('BOARD_LOOKUP_FAILED');
-        const boardIds = (boards ?? []).map((board) => board.id as string);
-        if (boardIds.length > 0) {
-          const { data: assets, error: assetError } = await client
-            .from('board_assets')
-            .select('object_path')
-            .in('board_id', boardIds);
-          if (assetError) throw new Error('ASSET_LOOKUP_FAILED');
-          const jobs = (assets ?? []).map((asset) => ({
-            object_path: asset.object_path,
-            reason: 'account_deleted',
-            not_before: now,
-            status: 'pending',
-            attempts: 0,
-          }));
-          if (jobs.length > 0) {
-            const { error: queueError } = await client
-              .from('asset_cleanup_jobs')
-              .upsert(jobs, { onConflict: 'object_path' });
-            if (queueError) throw new Error('CLEANUP_QUEUE_FAILED');
-          }
-        }
+        const { error: queueError } = await client.rpc('enqueue_account_asset_cleanup', {
+          p_user_id: userId,
+          p_not_before: now,
+        });
+        if (queueError) throw new Error('CLEANUP_QUEUE_FAILED');
         const { error: deleteError } = await client.auth.admin.deleteUser(userId);
         if (deleteError) throw deleteError;
         const actorHash = createHmac('sha256', required('ACTOR_HASH_SECRET'))
