@@ -5,6 +5,7 @@ import { syncStatusLabel } from './syncStatus';
 describe('syncStatusLabel', () => {
   it('distinguishes offline state from server retry state', () => {
     expect(syncStatusLabel('offline', true)).toBe('离线 · 等待联网');
+    expect(syncStatusLabel('waiting-lease', true)).toBe('其他页面正在同步 · 稍后重试');
     expect(syncStatusLabel('retrying', true)).toBe('同步失败 · 自动重试');
   });
 

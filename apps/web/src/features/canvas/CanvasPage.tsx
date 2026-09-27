@@ -74,6 +74,7 @@ import { useOnlineStatus } from './useOnlineStatus';
 
 const ASSET_IO_CONCURRENCY = 4;
 const SYNC_FAILURE_RETRY_MS = 5_000;
+const SYNC_LEASE_RETRY_MS = 1_000;
 
 interface OpenMenu {
   x: number;
@@ -620,7 +621,13 @@ export default function CanvasPage() {
       if (syncTimer.current === timer) syncTimer.current = null;
       void (async () => {
         const lease = await coordinator.acquire(boardId);
-        if (!lease) return;
+        if (!lease) {
+          if (active) {
+            setSyncState('waiting-lease');
+            setSyncRetryAt(Date.now() + SYNC_LEASE_RETRY_MS);
+          }
+          return;
+        }
         try {
           if (!active) return;
           setSyncState('syncing-snapshot');
@@ -655,7 +662,7 @@ export default function CanvasPage() {
   }, [boardId, syncState, user?.id]);
 
   useEffect(() => {
-    if (syncRetryAt === null || syncState !== 'retrying') return;
+    if (syncRetryAt === null || (syncState !== 'retrying' && syncState !== 'waiting-lease')) return;
     const timer = window.setTimeout(
       () => {
         setSyncRetryAt(null);

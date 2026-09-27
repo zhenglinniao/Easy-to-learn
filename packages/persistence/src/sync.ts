@@ -10,6 +10,7 @@ export type SyncState =
   | 'syncing-snapshot'
   | 'synced'
   | 'offline'
+  | 'waiting-lease'
   | 'retrying'
   | 'conflict'
   | 'failed-local';

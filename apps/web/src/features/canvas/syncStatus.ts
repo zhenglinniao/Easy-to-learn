@@ -7,6 +7,7 @@ export const syncStatusLabel = (state: SyncState, isUser: boolean): string => {
   if (state === 'syncing-assets' || state === 'syncing-snapshot') return '正在同步';
   if (state === 'conflict') return '版本冲突 · 已保留副本';
   if (state === 'offline') return '离线 · 等待联网';
+  if (state === 'waiting-lease') return '其他页面正在同步 · 稍后重试';
   if (state === 'retrying') return '同步失败 · 自动重试';
   if (state === 'failed-local') return '本地保存失败';
   return '已保存本机 · 待同步';
