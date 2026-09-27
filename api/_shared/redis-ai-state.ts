@@ -100,13 +100,24 @@ export class RedisAiStateStore implements AiStateStore {
     }
   }
 
+  private async redisCall<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (error instanceof ApiFault) throw error;
+      throw new ApiFault('DEPENDENCY_UNAVAILABLE', 'AI 状态存储暂时不可用');
+    }
+  }
+
   async getCached(actorKey: string, requestId: string): Promise<TutorResponse['data'] | null> {
-    const encrypted = await this.redis.get<string>(this.cacheKey(actorKey, requestId));
+    const encrypted = await this.redisCall(() =>
+      this.redis.get<string>(this.cacheKey(actorKey, requestId)),
+    );
     if (!encrypted) return null;
     try {
       return tutorResponseSchema.parse({ data: JSON.parse(this.decrypt(encrypted)) }).data;
     } catch {
-      await this.redis.del(this.cacheKey(actorKey, requestId));
+      await this.redisCall(() => this.redis.del(this.cacheKey(actorKey, requestId)));
       return null;
     }
   }
@@ -122,15 +133,28 @@ export class RedisAiStateStore implements AiStateStore {
       retryMs,
       actionPeriodTtl,
       imagePeriodTtl,
-    ] = await Promise.all([
-      this.redis.get<number>(keys.actionDaily),
-      this.redis.get<number>(keys.actionPeriod),
-      this.redis.get<number>(keys.imageDaily),
-      this.redis.get<number>(keys.imagePeriod),
-      this.redis.pttl(keys.rate),
-      this.redis.pttl(keys.actionPeriod),
-      this.redis.pttl(keys.imagePeriod),
-    ]);
+    ] = await this.redisCall(() =>
+      Promise.all([
+        this.redis.get<number>(keys.actionDaily),
+        this.redis.get<number>(keys.actionPeriod),
+        this.redis.get<number>(keys.imageDaily),
+        this.redis.get<number>(keys.imagePeriod),
+        this.redis.pttl(keys.rate),
+        this.redis.pttl(keys.actionPeriod),
+        this.redis.pttl(keys.imagePeriod),
+      ]),
+    );
+    const counters = [actionDailyRaw, actionPeriodRaw, imageDailyRaw, imagePeriodRaw];
+    if (
+      counters.some(
+        (value) =>
+          value !== null &&
+          value !== undefined &&
+          (!Number.isSafeInteger(Number(value)) || Number(value) < 0),
+      )
+    ) {
+      throw new ApiFault('DEPENDENCY_UNAVAILABLE', 'AI 状态存储数据无效');
+    }
     const limits = quotaLimitsForActor(actorKey);
     const actionDailyRemaining = Math.max(0, limits.actionDaily - Number(actionDailyRaw ?? 0));
     const actionPeriodRemaining = Math.max(0, limits.actionPeriod - Number(actionPeriodRaw ?? 0));
@@ -170,18 +194,20 @@ export class RedisAiStateStore implements AiStateStore {
     const day = shanghaiDayWindow(now);
     const limits = quotaLimitsForActor(actorKey);
     const keys = this.counterKeys(actorKey, day.day);
-    const raw = await this.redis.eval(
-      RESERVE_SCRIPT,
-      [keys.actionDaily, keys.actionPeriod, keys.rate, this.reservationKey(actorKey, requestId)],
-      [
-        limits.actionDaily,
-        limits.actionPeriod,
-        day.ttlSeconds,
-        AI_PERIOD_MS,
-        requestId,
-        minIntervalForActor(actorKey),
-        IDEMPOTENCY_TTL_MS,
-      ],
+    const raw = await this.redisCall(() =>
+      this.redis.eval(
+        RESERVE_SCRIPT,
+        [keys.actionDaily, keys.actionPeriod, keys.rate, this.reservationKey(actorKey, requestId)],
+        [
+          limits.actionDaily,
+          limits.actionPeriod,
+          day.ttlSeconds,
+          AI_PERIOD_MS,
+          requestId,
+          minIntervalForActor(actorKey),
+          IDEMPOTENCY_TTL_MS,
+        ],
+      ),
     );
     const [status, , , retryMs] = (raw as Array<number | string>).map(Number);
     if (status === -1) {
@@ -209,10 +235,12 @@ export class RedisAiStateStore implements AiStateStore {
   async refund(actorKey: string, requestId: string, now: Date): Promise<void> {
     const day = shanghaiDayWindow(now);
     const keys = this.counterKeys(actorKey, day.day);
-    await this.redis.eval(
-      REFUND_SCRIPT,
-      [keys.actionDaily, keys.actionPeriod, keys.rate, this.reservationKey(actorKey, requestId)],
-      [requestId],
+    await this.redisCall(() =>
+      this.redis.eval(
+        REFUND_SCRIPT,
+        [keys.actionDaily, keys.actionPeriod, keys.rate, this.reservationKey(actorKey, requestId)],
+        [requestId],
+      ),
     );
   }
 
@@ -228,17 +256,19 @@ export class RedisAiStateStore implements AiStateStore {
     const day = shanghaiDayWindow(now);
     const limits = quotaLimitsForActor(actorKey);
     const keys = this.counterKeys(actorKey, day.day);
-    const raw = await this.redis.eval(
-      RESERVE_IMAGES_SCRIPT,
-      [keys.imageDaily, keys.imagePeriod, this.imageReservationKey(actorKey, requestId)],
-      [
-        count,
-        limits.imageDaily,
-        limits.imagePeriod,
-        day.ttlSeconds,
-        AI_PERIOD_MS,
-        IDEMPOTENCY_TTL_MS,
-      ],
+    const raw = await this.redisCall(() =>
+      this.redis.eval(
+        RESERVE_IMAGES_SCRIPT,
+        [keys.imageDaily, keys.imagePeriod, this.imageReservationKey(actorKey, requestId)],
+        [
+          count,
+          limits.imageDaily,
+          limits.imagePeriod,
+          day.ttlSeconds,
+          AI_PERIOD_MS,
+          IDEMPOTENCY_TTL_MS,
+        ],
+      ),
     );
     const [status] = (raw as Array<number | string>).map(Number);
     return {
@@ -251,17 +281,21 @@ export class RedisAiStateStore implements AiStateStore {
   async refundImages(actorKey: string, requestId: string, now: Date): Promise<void> {
     const day = shanghaiDayWindow(now);
     const keys = this.counterKeys(actorKey, day.day);
-    await this.redis.eval(
-      REFUND_IMAGES_SCRIPT,
-      [keys.imageDaily, keys.imagePeriod, this.imageReservationKey(actorKey, requestId)],
-      [],
+    await this.redisCall(() =>
+      this.redis.eval(
+        REFUND_IMAGES_SCRIPT,
+        [keys.imageDaily, keys.imagePeriod, this.imageReservationKey(actorKey, requestId)],
+        [],
+      ),
     );
   }
 
   async cache(actorKey: string, requestId: string, data: TutorResponse['data']): Promise<void> {
-    await this.redis.set(this.cacheKey(actorKey, requestId), this.encrypt(JSON.stringify(data)), {
-      px: IDEMPOTENCY_TTL_MS,
-    });
+    await this.redisCall(() =>
+      this.redis.set(this.cacheKey(actorKey, requestId), this.encrypt(JSON.stringify(data)), {
+        px: IDEMPOTENCY_TTL_MS,
+      }),
+    );
   }
 
   async reserveUnmetered(
@@ -271,10 +305,12 @@ export class RedisAiStateStore implements AiStateStore {
     now: Date,
   ): Promise<boolean> {
     void now;
-    const result = await this.redis.eval(
-      RESERVE_UNMETERED_SCRIPT,
-      [this.unmeteredReservationKey(actorKey, requestId, scope)],
-      [IDEMPOTENCY_TTL_MS],
+    const result = await this.redisCall(() =>
+      this.redis.eval(
+        RESERVE_UNMETERED_SCRIPT,
+        [this.unmeteredReservationKey(actorKey, requestId, scope)],
+        [IDEMPOTENCY_TTL_MS],
+      ),
     );
     return Number(result) === 1;
   }
@@ -284,7 +320,9 @@ export class RedisAiStateStore implements AiStateStore {
     requestId: string,
     scope: 'action' | 'image',
   ): Promise<void> {
-    await this.redis.del(this.unmeteredReservationKey(actorKey, requestId, scope));
+    await this.redisCall(() =>
+      this.redis.del(this.unmeteredReservationKey(actorKey, requestId, scope)),
+    );
   }
 
   private actorHash(actorKey: string): string {

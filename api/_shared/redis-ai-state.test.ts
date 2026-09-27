@@ -163,4 +163,30 @@ describe('RedisAiStateStore', () => {
     await store.refundUnmetered('user:admin-id', 'same-request', 'action');
     expect(redis.del).toHaveBeenCalledWith(keys[0]);
   });
+
+  it('maps Redis transport failures and corrupt counters to dependency faults', async () => {
+    const failing = createRedis();
+    failing.redis.eval.mockRejectedValueOnce(new Error('socket details must stay private'));
+    const failingStore = new RedisAiStateStore(
+      failing.redis as never,
+      'actor-secret',
+      encryptionKey,
+    );
+    await expect(failingStore.reserve('user:user-1', 'request-1', now)).rejects.toMatchObject({
+      code: 'DEPENDENCY_UNAVAILABLE',
+      message: 'AI 状态存储暂时不可用',
+    });
+
+    const corrupt = createRedis();
+    corrupt.redis.get.mockResolvedValueOnce('not-a-counter');
+    const corruptStore = new RedisAiStateStore(
+      corrupt.redis as never,
+      'actor-secret',
+      encryptionKey,
+    );
+    await expect(corruptStore.status('user:user-1', now)).rejects.toMatchObject({
+      code: 'DEPENDENCY_UNAVAILABLE',
+      message: 'AI 状态存储数据无效',
+    });
+  });
 });
