@@ -22,6 +22,13 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html'],
       include: ['apps/**/src/**/*.{ts,tsx}', 'packages/**/src/**/*.{ts,tsx}', 'api/**/*.ts'],
+      reportOnFailure: true,
+      thresholds: {
+        statements: 66,
+        branches: 60,
+        functions: 65,
+        lines: 70,
+      },
     },
   },
 });
