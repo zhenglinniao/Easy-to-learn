@@ -265,21 +265,32 @@ export default function CanvasPage() {
     tutorBoardsRef.current = tutorBoards;
   }, [tutorBoards]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const registry = aiTaskRegistry.current;
     registry.cancelAll();
-    const timer = window.setTimeout(() => {
-      setActiveAiTasks([]);
-      setConflictBusy(false);
-      setConflictError(null);
-      setPreparationError(null);
-      setPrepared(null);
-    }, 0);
+    // 路由切换时立即移除上一画板的题目上下文与图片输入，避免空白新画板
+    // 在异步恢复期间短暂展示旧数据，也避免已关闭图片题长期占用内存。
+    hydratedBoard.current = null;
+    requestInputs.current.clear();
+    tutorBoardsRef.current = [];
+    latestCanvasSnapshotRef.current = null;
+    api?.resetScene();
+    // 路由边界必须在浏览器绘制前同步清屏，不能使用定时器，否则快速恢复的新画板
+    // 可能先加载完成、随后又被旧的清理回调清空。
+    /* eslint-disable react-hooks/set-state-in-effect -- intentional route-boundary privacy reset */
+    setTutorBoards([]);
+    setCanvasFiles({});
+    setFeedbackStates({});
+    setActiveAiTasks([]);
+    setConflictBusy(false);
+    setConflictError(null);
+    setPreparationError(null);
+    setPrepared(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
     return () => {
-      window.clearTimeout(timer);
       registry.cancelAll();
     };
-  }, [boardId]);
+  }, [api, boardId]);
 
   const refreshQuota = useCallback(
     async (signal?: AbortSignal) => {
@@ -1373,9 +1384,16 @@ export default function CanvasPage() {
                     current.map((item) => (item.id === next.id ? next : item)),
                   )
                 }
-                onClose={(id) =>
-                  commitTutorBoards((current) => current.filter((item) => item.id !== id))
-                }
+                onClose={(id) => {
+                  requestInputs.current.delete(id);
+                  setFeedbackStates((current) => {
+                    if (!(id in current)) return current;
+                    const next = { ...current };
+                    delete next[id];
+                    return next;
+                  });
+                  commitTutorBoards((current) => current.filter((item) => item.id !== id));
+                }}
                 onExplainStep={(id, stepId) => void explainStep(id, stepId)}
                 explainPending={activeAiTasks.some(
                   (task) =>
