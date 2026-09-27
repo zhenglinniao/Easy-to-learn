@@ -62,16 +62,23 @@ const authenticatedAtFromJwt = (accessToken: string): Date => {
   }
 };
 
-export const sessionKeysFromEnvironment = (): SessionKey[] =>
-  required('ANON_SESSION_KEYS')
+export const sessionKeysFromEnvironment = (): SessionKey[] => {
+  const versions = new Set<string>();
+  return required('ANON_SESSION_KEYS')
     .split(',')
     .map((item) => {
       const separator = item.indexOf(':');
       if (separator <= 0) throw new Error('ANON_SESSION_KEYS 格式错误');
       const key = { version: item.slice(0, separator), secret: item.slice(separator + 1) };
+      if (!/^[A-Za-z0-9_-]{1,16}$/.test(key.version)) {
+        throw new Error('匿名会话密钥版本格式错误');
+      }
+      if (versions.has(key.version)) throw new Error('匿名会话密钥版本不能重复');
       if (key.secret.length < 32) throw new Error('匿名会话密钥至少需要 32 个字符');
+      versions.add(key.version);
       return key;
     });
+};
 
 export const createAiStateStore = (actor?: TutorActor): AiStateStore => {
   const store = new RedisAiStateStore(

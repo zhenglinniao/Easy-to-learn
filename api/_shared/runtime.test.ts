@@ -54,6 +54,10 @@ describe('runtime authentication', () => {
     expect(sessionKeysFromEnvironment).toThrow('格式错误');
     process.env.ANON_SESSION_KEYS = 'v1:short';
     expect(sessionKeysFromEnvironment).toThrow('至少需要 32');
+    process.env.ANON_SESSION_KEYS = `version!bad:${'a'.repeat(32)}`;
+    expect(sessionKeysFromEnvironment).toThrow('版本格式错误');
+    process.env.ANON_SESSION_KEYS = `v1:${'a'.repeat(32)},v1:${'b'.repeat(32)}`;
+    expect(sessionKeysFromEnvironment).toThrow('版本不能重复');
   });
 
   it('accepts a case-insensitive Bearer scheme and resolves a verified user', async () => {
