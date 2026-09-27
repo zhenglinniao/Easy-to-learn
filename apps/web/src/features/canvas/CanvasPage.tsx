@@ -54,6 +54,7 @@ import { ConflictResolutionDialog } from './ConflictResolutionDialog';
 import { DebouncedLatestTask } from './debouncedLatestTask';
 import { HANDWRITING_FONT_FAMILY, migrateElementsToHandwriting } from './handwriting';
 import { addStepIllustrationFile, blobToDataUrl } from './illustrationAsset';
+import { createExplainStepBoard } from './explainStepBoard';
 import {
   illustrationStatusLabel,
   updateMatchingIllustrationStatus,
@@ -1166,22 +1167,14 @@ export default function CanvasPage() {
       setQuota(result.quota);
       const now = new Date().toISOString();
       const id = crypto.randomUUID();
-      const child: PersistedTutorBoardV2 = {
-        ...parent,
+      const child = createExplainStepBoard({
+        parent,
+        targetStepId,
+        result: result.result,
         id,
         requestId,
-        title: `深入解释：${targetStep.title}`,
-        result: result.result,
-        stepIndex: 0,
-        sceneAnchor: {
-          sceneX: parent.sceneAnchor.sceneX + 420,
-          sceneY: parent.sceneAnchor.sceneY,
-        },
-        parentTutorBoardId: parentId,
-        targetStepId,
-        createdAt: now,
-        updatedAt: now,
-      };
+        now,
+      });
       requestInputs.current.set(id, base);
       commitTutorBoards((current) => [...current, child]);
     } catch (error) {
