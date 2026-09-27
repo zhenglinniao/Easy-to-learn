@@ -48,7 +48,11 @@ beforeEach(() => {
   });
   createTutorService.mockClear();
   execute.mockReset().mockResolvedValue({
-    data: { requestId: 'request-1', result: {}, quota: {} },
+    data: {
+      requestId: 'request-1',
+      result: { metadata: { model: 'sensenova/sensenova-6.8-flash-lite' } },
+      quota: {},
+    },
   });
 });
 
@@ -68,6 +72,7 @@ describe('/api/ai/tutor', () => {
     });
     expect(output.result().headers.get('cache-control')).toContain('no-store');
     expect(output.result().headers.get('x-request-id')).toBe('request-1');
+    expect(output.result().headers.get('x-ai-provider')).toBe('sensenova');
     expect(createTutorService).toHaveBeenCalledWith({ kind: 'user', id: 'user-1' }, 'access-token');
     expect(execute).toHaveBeenCalledWith(
       { kind: 'user', id: 'user-1' },

@@ -24,6 +24,10 @@ export default async function handler(request: HttpRequest, response: HttpRespon
     const { actor, accessToken } = await resolveActor(request);
     const service = await createTutorService(actor, accessToken);
     const result = await service.execute(actor, request.body);
+    const providerId = result.data.result.metadata.model.split('/', 1)[0];
+    if (providerId && /^[a-z][a-z0-9_-]{0,31}$/i.test(providerId)) {
+      response.setHeader('X-AI-Provider', providerId);
+    }
     response.setHeader('X-Request-Id', result.data.requestId);
     response.status(200).json(result);
   } catch (error) {
