@@ -1,4 +1,4 @@
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
@@ -9,6 +9,8 @@ const budgets = {
   entryScriptGzipBytes: 100 * 1024,
   entryStyleGzipBytes: 8 * 1024,
   initialAssetsGzipBytes: 115 * 1024,
+  canvasRouteScriptGzipBytes: 380 * 1024,
+  canvasRouteStyleGzipBytes: 32 * 1024,
 };
 
 const formatKiB = (bytes) => `${(bytes / 1024).toFixed(1)} KiB`;
@@ -37,6 +39,21 @@ const assets = await Promise.all(
   }),
 );
 
+const builtAssetNames = await readdir(join(distDirectory, 'assets'));
+const routeAsset = async (pattern, label) => {
+  const matches = builtAssetNames.filter((name) => pattern.test(name));
+  if (matches.length !== 1) {
+    throw new Error(`${label} 构建产物应当恰好有一个，实际找到 ${matches.length} 个。`);
+  }
+  const path = `/assets/${matches[0]}`;
+  const contents = await readFile(join(distDirectory, path.replace(/^\//, '')));
+  return { path, gzipBytes: gzipSync(contents).byteLength };
+};
+const [canvasRouteScript, canvasRouteStyle] = await Promise.all([
+  routeAsset(/^CanvasPage-.*\.js$/, '画板路由 JavaScript'),
+  routeAsset(/^CanvasPage-.*\.css$/, '画板路由 CSS'),
+]);
+
 const entryScripts = assets.filter(({ path }) => path.endsWith('.js'));
 const entryStyles = assets.filter(({ path }) => path.endsWith('.css'));
 const sum = (items, field) => items.reduce((total, item) => total + item[field], 0);
@@ -49,6 +66,8 @@ const measurements = [
   ['首屏 JavaScript', entryScriptGzipBytes, budgets.entryScriptGzipBytes],
   ['首屏 CSS', entryStyleGzipBytes, budgets.entryStyleGzipBytes],
   ['首屏资源合计', initialAssetsGzipBytes, budgets.initialAssetsGzipBytes],
+  ['画板路由 JavaScript', canvasRouteScript.gzipBytes, budgets.canvasRouteScriptGzipBytes],
+  ['画板路由 CSS', canvasRouteStyle.gzipBytes, budgets.canvasRouteStyleGzipBytes],
 ];
 
 for (const asset of assets) {
