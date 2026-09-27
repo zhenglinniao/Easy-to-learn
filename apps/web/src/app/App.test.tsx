@@ -1,10 +1,16 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from './App';
 
 describe('App', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.dataset.theme = 'light';
+    document.documentElement.style.colorScheme = 'light';
+  });
+
   it('展示官网价值主张与两条主要入口', async () => {
     render(<App />);
 
@@ -34,7 +40,6 @@ describe('App', () => {
   });
 
   it('保存并即时应用主题偏好', async () => {
-    localStorage.clear();
     const user = userEvent.setup();
     render(<App />);
 
@@ -43,5 +48,19 @@ describe('App', () => {
     expect(localStorage.getItem('easy-to-learn-theme')).toBe('dark');
     expect(document.documentElement.dataset.theme).toBe('dark');
     expect(screen.getByRole('button', { name: '切换到浅色主题' })).toBeInTheDocument();
+  });
+
+  it('浏览器阻止持久化时仍允许切换主题', async () => {
+    const storageError = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: '切换到深色主题' }));
+
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(screen.getByRole('button', { name: '切换到浅色主题' })).toBeInTheDocument();
+    storageError.mockRestore();
   });
 });
