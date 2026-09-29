@@ -129,6 +129,13 @@ describe('AdminService overview', () => {
     };
     return query;
   };
+  const entitlementQuery = (data: unknown = []) => {
+    const query = {
+      select: vi.fn(() => query),
+      in: vi.fn(() => Promise.resolve({ data, error: null })),
+    };
+    return query;
+  };
 
   it('filters the loaded page, masks email addresses, and counts boards', async () => {
     listUsers.mockResolvedValue({
@@ -154,6 +161,10 @@ describe('AdminService overview', () => {
     const boards = boardQuery([{ owner_id: learner }, { owner_id: learner }]);
     from.mockImplementation((table: string) => {
       if (table === 'boards') return boards;
+      if (table === 'account_entitlements')
+        return entitlementQuery([
+          { user_id: learner, plan_key: 'plus', subscription_status: 'active' },
+        ]);
       if (table === 'security_audit_events') return { insert: insertAudit };
       throw new Error(`unexpected table: ${table}`);
     });
@@ -166,6 +177,8 @@ describe('AdminService overview', () => {
           emailConfirmed: true,
           suspended: false,
           boardCount: 2,
+          plan: 'plus',
+          subscriptionStatus: 'active',
         },
       ],
       pagination: {
@@ -199,6 +212,7 @@ describe('AdminService overview', () => {
       .mockResolvedValueOnce({ data: [{ owner_id: learner }], error: null });
     from.mockImplementation((table: string) => {
       if (table === 'boards') return boards;
+      if (table === 'account_entitlements') return entitlementQuery();
       if (table === 'security_audit_events') return { insert: insertAudit };
       throw new Error(`unexpected table: ${table}`);
     });
@@ -229,6 +243,7 @@ describe('AdminService overview', () => {
     const boards = boardQuery([]);
     from.mockImplementation((table: string) => {
       if (table === 'boards') return boards;
+      if (table === 'account_entitlements') return entitlementQuery();
       if (table === 'security_audit_events') return { insert: insertAudit };
       throw new Error(`unexpected table: ${table}`);
     });

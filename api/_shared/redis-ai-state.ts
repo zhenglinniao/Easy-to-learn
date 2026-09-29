@@ -11,6 +11,7 @@ import {
   shanghaiDayWindow,
   type AiStateStore,
   type ImageQuotaGrant,
+  type QuotaLimits,
   type QuotaGrant,
 } from './ai-state.js';
 import { ApiFault } from './fault.js';
@@ -93,6 +94,12 @@ export class RedisAiStateStore implements AiStateStore {
     private readonly redis: Redis,
     private readonly actorHashSecret: string,
     encryptionKeyBase64: string,
+    private readonly quotaPolicyResolver: (
+      actorKey: string,
+    ) => Promise<{ limits: QuotaLimits; version: number }> = async (actorKey) => ({
+      limits: quotaLimitsForActor(actorKey),
+      version: 1,
+    }),
   ) {
     this.encryptionKey = Buffer.from(encryptionKeyBase64, 'base64');
     if (this.encryptionKey.length !== 32) {
@@ -124,7 +131,8 @@ export class RedisAiStateStore implements AiStateStore {
 
   async status(actorKey: string, now: Date): Promise<QuotaStatus> {
     const day = shanghaiDayWindow(now);
-    const keys = this.counterKeys(actorKey, day.day);
+    const policy = await this.quotaPolicyResolver(actorKey);
+    const keys = this.counterKeys(actorKey, day.day, policy.version);
     const [
       actionDailyRaw,
       actionPeriodRaw,
@@ -155,7 +163,7 @@ export class RedisAiStateStore implements AiStateStore {
     ) {
       throw new ApiFault('DEPENDENCY_UNAVAILABLE', 'AI 状态存储数据无效');
     }
-    const limits = quotaLimitsForActor(actorKey);
+    const limits = policy.limits;
     const actionDailyRemaining = Math.max(0, limits.actionDaily - Number(actionDailyRaw ?? 0));
     const actionPeriodRemaining = Math.max(0, limits.actionPeriod - Number(actionPeriodRaw ?? 0));
     const imageDailyRemaining = Math.max(0, limits.imageDaily - Number(imageDailyRaw ?? 0));
@@ -192,8 +200,9 @@ export class RedisAiStateStore implements AiStateStore {
 
   async reserve(actorKey: string, requestId: string, now: Date): Promise<QuotaGrant> {
     const day = shanghaiDayWindow(now);
-    const limits = quotaLimitsForActor(actorKey);
-    const keys = this.counterKeys(actorKey, day.day);
+    const policy = await this.quotaPolicyResolver(actorKey);
+    const limits = policy.limits;
+    const keys = this.counterKeys(actorKey, day.day, policy.version);
     const raw = await this.redisCall(() =>
       this.redis.eval(
         RESERVE_SCRIPT,
@@ -234,7 +243,8 @@ export class RedisAiStateStore implements AiStateStore {
 
   async refund(actorKey: string, requestId: string, now: Date): Promise<void> {
     const day = shanghaiDayWindow(now);
-    const keys = this.counterKeys(actorKey, day.day);
+    const policy = await this.quotaPolicyResolver(actorKey);
+    const keys = this.counterKeys(actorKey, day.day, policy.version);
     await this.redisCall(() =>
       this.redis.eval(
         REFUND_SCRIPT,
@@ -254,8 +264,9 @@ export class RedisAiStateStore implements AiStateStore {
       throw new ApiFault('INVALID_INPUT', '插画额度必须是正整数');
     }
     const day = shanghaiDayWindow(now);
-    const limits = quotaLimitsForActor(actorKey);
-    const keys = this.counterKeys(actorKey, day.day);
+    const policy = await this.quotaPolicyResolver(actorKey);
+    const limits = policy.limits;
+    const keys = this.counterKeys(actorKey, day.day, policy.version);
     const raw = await this.redisCall(() =>
       this.redis.eval(
         RESERVE_IMAGES_SCRIPT,
@@ -280,7 +291,8 @@ export class RedisAiStateStore implements AiStateStore {
 
   async refundImages(actorKey: string, requestId: string, now: Date): Promise<void> {
     const day = shanghaiDayWindow(now);
-    const keys = this.counterKeys(actorKey, day.day);
+    const policy = await this.quotaPolicyResolver(actorKey);
+    const keys = this.counterKeys(actorKey, day.day, policy.version);
     await this.redisCall(() =>
       this.redis.eval(
         REFUND_IMAGES_SCRIPT,
@@ -329,14 +341,15 @@ export class RedisAiStateStore implements AiStateStore {
     return createHmac('sha256', this.actorHashSecret).update(actorKey).digest('hex');
   }
 
-  private counterKeys(actorKey: string, day: string) {
+  private counterKeys(actorKey: string, day: string, version: number) {
     const actor = this.actorHash(actorKey);
+    const namespace = version > 1 ? `:v${version}` : '';
     return {
       // 沿用旧键，避免发布当天为已经用过额度的用户意外重置日计数。
-      actionDaily: `ai:daily:${actor}:${day}`,
-      actionPeriod: `ai:action:period:${actor}`,
-      imageDaily: `ai:image:day:${actor}:${day}`,
-      imagePeriod: `ai:image:period:${actor}`,
+      actionDaily: `ai:daily:${actor}:${day}${namespace}`,
+      actionPeriod: `ai:action:period:${actor}${namespace}`,
+      imageDaily: `ai:image:day:${actor}:${day}${namespace}`,
+      imagePeriod: `ai:image:period:${actor}${namespace}`,
       rate: `ai:rate:${actor}`,
     };
   }

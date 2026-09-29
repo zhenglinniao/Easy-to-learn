@@ -34,7 +34,7 @@ const result: TutorResultV1 = {
 };
 
 const prepareState = async () => {
-  const state = new MemoryAiStateStore();
+  const state = new MemoryAiStateStore(() => now.getTime());
   await state.cache(
     'user:user-1',
     requestId,

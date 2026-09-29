@@ -1,0 +1,257 @@
+.page {
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 24px 0 72px;
+}
+.heading {
+  margin: 88px 0 36px;
+}
+.heading > p,
+.planCard p,
+.card > p,
+.security p {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.heading h1 {
+  margin: 0;
+  font:
+    500 clamp(40px, 6vw, 68px)/1.05 Georgia,
+    serif;
+  letter-spacing: -0.05em;
+  color: var(--ink);
+}
+.heading span,
+.planCard span,
+.card > span {
+  display: block;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.error,
+.loading {
+  padding: 15px 18px;
+  border-radius: 14px;
+  background: #fff1ed;
+  color: #9a3f2e;
+}
+.loading {
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+  color: var(--muted);
+}
+.planCard,
+.card,
+.security {
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  box-shadow: var(--shadow);
+}
+.planCard {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+  padding: 30px;
+  border-radius: 24px;
+}
+.planCard h2,
+.card h2,
+.security h2 {
+  margin: 0;
+  color: var(--ink);
+  font:
+    500 32px/1.1 Georgia,
+    serif;
+}
+.planAction {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+.planAction button,
+.security a {
+  padding: 11px 15px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--paper);
+  font: inherit;
+  font-weight: 720;
+  text-decoration: none;
+}
+.planAction button:disabled {
+  opacity: 0.55;
+}
+.planAction small {
+  color: var(--muted);
+}
+.upgrades {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.2fr) repeat(2, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+.upgrades > div,
+.upgrades article {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--paper) 90%, transparent);
+}
+.upgrades p {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.upgrades h2 {
+  margin: 0;
+  color: var(--ink);
+  font:
+    500 25px/1.15 Georgia,
+    serif;
+}
+.upgrades span {
+  display: block;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.upgrades article {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+}
+.upgrades article strong {
+  color: var(--ink);
+  font:
+    500 24px/1.1 Georgia,
+    serif;
+}
+.upgrades article button {
+  justify-self: start;
+  margin-top: 8px;
+  padding: 9px 13px;
+  border: 1px solid var(--ink);
+  border-radius: 11px;
+  color: #fffaf3;
+  background: var(--ink);
+  font: inherit;
+  font-weight: 720;
+}
+.upgrades article button:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  background: var(--paper);
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+.card {
+  min-height: 190px;
+  padding: 24px;
+  border-radius: 20px;
+}
+.card h2 {
+  font-size: 30px;
+}
+.usageItem {
+  margin-top: 24px;
+}
+.usageItem > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.usageItem strong {
+  color: var(--ink);
+}
+.usageItem progress {
+  width: 100%;
+  height: 6px;
+  margin-top: 8px;
+  accent-color: var(--accent);
+}
+.meter {
+  height: 6px;
+  margin-top: 28px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+}
+.meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.security {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-top: 36px;
+  padding: 28px 30px;
+  border-radius: 24px;
+}
+.security h2 {
+  font-size: 26px;
+}
+.security nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px;
+}
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .upgrades {
+    grid-template-columns: 1fr 1fr;
+  }
+  .upgrades > div {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 620px) {
+  .page {
+    width: min(100% - 24px, 1180px);
+  }
+  .heading {
+    margin-top: 58px;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .upgrades {
+    grid-template-columns: 1fr;
+  }
+  .upgrades > div {
+    grid-column: auto;
+  }
+  .planCard,
+  .security {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .planAction {
+    justify-items: start;
+  }
+  .security nav {
+    justify-content: flex-start;
+  }
+}

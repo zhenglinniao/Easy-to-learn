@@ -1,4 +1,10 @@
-import { accountDeletionResponseSchema, type AccountDeletionResponse } from '@easy-to-learn/domain';
+import {
+  accountDeletionResponseSchema,
+  billingSummaryResponseSchema,
+  billingRedirectResponseSchema,
+  type AccountDeletionResponse,
+  type BillingSummary,
+} from '@easy-to-learn/domain';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
@@ -39,6 +45,32 @@ export class AccountService {
     if (!data) return null;
     const pending = pendingDeletionSchema.parse(data);
     return { executeAfter: pending.execute_after };
+  }
+
+  async overview(): Promise<BillingSummary> {
+    const response = await this.authorizedFetch('/api/account/overview', { method: 'GET' });
+    if (!response.ok) throw await this.responseError(response);
+    return billingSummaryResponseSchema.parse(await response.json()).data;
+  }
+
+  async checkout(plan: 'plus' | 'pro'): Promise<string> {
+    const response = await this.authorizedFetch('/api/billing/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan }),
+    });
+    if (!response.ok) throw await this.responseError(response);
+    return billingRedirectResponseSchema.parse(await response.json()).data.url;
+  }
+
+  async billingPortal(): Promise<string> {
+    const response = await this.authorizedFetch('/api/billing/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!response.ok) throw await this.responseError(response);
+    return billingRedirectResponseSchema.parse(await response.json()).data.url;
   }
 
   async requestDeletion(): Promise<AccountDeletionResponse['data']> {

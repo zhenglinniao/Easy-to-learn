@@ -41,6 +41,7 @@ export function SiteHeader() {
         {user ? (
           <>
             <Link to="/boards">我的画板</Link>
+            <Link to="/account">账户</Link>
             {isAdmin && (
               <Link
                 className={styles.adminModeSwitch}

@@ -9,10 +9,10 @@ export const AI_PERIOD_MS = 30 * 24 * 60 * 60 * 1_000;
 export const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1_000;
 
 export interface QuotaLimits {
-  actionDaily: 3 | 10;
-  actionPeriod: 15 | 45;
-  imageDaily: 1 | 2;
-  imagePeriod: 3 | 20;
+  actionDaily: number;
+  actionPeriod: number;
+  imageDaily: number;
+  imagePeriod: number;
 }
 
 export const quotaLimitsForActor = (actorKey: string): QuotaLimits =>

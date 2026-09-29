@@ -12,6 +12,7 @@ const ResetPasswordPage = lazy(() => import('../pages/ResetPasswordPage'));
 const LegalPage = lazy(() => import('../pages/LegalPage'));
 const CanvasPage = lazy(() => import('../features/canvas/CanvasPage'));
 const AdminPage = lazy(() => import('../features/admin/AdminPage'));
+const AccountPage = lazy(() => import('../features/account/AccountPage'));
 // Compatibility spikes are developer diagnostics, not product routes. Keeping
 // the imports behind Vite's compile-time DEV flag lets production builds remove
 // their Mermaid/Cytoscape dependency graph entirely.
@@ -37,6 +38,7 @@ export function App() {
               <Route path="/privacy" element={<LegalPage kind="privacy" />} />
               <Route path="/terms" element={<LegalPage kind="terms" />} />
               <Route path="/boards" element={<BoardsPage />} />
+              <Route path="/account" element={<AccountPage />} />
               <Route path="/canvas" element={<CanvasPage />} />
               <Route path="/canvas/:boardId" element={<CanvasPage />} />
               <Route path="/admin" element={<AdminPage />} />

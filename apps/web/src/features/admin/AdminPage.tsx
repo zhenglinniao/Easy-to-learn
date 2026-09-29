@@ -649,6 +649,7 @@ export default function AdminPage() {
           <div className={styles.accountHeader} role="row">
             <span>账户</span>
             <span>状态</span>
+            <span>套餐</span>
             <span>画板</span>
             <span>最近登录</span>
             <span>操作</span>
@@ -661,6 +662,9 @@ export default function AdminPage() {
               </div>
               <span className={account.suspended ? styles.statusSuspended : styles.statusActive}>
                 {account.suspended ? '已暂停' : account.emailConfirmed ? '正常' : '待验证'}
+              </span>
+              <span>
+                {account.plan === 'free' ? '免费版' : account.plan === 'plus' ? 'Plus' : 'Pro'}
               </span>
               <span>{account.boardCount}</span>
               <span>{dateLabel(account.lastSignInAt)}</span>

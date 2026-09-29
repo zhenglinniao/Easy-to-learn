@@ -75,6 +75,8 @@ export interface AdminAccountSummary {
   emailConfirmed: boolean;
   suspended: boolean;
   boardCount: number;
+  plan: 'free' | 'plus' | 'pro';
+  subscriptionStatus: string;
 }
 
 export class AdminService {
@@ -144,6 +146,7 @@ export class AdminService {
       : matchingUsers;
     const userIds = users.map(({ id }) => id);
     const boardCounts = new Map<string, number>();
+    const accountPlans = new Map<string, { plan: 'free' | 'plus' | 'pro'; status: string }>();
     if (userIds.length > 0) {
       let offset = 0;
       while (true) {
@@ -161,6 +164,18 @@ export class AdminService {
         if (batch.length < BOARD_COUNT_BATCH_SIZE) break;
         offset += BOARD_COUNT_BATCH_SIZE;
       }
+      const { data: entitlements, error: entitlementError } = await this.supabase
+        .from('account_entitlements')
+        .select('user_id,plan_key,subscription_status')
+        .in('user_id', userIds);
+      if (entitlementError) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '无法读取账户套餐');
+      for (const entitlement of entitlements ?? []) {
+        const plan = entitlement.plan_key;
+        accountPlans.set(String(entitlement.user_id), {
+          plan: plan === 'plus' || plan === 'pro' ? plan : 'free',
+          status: String(entitlement.subscription_status ?? 'none'),
+        });
+      }
     }
     const accounts = users.map((user): AdminAccountSummary => ({
       id: user.id,
@@ -170,6 +185,8 @@ export class AdminService {
       emailConfirmed: Boolean(user.email_confirmed_at),
       suspended: isSuspended(user),
       boardCount: boardCounts.get(user.id) ?? 0,
+      plan: accountPlans.get(user.id)?.plan ?? 'free',
+      subscriptionStatus: accountPlans.get(user.id)?.status ?? 'none',
     }));
     const configs = loadAiProviderConfigs(process.env);
     const policy = await this.policyStore.read(configs);

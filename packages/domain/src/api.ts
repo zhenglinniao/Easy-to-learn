@@ -69,10 +69,10 @@ export const createDataResponseSchema = <T extends z.ZodType>(dataSchema: T) =>
 
 const actionQuotaSchema = z
   .strictObject({
-    dailyLimit: z.union([z.literal(3), z.literal(10)]),
-    dailyRemaining: nonNegativeIntegerSchema.max(10),
-    periodLimit: z.union([z.literal(15), z.literal(45)]),
-    periodRemaining: nonNegativeIntegerSchema.max(45),
+    dailyLimit: z.number().int().positive().max(100_000),
+    dailyRemaining: nonNegativeIntegerSchema.max(100_000),
+    periodLimit: z.number().int().positive().max(1_000_000),
+    periodRemaining: nonNegativeIntegerSchema.max(1_000_000),
     nextAllowedAt: isoDateTimeSchema.nullable(),
     dailyResetsAt: isoDateTimeSchema,
     periodResetsAt: isoDateTimeSchema.nullable(),
@@ -87,18 +87,18 @@ const actionQuotaSchema = z
   });
 
 const imageQuotaSchema = z.strictObject({
-  dailyLimit: z.union([z.literal(1), z.literal(2)]),
-  dailyRemaining: nonNegativeIntegerSchema.max(2),
-  periodLimit: z.union([z.literal(3), z.literal(20)]),
-  periodRemaining: nonNegativeIntegerSchema.max(20),
+  dailyLimit: z.number().int().positive().max(10_000),
+  dailyRemaining: nonNegativeIntegerSchema.max(10_000),
+  periodLimit: z.number().int().positive().max(100_000),
+  periodRemaining: nonNegativeIntegerSchema.max(100_000),
   periodResetsAt: isoDateTimeSchema.nullable(),
 });
 
 export const quotaStatusSchema = z
   .strictObject({
     // 兼容已发布客户端；新客户端读取 action/image。
-    dailyLimit: z.union([z.literal(3), z.literal(10)]),
-    remaining: nonNegativeIntegerSchema.max(10),
+    dailyLimit: z.number().int().positive().max(100_000),
+    remaining: nonNegativeIntegerSchema.max(100_000),
     nextAllowedAt: isoDateTimeSchema.nullable(),
     action: actionQuotaSchema,
     image: imageQuotaSchema,

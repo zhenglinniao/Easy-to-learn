@@ -10,11 +10,12 @@ import {
   type StoredAdminProvider,
 } from './admin-model-policy.js';
 import { isAdminUserId } from './admin-access.js';
-import { UnlimitedAiStateStore, type AiStateStore } from './ai-state.js';
+import { quotaLimitsForActor, UnlimitedAiStateStore, type AiStateStore } from './ai-state.js';
 import { ApiFault } from './fault.js';
 import { cookieValue, header, type HttpRequest } from './http.js';
 import { resolveTutorPromptVersion, TutorPromptConfigurationError } from './model-prompt.js';
 import { RedisAiStateStore } from './redis-ai-state.js';
+import { quotaPolicyFromEntitlement, SupabaseEntitlementResolver } from './entitlements.js';
 import { verifyAnonymousSession, type SessionKey } from './session.js';
 import {
   TutorService,
@@ -34,6 +35,7 @@ import {
   IllustrationService,
   SenseNovaImageGenerator,
 } from './illustration-service.js';
+import { AccountBillingService, isBillingConfigured } from './account-billing.js';
 
 const required = (name: string): string => {
   const value = process.env[name];
@@ -87,15 +89,38 @@ export const sessionKeysFromEnvironment = (): SessionKey[] => {
 };
 
 export const createAiStateStore = (actor?: TutorActor): AiStateStore => {
+  let entitlementPromise: ReturnType<SupabaseEntitlementResolver['resolve']> | undefined;
+  const entitlementResolver =
+    actor?.kind === 'user'
+      ? new SupabaseEntitlementResolver(
+          required('SUPABASE_URL'),
+          required('SUPABASE_SERVICE_ROLE_KEY'),
+        )
+      : undefined;
   const store = new RedisAiStateStore(
     Redis.fromEnv(),
     required('ACTOR_HASH_SECRET'),
     required('AI_CACHE_ENCRYPTION_KEY'),
+    async (actorKey) => {
+      if (!entitlementResolver || actor?.kind !== 'user') {
+        return { limits: quotaLimitsForActor(actorKey), version: 1 };
+      }
+      entitlementPromise ??= entitlementResolver.resolve(actor.id);
+      return quotaPolicyFromEntitlement(await entitlementPromise);
+    },
   );
   return actor?.kind === 'user' && isAdminUserId(actor.id)
     ? new UnlimitedAiStateStore(store)
     : store;
 };
+
+export const createAccountBillingService = (userId: string): AccountBillingService =>
+  new AccountBillingService(
+    required('SUPABASE_URL'),
+    required('SUPABASE_SERVICE_ROLE_KEY'),
+    createAiStateStore({ kind: 'user', id: userId }),
+    isBillingConfigured(),
+  );
 
 export const createAiFeedbackService = (): AiFeedbackService =>
   new AiFeedbackService(

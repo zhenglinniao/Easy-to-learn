@@ -29,6 +29,12 @@ const tables = [
   'asset_cleanup_jobs',
   'analytics_daily_metrics',
   'analytics_daily_visitors',
+  'account_profiles',
+  'billing_customers',
+  'billing_subscriptions',
+  'account_entitlements',
+  'account_entitlement_overrides',
+  'billing_webhook_events',
 ];
 
 for (const table of tables) {

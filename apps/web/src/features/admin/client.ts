@@ -22,6 +22,8 @@ export interface AdminAccountView {
   emailConfirmed: boolean;
   suspended: boolean;
   boardCount: number;
+  plan: 'free' | 'plus' | 'pro';
+  subscriptionStatus: string;
 }
 
 export interface AdminOverview {

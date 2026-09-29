@@ -30,6 +30,8 @@ const overview = {
       emailConfirmed: true,
       suspended: false,
       boardCount: 2,
+      plan: 'free',
+      subscriptionStatus: 'none',
     },
   ],
   pagination: {

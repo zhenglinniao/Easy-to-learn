@@ -310,7 +310,7 @@
 .accountHeader,
 .accountRow {
   display: grid;
-  grid-template-columns: minmax(230px, 1.4fr) 0.55fr 0.35fr 0.9fr 0.45fr;
+  grid-template-columns: minmax(230px, 1.4fr) 0.55fr 0.45fr 0.35fr 0.9fr 0.45fr;
   align-items: center;
   gap: 12px;
   padding: 11px 14px;

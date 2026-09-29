@@ -71,6 +71,67 @@ describe('AccountService', () => {
     expect(init).toMatchObject({ method: 'POST', credentials: 'same-origin' });
   });
 
+  it('读取账户套餐与真实用量', async () => {
+    const payload = {
+      data: {
+        configured: false,
+        entitlement: {
+          plan: 'free',
+          source: 'free',
+          subscriptionStatus: 'none',
+          actionDailyLimit: 10,
+          actionPeriodLimit: 45,
+          imageDailyLimit: 2,
+          imagePeriodLimit: 20,
+          maxBoards: 100,
+          maxStorageBytes: 1073741824,
+          maxConcurrentAiTasks: 3,
+          modelQualityTier: 'standard',
+          unlimited: false,
+          effectiveUntil: null,
+          version: 1,
+        },
+        quota: {
+          dailyLimit: 10,
+          remaining: 8,
+          nextAllowedAt: null,
+          action: {
+            dailyLimit: 10,
+            dailyRemaining: 8,
+            periodLimit: 45,
+            periodRemaining: 43,
+            nextAllowedAt: null,
+            dailyResetsAt: '2026-09-30T00:00:00.000Z',
+            periodResetsAt: '2026-10-29T00:00:00.000Z',
+          },
+          image: {
+            dailyLimit: 2,
+            dailyRemaining: 2,
+            periodLimit: 20,
+            periodRemaining: 20,
+            periodResetsAt: null,
+          },
+          mode: 'full',
+        },
+        subscription: null,
+        usage: { boards: 2, storageBytes: 4096 },
+      },
+    };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const service = new AccountService(clientWith({ accessToken: 'user-token' }), fetcher);
+
+    await expect(service.overview()).resolves.toMatchObject({ usage: { boards: 2 } });
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/account/overview',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
   it('取消删除请求使用 DELETE', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }));
     const service = new AccountService(clientWith({ accessToken: 'user-token' }), fetcher);
