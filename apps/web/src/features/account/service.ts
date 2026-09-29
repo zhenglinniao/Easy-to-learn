@@ -32,7 +32,9 @@ export class AccountApiError extends Error {
 export class AccountService {
   constructor(
     private readonly client: SupabaseClient,
-    private readonly fetcher: typeof fetch = fetch,
+    // 浏览器原生 fetch 依赖 Window 作为接收者。用包装函数调用，避免作为
+    // AccountService 属性执行时把 `this` 错误绑定到服务实例而触发 Illegal invocation。
+    private readonly fetcher: typeof fetch = (input, init) => globalThis.fetch(input, init),
   ) {}
 
   async pendingDeletion(): Promise<{ executeAfter: string } | null> {

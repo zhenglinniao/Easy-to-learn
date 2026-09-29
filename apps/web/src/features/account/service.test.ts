@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AccountApiError, AccountService } from './service';
 
@@ -28,6 +28,10 @@ const clientWith = (options: {
 };
 
 describe('AccountService', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('读取待删除状态并规范化字段', async () => {
     const client = clientWith({ pending: { execute_after: '2026-10-04T00:00:00.000Z' } });
     const service = new AccountService(client);
@@ -130,6 +134,72 @@ describe('AccountService', () => {
       '/api/account/overview',
       expect.objectContaining({ method: 'GET' }),
     );
+  });
+
+  it('默认 fetch 保持浏览器全局接收者', async () => {
+    const payload = {
+      data: {
+        configured: false,
+        entitlement: {
+          plan: 'free',
+          source: 'free',
+          subscriptionStatus: 'none',
+          actionDailyLimit: 10,
+          actionPeriodLimit: 45,
+          imageDailyLimit: 2,
+          imagePeriodLimit: 20,
+          maxBoards: 100,
+          maxStorageBytes: 1073741824,
+          maxConcurrentAiTasks: 3,
+          modelQualityTier: 'standard',
+          unlimited: false,
+          effectiveUntil: null,
+          version: 1,
+        },
+        quota: {
+          dailyLimit: 10,
+          remaining: 10,
+          nextAllowedAt: null,
+          action: {
+            dailyLimit: 10,
+            dailyRemaining: 10,
+            periodLimit: 45,
+            periodRemaining: 45,
+            nextAllowedAt: null,
+            dailyResetsAt: '2026-09-30T00:00:00.000Z',
+            periodResetsAt: '2026-10-29T00:00:00.000Z',
+          },
+          image: {
+            dailyLimit: 2,
+            dailyRemaining: 2,
+            periodLimit: 20,
+            periodRemaining: 20,
+            periodResetsAt: null,
+          },
+          mode: 'full',
+        },
+        subscription: null,
+        usage: { boards: 0, storageBytes: 0 },
+      },
+    };
+    let calledWithGlobalReceiver = false;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(function (this: unknown) {
+        if (this !== globalThis) throw new TypeError('Illegal invocation');
+        calledWithGlobalReceiver = true;
+        return Promise.resolve(
+          new Response(JSON.stringify(payload), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }),
+    );
+    const service = new AccountService(clientWith({ accessToken: 'user-token' }));
+
+    await expect(service.overview()).resolves.toMatchObject({ configured: false });
+    expect(calledWithGlobalReceiver).toBe(true);
   });
 
   it('取消删除请求使用 DELETE', async () => {
