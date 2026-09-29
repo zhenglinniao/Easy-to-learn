@@ -68,4 +68,35 @@ describe('AccountBillingService', () => {
     expect(isBillingConfigured(complete)).toBe(true);
     expect(isBillingConfigured({ ...complete, STRIPE_WEBHOOK_SECRET: '' })).toBe(false);
   });
+
+  it('将管理员的不限额运行权限明确呈现为管理员权益', async () => {
+    const empty = fluent({ data: null, error: null });
+    const boards = fluent({ count: 0, error: null });
+    boards.eq.mockImplementation(() => Promise.resolve({ count: 0, error: null }) as never);
+    const assets = fluent({ data: [], error: null });
+    const supabase = {
+      from: vi.fn((table: string) =>
+        table === 'billing_subscriptions' ? empty : table === 'boards' ? boards : assets,
+      ),
+    } as unknown as SupabaseClient;
+    const quota = { dailyLimit: 10, remaining: 10, unlimited: true };
+    const service = new AccountBillingService(
+      'u',
+      'k',
+      { status: vi.fn(async () => quota) } as never,
+      false,
+      supabase,
+      { resolve: vi.fn(async () => planEntitlement('free')) } as never,
+    );
+
+    await expect(service.summary('admin-1')).resolves.toMatchObject({
+      entitlement: {
+        plan: 'pro',
+        source: 'admin_override',
+        modelQualityTier: 'premium',
+        unlimited: true,
+      },
+      quota: { unlimited: true },
+    });
+  });
 });

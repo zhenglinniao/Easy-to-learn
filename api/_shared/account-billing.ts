@@ -35,12 +35,22 @@ export class AccountBillingService {
   }
 
   async summary(userId: string, now = new Date()): Promise<BillingSummary> {
-    const [entitlement, quota, subscription, usage] = await Promise.all([
+    const [resolvedEntitlement, quota, subscription, usage] = await Promise.all([
       this.entitlements.resolve(userId),
       this.aiState.status(`user:${userId}`, now),
       this.subscription(userId),
       this.usage(userId),
     ]);
+    const entitlement =
+      quota.unlimited && !resolvedEntitlement.unlimited
+        ? {
+            ...resolvedEntitlement,
+            plan: 'pro' as const,
+            source: 'admin_override' as const,
+            modelQualityTier: 'premium' as const,
+            unlimited: true,
+          }
+        : resolvedEntitlement;
     return {
       configured: this.billingConfigured,
       entitlement,

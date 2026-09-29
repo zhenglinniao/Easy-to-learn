@@ -129,6 +129,28 @@ describe('AccountPage', () => {
     expect(screen.queryByRole('heading', { name: '按学习强度选择额度' })).not.toBeInTheDocument();
   });
 
+  it('明确标识管理员不限额权益', async () => {
+    overview.mockResolvedValue({
+      ...summary,
+      entitlement: {
+        ...summary.entitlement,
+        plan: 'pro',
+        source: 'admin_override',
+        modelQualityTier: 'premium',
+        unlimited: true,
+      },
+      quota: { ...summary.quota, unlimited: true },
+    });
+    render(
+      <MemoryRouter>
+        <AccountPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: '管理员权益' })).toBeInTheDocument();
+    expect(screen.getAllByText('不限额')).toHaveLength(2);
+  });
+
   it('未登录时保留账户目标并跳转登录', async () => {
     useAuth.mockReturnValue({ client: null, user: null, loading: false });
     render(

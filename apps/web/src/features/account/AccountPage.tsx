@@ -107,7 +107,11 @@ export default function AccountPage() {
           <section className={styles.planCard} aria-labelledby="current-plan">
             <div>
               <p>当前套餐</p>
-              <h2 id="current-plan">{planLabel[entitlement.plan]}</h2>
+              <h2 id="current-plan">
+                {entitlement.source === 'admin_override'
+                  ? '管理员权益'
+                  : planLabel[entitlement.plan]}
+              </h2>
               <span>{tierLabel[entitlement.modelQualityTier]}</span>
             </div>
             <div className={styles.planAction}>
