@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(56);
+select plan(57);
 
 select has_table('public', 'boards', '存在 boards 表');
 select has_table('public', 'board_assets', '存在 board_assets 表');
@@ -277,6 +277,26 @@ select throws_ok(
 select set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', true);
 select is((select count(*) from public.board_assets), 0::bigint, '用户 B 看不到用户 A 的资产');
 select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+
+reset role;
+set local role service_role;
+select lives_ok(
+  $$
+    select public.enqueue_account_asset_cleanup(
+      '11111111-1111-4111-8111-111111111111'::uuid,
+      pg_catalog.now() + interval '7 days'
+    );
+    select public.enqueue_account_asset_cleanup(
+      '11111111-1111-4111-8111-111111111111'::uuid,
+      pg_catalog.now() + interval '8 days'
+    );
+  $$,
+  '账户资产重复入队会安全保留较早执行时间'
+);
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
 
 select lives_ok(
   pg_catalog.format(
