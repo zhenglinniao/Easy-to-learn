@@ -64,7 +64,8 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: '创建账户' }));
 
     expect(actions.signUp).toHaveBeenCalledWith('Learner@Example.com', 'Password123!', '/boards');
-    expect(screen.getByText(/验证邮件已发送/)).toBeInTheDocument();
+    expect(screen.getByText(/如果这是尚未注册的邮箱/)).toBeInTheDocument();
+    expect(screen.getByText(/已注册，请切换到登录/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '没收到邮件？重新发送' })).toBeInTheDocument();
   });
 

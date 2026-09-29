@@ -72,7 +72,9 @@ export default function LoginPage() {
       const result = await signUp(email, password, target);
       if (result.requiresEmailConfirmation) {
         setPendingEmail(email.trim().toLowerCase());
-        setSuccess('验证邮件已发送。请在同一浏览器打开邮件中的链接完成注册。');
+        setSuccess(
+          '如果这是尚未注册的邮箱，验证邮件已发送。请检查收件箱和垃圾邮件；如果该邮箱已注册，请切换到登录或使用“忘记密码”。',
+        );
       } else {
         navigate(target, { replace: true });
       }
@@ -102,7 +104,9 @@ export default function LoginPage() {
     setError(null);
     try {
       await resendSignUpConfirmation(pendingEmail, target);
-      setSuccess('新的验证邮件已发送，请以最新一封邮件为准。');
+      setSuccess(
+        '如果该邮箱仍在等待验证，新的验证邮件已发送。已注册或已验证的账户请直接登录或重置密码。',
+      );
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '暂时无法重新发送验证邮件。');
     } finally {
