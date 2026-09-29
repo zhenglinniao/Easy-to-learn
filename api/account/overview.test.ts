@@ -11,7 +11,7 @@ vi.mock('../_shared/runtime.js', () => ({
   resolveAuthenticatedAccount,
 }));
 
-import handler from './overview.js';
+import { overviewHandler as handler } from './[action].js';
 
 const response = () => {
   let statusCode = 200;

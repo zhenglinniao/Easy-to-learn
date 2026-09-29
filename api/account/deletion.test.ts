@@ -14,7 +14,7 @@ vi.mock('../_shared/runtime.js', () => ({
   resolveAuthenticatedAccount,
 }));
 
-import handler from './deletion.js';
+import { deletionHandler as handler } from './[action].js';
 
 const createResponse = () => {
   const headers = new Map<string, string>();
