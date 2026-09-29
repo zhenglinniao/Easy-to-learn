@@ -142,6 +142,12 @@ describe('TutorService', () => {
       expect.stringContaining('schemaVersion'),
       expect.anything(),
     );
+    expect(generate).toHaveBeenNthCalledWith(
+      2,
+      request,
+      expect.stringContaining('顶层 mode 必须精确等于 solve'),
+      expect.anything(),
+    );
 
     const invalidState = new MemoryAiStateStore();
     const invalidGenerate = vi
@@ -163,6 +169,21 @@ describe('TutorService', () => {
       data: { quota: { remaining: 2 } },
     });
     expect(invalidGenerate).toHaveBeenCalledTimes(3);
+  });
+
+  it('确定性修复唯一的模型 mode 漂移并重新执行完整校验', async () => {
+    const generate = vi.fn().mockResolvedValue({ ...result, mode: 'explain_step' });
+    const service = new TutorService(
+      new MemoryAiStateStore(),
+      { generate },
+      boards,
+      () => new Date('2026-09-22T00:00:00.000Z'),
+    );
+
+    await expect(service.execute(actor, request)).resolves.toMatchObject({
+      data: { result: { mode: 'solve', title: '一元一次方程' } },
+    });
+    expect(generate).toHaveBeenCalledOnce();
   });
 
   it('拒绝 Explain step 复述原步骤并要求拆成新增信息的微步骤', async () => {

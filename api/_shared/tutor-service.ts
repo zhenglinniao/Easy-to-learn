@@ -44,13 +44,17 @@ const providerFailureDetails = (error: unknown): Record<string, string> => {
   return details;
 };
 
-const correctionFromIssues = (issues: Array<{ path: PropertyKey[]; message: string }>): string => {
+const correctionFromIssues = (
+  request: TutorRequest,
+  issues: Array<{ path: PropertyKey[]; message: string }>,
+): string => {
   const details = issues
     .slice(0, 8)
     .map(({ path, message }) => `${path.length ? path.join('.') : '<root>'}: ${message}`)
     .join('；');
   return [
     '上一次输出未通过 Tutor DSL。只返回符合 JSON Schema 的 JSON，不要添加未定义字段。',
+    `当前请求模式固定为 ${request.mode}；顶层 mode 必须精确等于 ${request.mode}。`,
     `需要修正：${details}`,
   ].join('\n');
 };
@@ -292,6 +296,44 @@ const normalizeKnownModelDrift = (candidate: unknown): unknown => {
   };
 };
 
+// 部分仅支持提示词约束的模型偶尔会生成完全合法的 Tutor DSL，却把顶层
+// mode 写成另一个枚举值。只有 mode 是唯一问题时才尝试确定性纠正，并在
+// 修改后重新执行完整 Schema 与请求语义校验；任何其他漂移仍进入模型纠错。
+const repairModeOnlyDrift = (
+  request: TutorRequest,
+  candidate: unknown,
+  issues: TutorValidationIssue[],
+): TutorResultV1 | undefined => {
+  if (
+    request.mode === 'hint' ||
+    issues.length !== 1 ||
+    issues[0]?.path.length !== 1 ||
+    issues[0]?.path[0] !== 'mode'
+  ) {
+    return undefined;
+  }
+  const normalized = normalizeKnownModelDrift(candidate);
+  if (normalized === null || typeof normalized !== 'object' || Array.isArray(normalized)) {
+    return undefined;
+  }
+  const repaired: Record<string, unknown> = {
+    ...(normalized as Record<string, unknown>),
+    mode: request.mode,
+  };
+  if (request.mode === 'explain_step') delete repaired.answerPresentation;
+  delete repaired.hintLevel;
+  if (Array.isArray(repaired.steps)) {
+    repaired.steps = repaired.steps.map((step) => {
+      if (step === null || typeof step !== 'object' || Array.isArray(step)) return step;
+      const safeStep = { ...(step as Record<string, unknown>) };
+      delete safeStep.hintLevel;
+      return safeStep;
+    });
+  }
+  const validated = validateTutorCandidate(request, repaired);
+  return validated.success ? validated.data : undefined;
+};
+
 export class TutorService {
   constructor(
     private readonly state: AiStateStore,
@@ -351,6 +393,22 @@ export class TutorService {
             executionController.signal,
           );
           let validated = validateTutorCandidate(request, candidate);
+          if (!validated.success) {
+            const repaired = repairModeOnlyDrift(request, candidate, validated.issues);
+            if (repaired) {
+              console.info(
+                JSON.stringify({
+                  timestamp: this.now().toISOString(),
+                  level: 'info',
+                  event: 'ai_model_mode_drift_repaired',
+                  requestId: request.requestId,
+                  providerIndex,
+                  requestedMode: request.mode,
+                }),
+              );
+              validated = { success: true, data: repaired, issues: [] };
+            }
+          }
           const initialIssues = validated.success ? [] : safeIssueSummary(validated.issues);
           const isLastProvider = providerIndex === candidates.length - 1;
           // 有备用模型时直接回退，避免慢模型再做一次纠错并耗尽整条 52 秒预算。
@@ -358,7 +416,7 @@ export class TutorService {
           if (!validated.success && isLastProvider) {
             candidate = await candidateModel.generate(
               request,
-              correctionFromIssues(validated.issues),
+              correctionFromIssues(request, validated.issues),
               executionController.signal,
             );
             validated = validateTutorCandidate(request, candidate);

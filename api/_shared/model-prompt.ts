@@ -81,6 +81,7 @@ export const buildTutorPrompt = (
     getPromptDefinition(promptVersion).modeInstructions;
   return [
     modeInstruction[request.mode],
+    `当前请求模式固定为 ${request.mode}；顶层 mode 必须精确输出为 "${request.mode}"，不得自行切换模式。`,
     '输出契约：只返回一个 JSON 对象；顶层必须包含 schemaVersion、mode、title、steps；不得输出 rawHtml、boardHtml、finalAnswer 或未定义字段。每个 step 必须包含 id、title、blocks，blocks 只能使用 Tutor DSL 已支持的类型。',
     request.text ? `题目文字：${request.text}` : '',
     request.parentContext ? `父辅导板标题：${request.parentContext.title}` : '',
