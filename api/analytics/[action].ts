@@ -83,7 +83,15 @@ export const visitHandler = async (request: HttpRequest, response: HttpResponse)
       p_visitor_hash: hashVisitorId(visitorId, secret),
       p_seen_at: new Date().toISOString(),
     });
-    if (error) throw new ApiFault('DEPENDENCY_UNAVAILABLE', '访问统计暂时不可用');
+    if (error) {
+      console.error(
+        JSON.stringify({
+          event: 'analytics_visit_rpc_failed',
+          dependencyCode: error.code,
+        }),
+      );
+      throw new ApiFault('DEPENDENCY_UNAVAILABLE', '访问统计暂时不可用');
+    }
     response.setHeader('Cache-Control', 'no-store');
     response.status(204).end();
   } catch (error) {
